@@ -3,6 +3,7 @@ import { sharedMemoryAvailable, threadPlan } from './capabilities';
 export type EngineStatus = {
   backend: 'webgpu' | 'wasm'; precision: 'fp16' | 'fp32'; ortThreads: number;
   searchThreads: 1; validated: boolean; messages: string[];
+  maxBatch: number;
 };
 export type EngineMessage = { type: string; [key: string]: unknown };
 
@@ -65,11 +66,11 @@ export class BrowserEngine {
     throw new Error(messages.join('\n'));
   }
 
-  analyze(sgf: string, config?: Record<string, unknown>): void {
+  analyze(sgf: string, config?: Record<string, unknown>, searchOptions?: { rootSymmetries?: number; batchSize?: number }): void {
     if (!this.worker || !this.ready) throw new Error('Initialize the engine first.');
     if (this.running) throw new Error('An analysis is already running.');
     this.running = true;
-    this.worker.postMessage({ type: 'analyze', sgf, config });
+    this.worker.postMessage({ type: 'analyze', sgf, config, searchOptions });
   }
 
   dispose(): void {

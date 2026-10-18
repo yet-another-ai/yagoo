@@ -7,6 +7,8 @@ import { resolve, extname, sep } from 'node:path';
 import assert from 'node:assert/strict';
 
 const mode = process.argv[2] ?? 'wasm-threads';
+const gpu = mode.startsWith('webgpu');
+const batched = mode.endsWith('-batch');
 const isolated = mode !== 'wasm-single' && mode !== 'service-worker';
 const root = resolve('dist');
 const artifacts = resolve('../../.yagoo-data/browser-smoke', mode);
@@ -53,7 +55,7 @@ try {
       gpu: adapter ? { features: [...adapter.features], info: { vendor: adapter.info.vendor, architecture: adapter.info.architecture, device: adapter.info.device, description: adapter.info.description } } : null };
   });
   console.log(JSON.stringify({ mode, capabilities }));
-  if (mode !== 'webgpu') await page.locator('#wasm').check();
+  if (!gpu) await page.locator('#wasm').check();
   await page.locator('#threads').fill('4');
   await page.getByRole('button', { name: 'Load and validate model' }).click();
   // Generous liveness bound; no recorded duration or throughput requirement.
@@ -62,9 +64,13 @@ try {
   console.log(status);
   await writeFile(resolve(artifacts, 'initialization.json'), JSON.stringify({ mode, capabilities, status }, null, 2));
   assert.equal(await page.locator('#scan').isEnabled(), true, status);
-  if (mode === 'webgpu') assert.match(status, /^webgpu /, 'A Wasm fallback does not pass the WebGPU smoke');
+  if (gpu) assert.match(status, /^webgpu /, 'A Wasm fallback does not pass the WebGPU smoke');
+  if (batched) {
+    assert.match(status, /Maximum neural batch: 4/);
+    await page.locator('#symmetries').check();
+  }
   const ortWorkers = [...targets.values()].filter(t => t.type === 'worker' && /ort-wasm.*\.mjs/.test(t.url));
-  if (mode === 'wasm-threads' || mode === 'service-worker') {
+  if (mode === 'wasm-threads' || mode === 'wasm-batch' || mode === 'service-worker') {
     assert.equal(capabilities.isolated, true);
     assert.match(status, /ORT 4 thread\(s\)/);
     assert.equal(ortWorkers.length, 3, 'Four ORT threads require the calling worker plus three pthread workers');
@@ -77,6 +83,10 @@ try {
   await page.getByRole('button', { name: 'Scan only', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('#events').textContent.includes('"type":"gameCompleted"') || /Error:/.test(document.querySelector('#status').textContent), null, { timeout: 300_000 });
   assert.match(await page.locator('#events').innerText(), /"type":"gameCompleted"/, await page.locator('#status').innerText());
+  if (batched) {
+    await page.waitForFunction(() => document.querySelector('#status').textContent.includes('Largest actual NN batch: 4'));
+    assert.match(await page.locator('#status').innerText(), /neural evaluations: 24/);
+  }
   const downloaded = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download events' }).click();
   await (await downloaded).saveAs(resolve(artifacts, 'events.ndjson'));
@@ -92,10 +102,10 @@ try {
     assert.ok(Number.isFinite(snapshot.root.scoreLead));
   }
   await page.screenshot({ path: resolve(artifacts, 'page.png'), fullPage: true });
-  await writeFile(resolve(artifacts, 'result.json'), JSON.stringify({ mode, capabilities, status, ortWorkers, eventCount: events.length, positions: positions.length }, null, 2));
-  if (mode === 'webgpu') {
+  await writeFile(resolve(artifacts, 'result.json'), JSON.stringify({ mode, capabilities, status, scanSummary: await page.locator('#status').innerText(), ortWorkers, eventCount: events.length, positions: positions.length }, null, 2));
+  if (gpu) {
     await page.locator('#sgf').fill('(;SZ[9]KM[7.5]RU[Chinese];B[cc])');
-    await page.locator('#visits').fill('4');
+    await page.locator('#visits').fill(batched ? '8' : '4');
     await page.locator('#all').check();
     await page.getByRole('button', { name: 'Scan and deepen', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('#events').textContent.includes('"type":"gameCompleted"') || /failed|not implemented|Error:/.test(document.querySelector('#status').textContent), null, { timeout: 300_000 });
@@ -108,9 +118,28 @@ try {
     assert.equal(deepEvents.filter(e => e.type === 'stageCompleted' && e.phase === 'deep' && e.stage === 'pass_probe' && !e.skipped).length, 2);
     const roots = deepEvents.filter(e => e.type === 'positionCompleted' && e.phase === 'deep');
     for (const { snapshot } of roots) {
-      assert.equal(snapshot.root.visits, 4);
+      assert.equal(snapshot.root.visits, batched ? 8 : 4);
       assert.ok(snapshot.candidates.length > 0);
       assert.ok(snapshot.candidates.every(c => c.pv.length > 0));
+    }
+    await page.locator('#sgf').fill('(;SZ[9]KM[7.5]RU[Chinese];B[];W[])');
+    await page.getByRole('button', { name: 'Scan and deepen', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('#events').textContent.includes('"type":"gameCompleted"') || /Error:/.test(document.querySelector('#status').textContent), null, { timeout: 300_000 });
+    assert.match(await page.locator('#events').innerText(), /"type":"gameCompleted"/, await page.locator('#status').innerText());
+    const terminalDownload = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Download events' }).click();
+    await (await terminalDownload).saveAs(resolve(artifacts, 'terminal-events.ndjson'));
+    const terminalEvents = (await readFile(resolve(artifacts, 'terminal-events.ndjson'), 'utf8')).trim().split('\n').map(JSON.parse);
+    const ended = terminalEvents.filter(e => e.type === 'positionCompleted' && e.snapshot.ply === 2);
+    assert.equal(ended.length, 2, 'Final position completes both scan and deep');
+    for (const { snapshot } of ended) {
+      assert.equal(snapshot.root.visits, 1);
+      assert.equal(snapshot.root.scoreLead, -7.5);
+      assert.equal(snapshot.root.winrate, 0);
+      assert.ok(snapshot.root.policy.every(v => v === 0));
+      assert.ok(snapshot.root.ownership.every(v => v === 0));
+      assert.equal(snapshot.candidates?.length ?? 0, 0);
+      assert.equal(snapshot.passProbeSkipped, snapshot.phase === 'deep' ? 'previous_was_pass' : 'disabled_in_phase');
     }
     await page.locator('#sgf').fill('(;SZ[9]KM[6.5]RU[Japanese];B[];W[])');
     await page.getByRole('button', { name: 'Scan only', exact: true }).click();

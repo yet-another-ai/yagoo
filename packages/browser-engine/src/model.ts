@@ -1,17 +1,18 @@
 export interface Artifact { url: string; bytes: number; sha256: string; integrity: string }
 export interface Manifest {
   schemaVersion: 1; model: string; swa: true; modelVersion: number; inputVersion: 7;
-  boardSize: 19; batch: number; outputs: string[];
+  boardSize: 19; batch: number; maxBatch?: number; outputs: string[];
   variants: { fp32: Artifact; fp16?: Artifact }; warmup: Artifact;
   postprocess: Record<string, number>; license: string; source: string;
 }
 
 export function validateManifest(value: unknown): Manifest {
   const m = value as Manifest;
-  if (!m || m.schemaVersion !== 1 || m.swa !== true || m.inputVersion !== 7 || m.boardSize !== 19 || m.batch !== 1 ||
+  if (!m || m.schemaVersion !== 1 || m.swa !== true || m.inputVersion !== 7 || m.boardSize !== 19 || ![0, 1].includes(m.batch) ||
       ![14, 15].includes(m.modelVersion) || !m.model?.startsWith('kata1-b18c384nbt-')) {
-    throw new Error('Expected a validated b18 SWA V7 model bundle with fixed batch 1.');
+    throw new Error('Expected a validated b18 SWA V7 model bundle with fixed batch 1 or bounded dynamic batches.');
   }
+  if (m.batch === 0 && (!Number.isInteger(m.maxBatch) || m.maxBatch! < 1 || m.maxBatch! > 4)) throw new Error('Dynamic model maxBatch must be 1..4.');
   for (const name of ['policy', 'value', 'miscvalue', 'ownership', 'scorebelief_logprobs']) {
     if (!m.outputs.includes(name)) throw new Error(`Model is missing ${name}.`);
   }

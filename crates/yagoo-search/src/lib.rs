@@ -4,7 +4,9 @@
 use futures::future::LocalBoxFuture;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::{HashMap, VecDeque};
+mod search;
+mod symmetry;
+mod terminal;
 use yagoo_core::{
     nn_features::{encode_v7, FeatureRules, V7Features, NN_AREA, NN_LEN},
     Color, GameState, Point, Ruleset,
@@ -36,15 +38,33 @@ pub struct RawHeads {
 }
 
 pub trait NnEvaluator {
-    fn evaluate<'a>(
+    /// One asynchronous inference call, preserving the input row order.
+    fn evaluate_batch<'a>(
         &'a self,
-        input: &'a V7Features,
-    ) -> LocalBoxFuture<'a, Result<RawHeads, String>>;
+        inputs: &'a [V7Features],
+    ) -> LocalBoxFuture<'a, Result<Vec<RawHeads>, String>>;
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+pub struct SearchOptions {
+    pub root_symmetries: usize,
+    pub batch_size: usize,
+}
+
+impl Default for SearchOptions {
+    fn default() -> Self {
+        Self {
+            root_symmetries: 1,
+            batch_size: 1,
+        }
+    }
 }
 
 pub struct SearchEngine<E> {
     pub evaluator: E,
     pub postprocess: Postprocess,
+    pub options: SearchOptions,
 }
 
 #[derive(Clone)]
@@ -53,7 +73,7 @@ struct Evaluation {
     winrate: f64,
     lead: f64,
     ownership: Vec<f64>,
-    raw: RawHeads,
+    raw: Option<RawHeads>,
 }
 
 struct Node {
@@ -176,8 +196,10 @@ fn replay(query: &AnalysisQuery) -> Result<(GameState, FeatureRules), String> {
         }
         game.play_gtp(coord).map_err(|e| e.to_string())?;
     }
-    if game.consecutive_passes() >= 2 {
-        return Err("Terminal scoring and Japanese encore are not implemented".into());
+    if game.consecutive_passes() >= 2 && rules == FeatureRules::Japanese {
+        return Err(
+            "Japanese encore legality, features and territory scoring are not implemented".into(),
+        );
     }
     Ok((game, rules))
 }
@@ -244,7 +266,7 @@ fn process(
         },
         lead: sign * f64::from(raw.miscvalue[2]) * post.lead_multiplier,
         ownership,
-        raw,
+        raw: Some(raw),
     })
 }
 
@@ -367,9 +389,13 @@ fn response(
         infos.push(info);
     }
     let mut value = json!({ "id": query.id, "isDuringSearch": partial,
+        "isTerminal": root.eval.raw.is_none(),
         "rootInfo": { "visits": root.visits, "winrate": root.mean(root.win_sum), "scoreLead": root.mean(root.lead_sum), "utility": root.mean(root.utility_sum) },
-        "moveInfos": infos, "raw": { "perspective": "toPlay", "scoreBeliefLogProbs": root.eval.raw.scorebelief_logprobs,
-            "seki": root.eval.raw.seki, "futurepos": root.eval.raw.futurepos } });
+        "moveInfos": infos });
+    if let Some(raw) = &root.eval.raw {
+        value["raw"] = json!({ "perspective": "toPlay", "sampleSymmetry": "identity", "scoreBeliefLogProbs": raw.scorebelief_logprobs,
+            "seki": raw.seki, "futurepos": raw.futurepos });
+    }
     if query.include_policy == Some(true) {
         value["policy"] = json!(root.eval.policy);
     }
@@ -380,158 +406,6 @@ fn response(
         value["ownershipStdev"] = json!(stdev);
     }
     serde_json::from_value(value).map_err(Into::into)
-}
-
-type SelectedLeaf = (Vec<usize>, GameState, Option<(usize, usize)>);
-
-/// Follow PUCT edges until an unexpanded move is found.
-fn select_leaf(nodes: &[Node], game: &GameState) -> Result<SelectedLeaf, String> {
-    let mut path = Vec::new();
-    if nodes.is_empty() {
-        return Ok((path, game.clone(), None));
-    }
-    let mut cursor = 0;
-    loop {
-        path.push(cursor);
-        let node = &nodes[cursor];
-        let sign = if node.game.to_play() == Color::Black {
-            1.0
-        } else {
-            -1.0
-        };
-        let mass: f64 = node
-            .children
-            .iter()
-            .map(|(m, _)| node.eval.policy[*m])
-            .sum();
-        let fpu = sign * utility(node.eval.winrate, node.eval.lead) - 0.2 * mass.sqrt();
-        let cpuct = 1.1 + (1.0 + f64::from(node.visits) / 19652.0).ln();
-        let mut selected = None;
-        let mut best = f64::NEG_INFINITY;
-        for (mv, prior) in node
-            .eval
-            .policy
-            .iter()
-            .enumerate()
-            .filter(|(_, p)| **p > 0.0)
-        {
-            let child = node
-                .children
-                .iter()
-                .find(|(m, _)| *m == mv)
-                .map(|(_, i)| *i);
-            let (q, n) = child.map_or((fpu, 0), |i| {
-                (sign * nodes[i].mean(nodes[i].utility_sum), nodes[i].visits)
-            });
-            let score = q + cpuct * prior * f64::from(node.visits).sqrt() / (1.0 + f64::from(n));
-            if score > best {
-                best = score;
-                selected = Some((mv, child));
-            }
-        }
-        let (mv, child) = selected.ok_or("No legal search move")?;
-        if let Some(child) = child {
-            cursor = child;
-        } else {
-            let next = play(&node.game, mv)?;
-            if next.consecutive_passes() >= 2 {
-                return Err("Search reached two passes: terminal scoring and Japanese encore are not implemented; no final analysis produced".into());
-            }
-            return Ok((path, next, Some((cursor, mv))));
-        }
-    }
-}
-
-impl<E: NnEvaluator> AnalysisEngine for SearchEngine<E> {
-    fn analyze_streaming<'a>(
-        &'a self,
-        query: &'a AnalysisQuery,
-        on_update: &'a mut UpdateCallback<'_>,
-    ) -> LocalBoxFuture<'a, KatagoResult<()>> {
-        Box::pin(async move {
-            for scale in [
-                self.postprocess.scoremean_multiplier,
-                self.postprocess.scorestdev_multiplier,
-                self.postprocess.lead_multiplier,
-            ] {
-                if !scale.is_finite() || scale <= 0.0 {
-                    return Err(fail(&query.id, "Invalid neural postprocessing scale"));
-                }
-            }
-            let (game, rules) = replay(query).map_err(|e| fail(&query.id, e))?;
-            let visits = query.max_visits.unwrap_or(200);
-            if !(1..=10_000).contains(&visits) {
-                return Err(fail(&query.id, "Browser visit budget must be 1..10000"));
-            }
-            let mut nodes: Vec<Node> = Vec::new();
-            let mut cache = HashMap::<Vec<u32>, Evaluation>::new();
-            let mut cache_order = VecDeque::new();
-            for visit in 0..visits {
-                let (mut path, next_game, edge) =
-                    select_leaf(&nodes, &game).map_err(|e| fail(&query.id, e))?;
-                let evaluation = if edge.is_none() && !nodes.is_empty() {
-                    nodes[*path.last().expect("search path")].eval.clone()
-                } else {
-                    let input =
-                        encode_v7(&next_game, rules, query.komi.unwrap_or(7.5) as f32, false)
-                            .map_err(|e| fail(&query.id, e))?;
-                    let mut key: Vec<u32> = input
-                        .spatial
-                        .iter()
-                        .chain(&input.global)
-                        .map(|x| x.to_bits())
-                        .chain(input.legal.iter().map(|b| u32::from(*b)))
-                        .collect();
-                    // Cached evaluations are black-positive, unlike the relative NN inputs.
-                    key.push(u32::from(next_game.to_play() == Color::Black));
-                    if let Some(value) = cache.get(&key) {
-                        value.clone()
-                    } else {
-                        let raw = self
-                            .evaluator
-                            .evaluate(&input)
-                            .await
-                            .map_err(|e| fail(&query.id, e))?;
-                        let value = process(raw, &next_game, &input.legal, &self.postprocess)
-                            .map_err(|e| fail(&query.id, e))?;
-                        if cache.len() >= 256 {
-                            if let Some(old) = cache_order.pop_front() {
-                                cache.remove(&old);
-                            }
-                        }
-                        cache_order.push_back(key.clone());
-                        cache.insert(key, value.clone());
-                        value
-                    }
-                };
-                if nodes.is_empty() || edge.is_some() {
-                    let index = nodes.len();
-                    nodes.push(Node::new(next_game, evaluation.clone()));
-                    path.push(index);
-                    if let Some((parent, mv)) = edge {
-                        nodes[parent].children.push((mv, index));
-                    }
-                }
-                let u = utility(evaluation.winrate, evaluation.lead);
-                for index in path {
-                    let node = &mut nodes[index];
-                    node.visits += 1;
-                    node.win_sum += evaluation.winrate;
-                    node.lead_sum += evaluation.lead;
-                    node.utility_sum += u;
-                    node.utility_sq_sum += u * u;
-                }
-                if query.report_during_search_every.is_some()
-                    && visit > 0
-                    && visit % 8 == 0
-                    && visit + 1 < visits
-                {
-                    on_update(AnalysisUpdate::Partial(response(&nodes, query, true)?))?;
-                }
-            }
-            on_update(AnalysisUpdate::Final(response(&nodes, query, false)?))
-        })
-    }
 }
 
 #[cfg(test)]
@@ -583,10 +457,11 @@ mod tests {
     fn terminal_history_and_unsupported_rules_are_explicit_errors() {
         let query = AnalysisQueryBuilder::new("terminal")
             .board_size(9)
+            .rules("japanese")
             .push_move(Color::Black, "pass")
             .push_move(Color::White, "pass")
             .build();
-        assert!(replay(&query).unwrap_err().contains("Terminal scoring"));
+        assert!(replay(&query).unwrap_err().contains("encore"));
         let query = AnalysisQueryBuilder::new("rules")
             .rules("tromp-taylor")
             .build();
@@ -602,8 +477,12 @@ mod tests {
         evaluation.policy[81] = 1.0;
         let mut root = Node::new(game.clone(), evaluation);
         root.visits = 1;
-        assert!(select_leaf(&[root], &game)
-            .unwrap_err()
-            .contains("two passes"));
+        let leaf = search::select_leaf(&[root], &search::Reservations::new(1))
+            .unwrap()
+            .unwrap();
+        assert!(terminal::evaluate(&leaf.game, FeatureRules::Japanese, 6.5)
+            .err()
+            .unwrap()
+            .contains("encore"));
     }
 }

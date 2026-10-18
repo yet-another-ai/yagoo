@@ -19,11 +19,16 @@ native KataGo. The checkpoint reports model version **14**, despite the version
   is retained when building queries, including setup and pass moves.
 - The browser package has a standalone load/scan/deepen/stop/download page.
   Model bytes are verified before use and cached in OPFS when available.
-- The current search is serial PUCT with FPU, an evaluation cache, partial
-  events, candidate/PV output and tree ownership aggregation. It rejects
-  unsupported rules and query settings. Reaching two passes fails explicitly;
-  terminal scoring and Japanese encore are not implemented. It does not mask
-  the second pass or silently substitute a neural estimate for a terminal score.
+- Experimental PUCT/FPU search has a bounded cache, partial events, candidates,
+  PVs and tree ownership. Optional eight-way root symmetry averages probabilities
+  and ownership after inverse transforms. Async batches of up to four reserve
+  distinct unexpanded edges, apply temporary virtual losses, preserve row order
+  and honor the remaining visit budget. Failure discards the query's tree.
+- Chinese/Chinese-OGS two-pass endings use exact area scoring without a neural
+  call or further continuations. Thirty cases match upstream C++ BoardHistory,
+  including handicap compensation, draws and a Benson-alive enclosing chain.
+  Japanese encore remains explicitly unsupported, including when search reaches
+  it. No second pass is masked and no neural estimate substitutes for its score.
 
 ## Threading and hosting
 
@@ -31,7 +36,9 @@ ORT CPU inference supports an actual shared-memory pthread pool. Its requested
 thread count defaults to four and is capped at eight and `hardwareConcurrency - 1`
 (minimum one). The calling engine worker counts as one ORT thread. Rust search
 currently runs on that same worker, awaiting inference; there is no second Rust
-thread pool. This is **not** parallel Rust MCTS or virtual-loss batching.
+thread pool. Rust forms asynchronous batches with virtual reservations on that
+worker; it does not run parallel CPU tree traversals. This avoids oversubscribing
+the ORT pool while allowing actual multi-row inference.
 
 Multiple ORT threads require cross-origin isolation, SharedArrayBuffer, and
 shared WebAssembly memory. Without them, the UI explains its single-thread
@@ -76,17 +83,22 @@ Do not use third-party AGPL exporter code. With `model.ckpt` extracted:
 
 ```sh
 uv sync --project python --extra web
-uv run --project python --extra web python python/web/export_model.py --katago-source /path/to/KataGo --checkpoint /path/to/model.ckpt --out .yagoo-data/web-model --trunk --fp16
+uv run --project python --extra web python python/web/export_model.py --katago-source /path/to/KataGo --checkpoint /path/to/model.ckpt --out .yagoo-data/web-model --batch 0 --trunk
 ```
 
-Copy `manifest.json`, `warmup.json`, both `.onnx` files and
+`--batch 0` exports a dynamic batch with an explicitly supported maximum of four;
+the default `--batch 1` retains a fixed single-row model. The exporter checks
+varied valid inputs at batches two, three and four against PyTorch and single-row
+ORT. `--fp16` additionally exports an optional half-precision variant.
+
+Copy `manifest.json`, `warmup.json`, the exported `.onnx` files and
 `KATAGO_NETWORK_LICENSE.txt` into `packages/browser-engine/public/models` before
 building, or supply a hosted manifest URL in the page. Generated model and runtime
 binaries are ignored by Git. The existing `@yagoo/ui` reviewer remains independent.
 
 ## Local evidence (DELTON-WS, 2026-10-18)
 
-- Workspace Clippy with `-D warnings`, all 43 Rust tests (including the 72-position
+- Workspace Clippy with `-D warnings`, all 50 Rust tests (including the 72-position
   golden comparison), Wasm release build, TypeScript check and Vite production
   build passed. The five browser unit tests, 28 existing UI tests, UI typecheck
   and documentation build also passed.
@@ -104,7 +116,7 @@ binaries are ignored by Git. The existing `@yagoo/ui` reviewer remains independe
   observed, and the same real-model scan completed successfully.
 - **Real fp32 WebGPU passed** on Chrome with an NVIDIA Lovelace adapter, with
   CPU execution-provider fallback disabled. The same real-model scan completed.
-  A two-position deep analysis with four visits per root and pass probe also
+  A two-position deep analysis with eight visits per root and pass probe also
   completed with candidates and PVs. A separate two-pass Japanese SGF produced
   a visible terminal-scoring error and no `gameCompleted` event.
   fp16 is **not validated** on this GPU: its policy warmup differs beyond the
@@ -115,6 +127,19 @@ binaries are ignored by Git. The existing `@yagoo/ui` reviewer remains independe
   ReduceLogSumExp now use an explicit maximum shift. This removes the observed
   nonfinite scorebelief result, without suppressing finite checks or relaxing
   numerical tolerances. Further fp16 GPU alignment remains open.
+- Dynamic fp32 export with varied inputs passed batches two, three and four;
+  maximum absolute error across all exported outputs was `0.000123978`. Real WebGPU and four-thread Wasm both
+  passed the three-position scan using eight root symmetries and actual batch
+  four (24 neural evaluations). Browser warmup validates both one and four rows.
+- Search contract tests cover inverse symmetry, normalized root averaging,
+  distinct leaf reservations, exact visit budgets, inference failure cleanup,
+  and a mixed batch containing scored terminal and neural leaves. Terminal
+  roots bypass all inference. These deterministic test evaluators are not models
+  and are not used by the browser runtime.
+- The real GPU batch smoke also completes scan and deep analysis of a Chinese
+  two-pass ending: exact black score `-7.5`, zero continuation policy, no candidates,
+  and no pass probe after the game ends. Japanese encore still produces a visible
+  error without a false game-completion event.
 
 Reproduce functional browser checks after building with local model assets:
 
@@ -124,6 +149,8 @@ node test/browser-smoke.mjs wasm-threads
 node test/browser-smoke.mjs wasm-single
 node test/browser-smoke.mjs service-worker
 node test/browser-smoke.mjs webgpu
+node test/browser-smoke.mjs wasm-batch
+node test/browser-smoke.mjs webgpu-batch
 ```
 
 These use an installed Chrome in a temporary headless profile (or set
@@ -131,14 +158,27 @@ These use an installed Chrome in a temporary headless profile (or set
 `.yagoo-data/browser-smoke/`. They are manual functional checks, not CI performance
 benchmarks. They contain no throughput or elapsed-time acceptance threshold.
 
+Regenerate scoring fixtures from the pinned upstream source without a model:
+
+```sh
+python python/web/build_rules_reference.py --katago-source /path/to/KataGo --out .yagoo-data/rules-reference
+python python/web/rules_goldens.py --oracle .yagoo-data/rules-reference/rules_reference --out crates/yagoo-search/tests/fixtures/area.json
+```
+
+On Windows, use an x64 Visual Studio developer shell, add `--compiler cl`, and
+use `rules_reference.exe`. The checked fixture contains 30 exact area scores
+and three Japanese phase-transition examples documenting the unsupported boundary.
+
 ## Remaining acceptance work
 
-Align fp16 GPU numerics, add targeted rules/feature fixtures and
-search correctness tests, terminal/encore handling, root symmetry averaging,
-batched inference with virtual loss, native KataGo statistical comparison,
-and explicit Rust search concurrency scheduling. The implementation still needs
+See the [acceptance checklist](./issue-5-acceptance.md). Japanese encore legality,
+features and territory scoring remain open. Two-pass area scoring does not yet
+cover simple-ko long-cycle/no-result or repeated-pass phase endings. More targeted
+ladder/ko/superko fixtures and a native KataGo functional search comparison are
+needed; the PUCT implementation is still simplified. The implementation also needs
 model download resume, small-net/mobile support, propagation of extra raw heads
 through snapshots, GPU-resident activation/concept-head consumers, broader browser
-coverage and a deployed-host check. No full-game strength,
+coverage and a deployed-host check. fp16 WebGPU remains unvalidated and falls back
+to fp32. No full-game strength,
 throughput, or shared-runner performance claim is made. These gaps must stay open
 when the first draft PR is published; it must not close issue #5.

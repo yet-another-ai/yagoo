@@ -124,11 +124,11 @@ def main():
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--trunk", action="store_true")
-    parser.add_argument("--batch", type=int, default=1, help="0 for dynamic, otherwise fixed batch")
+    parser.add_argument("--batch", type=int, default=1, help="0 for dynamic batches of 1..4, otherwise fixed batch 1")
     parser.add_argument("--fp16", action="store_true")
     args = parser.parse_args()
-    if args.batch < 0:
-        parser.error("batch must be nonnegative")
+    if args.batch not in (0, 1):
+        parser.error("batch must be 0 (dynamic) or 1")
     sys.path.insert(0, str(args.katago_source.resolve() / "python"))
     import numpy as np
     import onnx
@@ -183,6 +183,31 @@ def main():
     for name, actual, expected in zip(all_outputs, values, reference):
         np.testing.assert_allclose(actual, expected, rtol=2e-4, atol=2e-4, err_msg=name)
     report["fp32MaxAbs"] = {name: float(np.max(np.abs(a - b))) for name, a, b in zip(all_outputs, values, reference)}
+    if args.batch == 0:
+        # Different valid positions catch cross-row mixing and traced batch=1
+        # reshape constants. Check PyTorch and separate ONNX single-row calls.
+        fixtures = json.loads((Path(__file__).resolve().parents[2] / "crates/yagoo-core/tests/fixtures/v7.json").read_text())
+        positions = [fixtures[i] for i in [0, 5, 13, 23]]
+        batch_spatial = np.zeros((4, 22 * 361), dtype=np.float32)
+        for row, position in enumerate(positions):
+            batch_spatial[row, position["spatial"]] = 1
+        batch_spatial = batch_spatial.reshape(4, 22, 19, 19)
+        batch_global = np.array([p["globalInput"] for p in positions], dtype=np.float32)
+        report["batchMaxAbs"] = {}
+        for count in [2, 3, 4]:
+            feeds_batch = {"spatial": batch_spatial[:count], "global_input": batch_global[:count]}
+            with torch.no_grad():
+                reference_batch = [x.numpy() for x in wrapper(torch.from_numpy(feeds_batch["spatial"]), torch.from_numpy(feeds_batch["global_input"]))]
+            actual_batch = session.run(all_outputs, feeds_batch)
+            maximum = 0.0
+            for name, actual, expected in zip(all_outputs, actual_batch, reference_batch):
+                np.testing.assert_allclose(actual, expected, rtol=2e-4, atol=2e-4, err_msg=f"batch {count} {name}")
+                maximum = max(maximum, float(np.max(np.abs(actual - expected))))
+            for row in range(count):
+                singles = session.run(all_outputs, {name: value[row:row+1] for name, value in feeds_batch.items()})
+                for name, actual, single in zip(all_outputs, actual_batch, singles):
+                    np.testing.assert_allclose(actual[row:row+1], single, rtol=2e-4, atol=2e-4, err_msg=f"row {row} {name}")
+            report["batchMaxAbs"][str(count)] = maximum
     variants = {"fp32": artifact(path)}
     if args.fp16:
         optimized = args.out / "optimized.fp32.onnx"
@@ -215,7 +240,7 @@ def main():
     manifest = {"schemaVersion": 1, "model": MODEL, "source": SOURCE, "swa": True,
                 "checkpointSha256": hashlib.sha256(args.checkpoint.read_bytes()).hexdigest(),
                 "upstreamRevision": revision, "modelVersion": model.config["version"], "inputVersion": 7,
-                "boardSize": 19, "batch": args.batch, "outputs": all_outputs, "variants": variants,
+                "boardSize": 19, "batch": args.batch, "maxBatch": 4 if args.batch == 0 else 1, "outputs": all_outputs, "variants": variants,
                 "warmup": artifact(args.out / "warmup.json"),
                 "postprocess": {name: float(getattr(model, name)) for name in [
                     "scoremean_multiplier", "scorestdev_multiplier", "lead_multiplier",

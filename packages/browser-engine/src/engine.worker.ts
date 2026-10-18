@@ -5,25 +5,32 @@ import { loadArtifact, validateManifest, type Manifest } from './model';
 let session: ort.InferenceSession | undefined;
 let manifest: Manifest;
 let busy = false;
+let stats = { evaluations: 0, batches: 0, maxBatch: 0 };
 const emit = (data: unknown) => postMessage(data);
 const heads = ['policy', 'value', 'miscvalue', 'moremiscvalue', 'ownership', 'scoring', 'futurepos', 'seki', 'scorebelief_logprobs'];
 
-async function evaluate(spatial: Float32Array, globalInput: Float32Array): Promise<string> {
+async function evaluate(spatial: Float32Array, globalInput: Float32Array, count = 1): Promise<string> {
   if (!session) throw new Error('Neural session is not initialized.');
+  const capacity = manifest.batch === 0 ? manifest.maxBatch! : 1;
+  if (!Number.isInteger(count) || count < 1 || count > capacity || spatial.length !== count * 22 * 361 || globalInput.length !== count * 19) throw new Error('Invalid neural batch shape.');
   const feeds = {
-    spatial: new ort.Tensor('float32', spatial, [1, 22, 19, 19]),
-    global_input: new ort.Tensor('float32', globalInput, [1, 19]),
+    spatial: new ort.Tensor('float32', spatial, [count, 22, 19, 19]),
+    global_input: new ort.Tensor('float32', globalInput, [count, 19]),
   };
   let output: ort.InferenceSession.ReturnType | undefined;
   try {
     output = await session.run(feeds, heads);
-    const values = Object.fromEntries(heads.map(name => {
+    const rows: Record<string, number[]>[] = Array.from({ length: count }, () => ({}));
+    for (const name of heads) {
       const tensor = output![name].data as Float32Array;
+      if (output![name].dims[0] !== count || tensor.length % count !== 0) throw new Error(`Wrong neural batch output: ${name}.`);
       const bad = tensor.findIndex(v => !Number.isFinite(v));
       if (bad !== -1) throw new Error(`Nonfinite neural output ${name}[${bad}]=${tensor[bad]} (${tensor.length} values).`);
-      return [name, Array.from(tensor)];
-    }));
-    return JSON.stringify(values);
+      const width = tensor.length / count;
+      for (let i = 0; i < count; i++) rows[i][name] = Array.from(tensor.subarray(i * width, (i + 1) * width));
+    }
+    stats.evaluations += count; stats.batches++; stats.maxBatch = Math.max(stats.maxBatch, count);
+    return JSON.stringify(rows);
   } finally {
     if (output) Object.values(output).forEach(tensor => tensor.dispose());
     Object.values(feeds).forEach(tensor => tensor.dispose());
@@ -76,17 +83,29 @@ self.onmessage = async ({ data }: MessageEvent) => {
         // Do not label a mixed CPU/GPU graph as a validated GPU backend.
         extra: data.backend === 'webgpu' ? { session: { disable_cpu_ep_fallback: '1' } } : undefined,
       });
-      const actual = JSON.parse(await evaluate(new Float32Array(reference.spatial), new Float32Array(reference.globalInput)));
-      compareWarmup(actual, reference.outputs, precision === 'fp16');
+      const maxBatch = manifest.batch === 0 ? manifest.maxBatch! : 1;
+      for (const count of maxBatch > 1 ? [1, maxBatch] : [1]) {
+        const spatial = new Float32Array(count * reference.spatial.length);
+        const global = new Float32Array(count * reference.globalInput.length);
+        for (let row = 0; row < count; row++) { spatial.set(reference.spatial, row * reference.spatial.length); global.set(reference.globalInput, row * reference.globalInput.length); }
+        const actual = JSON.parse(await evaluate(spatial, global, count));
+        for (const row of actual) compareWarmup(row, reference.outputs, precision === 'fp16');
+      }
       await initRust();
       emit({ type: 'ready', status: { backend: data.backend, precision, ortThreads: data.ortThreads,
-        searchThreads: 1, validated: true, messages: [] } });
+        searchThreads: 1, maxBatch, validated: true, messages: [] } });
     } else if (data.type === 'analyze') {
       if (!session) throw new Error('Initialize the engine first.');
       const defaults = JSON.parse(default_config());
       const config = { ...defaults, ...data.config, deepSelect: { ...defaults.deepSelect, ...data.config?.deepSelect } };
-      await analyze(data.sgf, JSON.stringify(config), JSON.stringify(manifest.postprocess), evaluate,
+      const requestedBatch = data.searchOptions?.batchSize ?? 4;
+      const rootSymmetries = data.searchOptions?.rootSymmetries ?? 1;
+      if (!Number.isInteger(requestedBatch) || requestedBatch < 1 || requestedBatch > 4 || ![1, 8].includes(rootSymmetries)) throw new Error('Batch size must be 1..4 and root symmetries must be 1 or 8.');
+      const searchOptions = { rootSymmetries, batchSize: Math.min(requestedBatch, manifest.batch === 0 ? manifest.maxBatch! : 1) };
+      stats = { evaluations: 0, batches: 0, maxBatch: 0 };
+      await analyze(data.sgf, JSON.stringify(config), JSON.stringify(manifest.postprocess), JSON.stringify(searchOptions), evaluate,
         (json: string) => emit({ type: 'event', event: JSON.parse(json) }));
+      emit({ type: 'stats', ...stats, ...searchOptions });
       emit({ type: 'done' });
     }
   } catch (error) { emit({ type: 'error', message: String(error) }); }

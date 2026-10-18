@@ -9,7 +9,7 @@ Priority is **after** the judgment layer (fate / tempo / score / zoning / ledger
 ## Inputs
 
 - Frozen trunk activations \(h^{(\ell)}\) from path **B** (SWA)
-- Fate communities for block-level pooling
+- Groups for block-level pooling
 
 ## Proposed heads
 
@@ -18,10 +18,10 @@ Priority is **after** the judgment layer (fate / tempo / score / zoning / ledger
 | Group status | settled / weak / tempo-critical / dead / seki | Pass-probe flips (counterfactual), finished self-play finals, human eval set — **not** thresholds on same-position ownership alone |
 | Eye count | 0 / 1 / 2+ / false eye | Rules eye detection; keep samples consistent with final results |
 | Liberty race / one-move | race liberty gap; needs patch? | Rules liberty count + race candidates; PV captures as positives |
-| Cut points | per-point probability | Opponent plays there → large drop in some community’s \(g\) (counterfactual) |
+| Cut points | per-point probability | Opponent plays there → large drop in some group’s \(g\) (counterfactual) |
 | seki / futurepos | direct use | Network’s own heads; Analysis Engine does not expose them |
 
-Architecture: \(1\times1\) conv or small MLP, per-point, then mean / attention pool over fate communities.
+Architecture: \(1\times1\) conv or small MLP, per-point, then mean / attention pool over groups.
 
 ## Anti label-loop
 

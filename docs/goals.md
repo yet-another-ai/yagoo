@@ -11,7 +11,7 @@ Yagoo targets **practical game review and teaching**. It uses KataGo internal si
 
 **Differentiation is semantic**, not another heatmap:
 
-- Units of explanation are **fate communities** (not raw chains or independent points)
+- Units of explanation are **groups** (not raw chains or independent points)
 - Group status is **tempo-normalized** (pass probe)
 - Territory / moyo / thickness / weak groups are named separately
 - Score is shown as a **distribution**, not a single lead
@@ -34,4 +34,4 @@ Painting ownership heatmaps alone is not differentiation — tools such as LizGo
 
 ## Competitive framing (context)
 
-Feasibility survey (summary): LizGoban is the closest competitor on ownership visualization; KaTrain / go-review-timelapse / Ogatak-style tools emphasize heatmaps or simple chain labels. Yagoo’s bet is **community-level, tempo-sensitive semantics + ledger + fact-driven explanation**.
+Feasibility survey (summary): LizGoban is the closest competitor on ownership visualization; KaTrain / go-review-timelapse / Ogatak-style tools emphasize heatmaps or simple chain labels. Yagoo’s bet is **group-level, tempo-sensitive semantics + ledger + fact-driven explanation**.

@@ -31,4 +31,4 @@ English docs under `docs/` are the working design. They were restructured from t
 
 ## Scope of early PRs
 
-Prefer documentation and scaffolding until the Analysis Engine client and fate-community MVP land. Algorithm PRs should cite the relevant `docs/modules/*` page.
+Teaching-module PRs (groups, tempo, …) should cite the relevant `docs/modules/*` page. KataGo binaries are not required for CI — use fixture JSON in `yagoo-katago` tests. Local model download: `mise run katago:fetch-dev`.

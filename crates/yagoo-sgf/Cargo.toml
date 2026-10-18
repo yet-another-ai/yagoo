@@ -1,0 +1,19 @@
+[package]
+name = "yagoo-sgf"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "SGF parsing for Yagoo game records"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+yagoo-core.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

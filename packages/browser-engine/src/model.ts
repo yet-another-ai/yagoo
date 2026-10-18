@@ -1,0 +1,68 @@
+export interface Artifact { url: string; bytes: number; sha256: string; integrity: string }
+export interface Manifest {
+  schemaVersion: 1; model: string; swa: true; modelVersion: number; inputVersion: 7;
+  boardSize: 19; batch: number; outputs: string[];
+  variants: { fp32: Artifact; fp16?: Artifact }; warmup: Artifact;
+  postprocess: Record<string, number>; license: string; source: string;
+}
+
+export function validateManifest(value: unknown): Manifest {
+  const m = value as Manifest;
+  if (!m || m.schemaVersion !== 1 || m.swa !== true || m.inputVersion !== 7 || m.boardSize !== 19 || m.batch !== 1 ||
+      ![14, 15].includes(m.modelVersion) || !m.model?.startsWith('kata1-b18c384nbt-')) {
+    throw new Error('Expected a validated b18 SWA V7 model bundle with fixed batch 1.');
+  }
+  for (const name of ['policy', 'value', 'miscvalue', 'ownership', 'scorebelief_logprobs']) {
+    if (!m.outputs.includes(name)) throw new Error(`Model is missing ${name}.`);
+  }
+  for (const key of ['scoremean_multiplier', 'scorestdev_multiplier', 'lead_multiplier']) {
+    if (!(m.postprocess?.[key] > 0) || !Number.isFinite(m.postprocess[key])) throw new Error(`Invalid model postprocess ${key}.`);
+  }
+  if (!m.license || !m.source) throw new Error('Model provenance and license are required.');
+  for (const a of [m.variants?.fp32, m.variants?.fp16, m.warmup].filter(Boolean) as Artifact[]) {
+    if (!a.url || !Number.isSafeInteger(a.bytes) || a.bytes <= 0 || !/^[0-9a-f]{64}$/.test(a.sha256)) throw new Error('Invalid model artifact metadata.');
+  }
+  if (!m.variants?.fp32 || !m.warmup) throw new Error('The fp32 fallback and warmup reference are required.');
+  return m;
+}
+
+async function verify(data: Uint8Array, a: Artifact): Promise<void> {
+  if (data.byteLength !== a.bytes) throw new Error(`Wrong size for ${a.url}.`);
+  const hash = await crypto.subtle.digest('SHA-256', data as Uint8Array<ArrayBuffer>);
+  const hex = Array.from(new Uint8Array(hash), x => x.toString(16).padStart(2, '0')).join('');
+  if (hex !== a.sha256) throw new Error(`SHA-256 mismatch for ${a.url}.`);
+}
+
+// Content-addressed cache. A partially written file is never accepted as a model.
+export async function loadArtifact(base: string, a: Artifact, progress: (n: number, total: number) => void): Promise<Uint8Array> {
+  let directory: FileSystemDirectoryHandle | undefined;
+  try { directory = await navigator.storage.getDirectory(); } catch { /* storage optional */ }
+  try {
+    if (directory) {
+      const file = await (await directory.getFileHandle(a.sha256)).getFile();
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      await verify(bytes, a); progress(a.bytes, a.bytes); return bytes;
+    }
+  } catch { /* cache miss, eviction or corrupt partial file: refetch */ }
+  const response = await fetch(new URL(a.url, base), { mode: 'cors', credentials: 'same-origin' });
+  if (!response.ok || !response.body) throw new Error(`Model download failed (${response.status}): ${a.url}`);
+  const reader = response.body.getReader();
+  const bytes = new Uint8Array(a.bytes);
+  let offset = 0;
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (offset + value.byteLength > bytes.byteLength) throw new Error('Model download exceeds manifest size.');
+      bytes.set(value, offset); offset += value.byteLength; progress(offset, a.bytes);
+    }
+  } finally { await reader.cancel(); }
+  await verify(bytes, a);
+  try {
+    if (directory) {
+      const writer = await (await directory.getFileHandle(a.sha256, { create: true })).createWritable();
+      await writer.write(bytes); await writer.close();
+    }
+  } catch { /* quota or private mode: verified in-memory model still works */ }
+  return bytes;
+}

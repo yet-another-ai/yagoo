@@ -6,6 +6,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
+/// A protocol update shared by the process and browser engines.
+#[derive(Clone, Debug)]
+pub enum AnalysisUpdate {
+    Partial(AnalysisResponse),
+    Final(AnalysisResponse),
+}
+
 /// `"B"` / `"W"` as used in Analysis Engine JSON.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]

@@ -1,0 +1,24 @@
+[package]
+name = "yagoo-web"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+yagoo-search = { path = "../yagoo-search" }
+yagoo-core.workspace = true
+yagoo-pipeline.workspace = true
+serde_json.workspace = true
+futures = { version = "0.3", default-features = false, features = ["std"] }
+wasm-bindgen = "=0.2.104"
+wasm-bindgen-futures = "=0.4.54"
+js-sys = "=0.3.81"
+
+[lints]
+workspace = true

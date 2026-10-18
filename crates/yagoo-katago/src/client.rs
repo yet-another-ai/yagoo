@@ -6,7 +6,7 @@
 //! future Web UI.
 
 use crate::error::{KatagoError, KatagoResult};
-use crate::types::{AnalysisQuery, AnalysisResponse};
+use crate::types::{AnalysisQuery, AnalysisResponse, AnalysisUpdate};
 use std::collections::{HashMap, VecDeque};
 use std::process::Stdio;
 use std::sync::{Arc, Weak};
@@ -14,15 +14,6 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 use tokio::sync::{mpsc, Mutex};
 use tokio::time::{sleep, Duration};
-
-/// One update from a streaming analysis query.
-#[derive(Clone, Debug)]
-pub enum AnalysisUpdate {
-    /// `isDuringSearch: true` progress report (only when requested).
-    Partial(AnalysisResponse),
-    /// Final response for the query id.
-    Final(AnalysisResponse),
-}
 
 enum RouteMsg {
     Update(Box<AnalysisUpdate>),

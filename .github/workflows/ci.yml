@@ -52,5 +52,8 @@ jobs:
       - name: UI unit tests
         run: mise run ui:test
 
+      - name: Browser Wasm build and functional unit tests
+        run: mise run browser:check
+
       - name: Build documentation
         run: mise run docs-build

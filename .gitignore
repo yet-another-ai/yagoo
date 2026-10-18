@@ -25,7 +25,6 @@ uv.lock
 # Mise local overrides
 .mise.local.toml
 mise.local.toml
-mise.lock
 
 # Coverage / test artifacts
 coverage/

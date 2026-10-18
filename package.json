@@ -1,0 +1,13 @@
+{
+  "name": "yagoo",
+  "private": true,
+  "packageManager": "pnpm@10.34.7",
+  "scripts": {
+    "docs:dev": "pnpm --filter @yagoo/docs dev",
+    "docs:build": "pnpm --filter @yagoo/docs build",
+    "docs:preview": "pnpm --filter @yagoo/docs preview"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  }
+}

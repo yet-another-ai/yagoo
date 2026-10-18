@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install toolchain
+        uses: jdx/mise-action@v5
+        with:
+          cache: true
+
+      - name: Install JavaScript dependencies
+        run: mise run install
+
+      - name: Rust format check
+        run: mise run format-check
+
+      - name: Rust Clippy
+        run: mise run lint
+
+      - name: Cargo check
+        run: mise run rust:check
+
+      - name: Rust tests
+        run: mise run rust:test
+
+      - name: Build documentation
+        run: mise run docs-build

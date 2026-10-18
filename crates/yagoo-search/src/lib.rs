@@ -84,7 +84,6 @@ struct Node {
     win_sum: f64,
     lead_sum: f64,
     utility_sum: f64,
-    utility_sq_sum: f64,
 }
 
 impl Node {
@@ -97,7 +96,6 @@ impl Node {
             win_sum: 0.0,
             lead_sum: 0.0,
             utility_sum: 0.0,
-            utility_sq_sum: 0.0,
         }
     }
     fn mean(&self, sum: f64) -> f64 {
@@ -201,12 +199,14 @@ fn replay(query: &AnalysisQuery) -> Result<(GameState, FeatureRules), String> {
             "Japanese encore legality, features and territory scoring are not implemented".into(),
         );
     }
+    yagoo_core::nn_features::validate_history(&game, rules)?;
     Ok((game, rules))
 }
 
 fn process(
     raw: RawHeads,
     game: &GameState,
+    rules: FeatureRules,
     legal: &[bool],
     post: &Postprocess,
 ) -> Result<Evaluation, String> {
@@ -242,8 +242,15 @@ fn process(
         }
     }
     let policy = softmax(&logits)?;
-    let value = softmax(&raw.value)?;
-    let current_win = value[0] + 0.5 * value[2];
+    // Positional-superko area rules cannot produce no-result games. Upstream
+    // excludes that logit before normalizing, not after the three-way softmax.
+    let value = softmax(if rules == FeatureRules::ChineseOgs {
+        &raw.value[..2]
+    } else {
+        &raw.value
+    })?;
+    let no_result = value.get(2).copied().unwrap_or(0.0);
+    let current_win = value[0] + 0.5 * no_result;
     let sign = if game.to_play() == Color::Black {
         1.0
     } else {
@@ -264,7 +271,8 @@ fn process(
         } else {
             1.0 - current_win
         },
-        lead: sign * f64::from(raw.miscvalue[2]) * post.lead_multiplier,
+        // The raw lead is conditional on a result; no-result contributes zero.
+        lead: sign * f64::from(raw.miscvalue[2]) * post.lead_multiplier * (1.0 - no_result),
         ownership,
         raw: Some(raw),
     })
@@ -302,16 +310,36 @@ fn tree_ownership(
     square: &mut [f64],
 ) {
     let node = &nodes[index];
-    let children_weight: f64 = node
+    let children_square_weight: f64 = node
         .children
         .iter()
         .map(|(_, i)| f64::from(nodes[*i].visits).powi(2))
         .sum();
-    let own_weight = if children_weight == 0.0 || weight < minimum {
+    let children_weight: f64 = node
+        .children
+        .iter()
+        .map(|(_, i)| f64::from(nodes[*i].visits))
+        .sum();
+    // This search assigns one unit of weight to each NN evaluation. Native
+    // KataGo can use uncertainty-dependent NN weights, which are not implemented.
+    let mut own_weight = if children_square_weight == 0.0 || weight < minimum {
         weight
     } else {
-        weight / f64::from(node.visits.max(1))
+        weight / (children_weight + 1.0)
     };
+    if own_weight < weight {
+        let descendant_weight = weight - own_weight;
+        for (_, child) in &node.children {
+            let w = descendant_weight * f64::from(nodes[*child].visits).powi(2)
+                / children_square_weight;
+            if w < minimum * 0.01 {
+                // Return pruned mass to this node, retaining normalization.
+                own_weight += w;
+            } else {
+                tree_ownership(nodes, *child, w, minimum, mean, square);
+            }
+        }
+    }
     for ((m, s), x) in mean
         .iter_mut()
         .zip(square.iter_mut())
@@ -319,13 +347,6 @@ fn tree_ownership(
     {
         *m += own_weight * x;
         *s += own_weight * x * x;
-    }
-    if own_weight < weight {
-        for (_, child) in &node.children {
-            let w =
-                (weight - own_weight) * f64::from(nodes[*child].visits).powi(2) / children_weight;
-            tree_ownership(nodes, *child, w, minimum, mean, square);
-        }
     }
 }
 
@@ -336,7 +357,7 @@ fn ownership(nodes: &[Node], index: usize) -> (Vec<f64>, Vec<f64>) {
         nodes,
         index,
         1.0,
-        0.005 / f64::from(nodes[index].visits.max(1)).powf(0.75),
+        0.5 / f64::from(nodes[index].visits.max(1)).powf(0.75),
         &mut mean,
         &mut square,
     );
@@ -360,26 +381,40 @@ fn response(
     let mut infos = Vec::new();
     for (order, (mv, index)) in candidates.iter().enumerate() {
         let node = &nodes[*index];
-        let mut pv = vec![gtp(&root.game, *mv)];
-        let mut cursor = *index;
-        while pv.len() < query.analysis_pv_len.unwrap_or(16).min(64) as usize {
-            if let Some((next_move, child)) = best_child(nodes, cursor) {
-                pv.push(gtp(&nodes[cursor].game, next_move));
-                cursor = child;
-            } else {
-                break;
+        // The candidate itself counts toward the requested length. Validation
+        // accepts the native protocol's 1..=1000 range; only visited nodes appear.
+        let pv_limit = query.analysis_pv_len.unwrap_or(15) as usize;
+        let mut pv = Vec::new();
+        let mut pv_visits = Vec::new();
+        if pv_limit > 0 {
+            pv.push(gtp(&root.game, *mv));
+            pv_visits.push(node.visits);
+            let mut cursor = *index;
+            while pv.len() < pv_limit {
+                if let Some((next_move, child)) = best_child(nodes, cursor) {
+                    pv.push(gtp(&nodes[cursor].game, next_move));
+                    pv_visits.push(nodes[child].visits);
+                    cursor = child;
+                } else {
+                    break;
+                }
             }
         }
-        let variance =
-            (node.mean(node.utility_sq_sum) - node.mean(node.utility_sum).powi(2)).max(0.0);
-        let (candidate_own, candidate_stdev) = if query.include_moves_ownership == Some(true) {
+        let (candidate_own, candidate_stdev) = if query.include_moves_ownership == Some(true)
+            || query.include_moves_ownership_stdev == Some(true)
+        {
             ownership(nodes, *index)
         } else {
             (vec![], vec![])
         };
+        // A utility confidence bound is not the protocol's winrate LCB.
+        // Leave lcb absent until a justified confidence estimate is implemented.
         let mut info = json!({ "move": gtp(&root.game, *mv), "order": order, "visits": node.visits,
             "winrate": node.mean(node.win_sum), "scoreLead": node.mean(node.lead_sum), "prior": root.eval.policy[*mv],
-            "utility": node.mean(node.utility_sum), "lcb": node.mean(node.utility_sum) - 1.96 * (variance / f64::from(node.visits.max(1))).sqrt(), "pv": pv });
+            "utility": node.mean(node.utility_sum), "pv": pv });
+        if query.include_pv_visits == Some(true) {
+            info["pvVisits"] = json!(pv_visits);
+        }
         if query.include_moves_ownership == Some(true) {
             info["ownership"] = json!(candidate_own);
         }
@@ -407,6 +442,9 @@ fn response(
     }
     serde_json::from_value(value).map_err(Into::into)
 }
+
+#[cfg(test)]
+mod output_tests;
 
 #[cfg(test)]
 mod tests {
@@ -437,21 +475,21 @@ mod tests {
         game.setup_stone(Point::new(0, 0), Color::Black).unwrap();
         game.set_to_play(Color::White);
         let input = encode_v7(&game, FeatureRules::Chinese, 7.5, false).unwrap();
-        let result = process(heads(), &game, &input.legal, &post()).unwrap();
+        let result = process(heads(), &game, FeatureRules::Chinese, &input.legal, &post()).unwrap();
         assert_eq!(result.policy.len(), 82);
         assert_eq!(result.policy[0], 0.0);
         assert!((result.policy.iter().sum::<f64>() - 1.0).abs() < 1e-12);
         assert_eq!(result.ownership.len(), 81);
         assert!(result.winrate < 0.5);
         assert!(result.ownership[1] < 0.0);
-        assert!((result.lead + 10.0).abs() < 1e-12);
+        assert!((result.lead + 8.858_048_006_154_055).abs() < 1e-12);
     }
     #[test]
     fn nonfinite_extra_head_is_rejected() {
         let game = GameState::new(9, Ruleset::Japanese).unwrap();
         let mut raw = heads();
         raw.scorebelief_logprobs.push(f32::NEG_INFINITY);
-        assert!(process(raw, &game, &[true; 82], &post()).is_err());
+        assert!(process(raw, &game, FeatureRules::Chinese, &[true; 82], &post()).is_err());
     }
     #[test]
     fn terminal_history_and_unsupported_rules_are_explicit_errors() {
@@ -472,7 +510,14 @@ mod tests {
         let mut game = GameState::new(9, Ruleset::Japanese).unwrap();
         game.play_pass().unwrap();
         let input = encode_v7(&game, FeatureRules::Japanese, 6.5, false).unwrap();
-        let mut evaluation = process(heads(), &game, &input.legal, &post()).unwrap();
+        let mut evaluation = process(
+            heads(),
+            &game,
+            FeatureRules::Japanese,
+            &input.legal,
+            &post(),
+        )
+        .unwrap();
         evaluation.policy.fill(0.0);
         evaluation.policy[81] = 1.0;
         let mut root = Node::new(game.clone(), evaluation);

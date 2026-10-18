@@ -1,0 +1,164 @@
+{
+  "scope": "Manual functional comparison; no timing, throughput, full-game strength or search-equivalence claim.",
+  "host": "DELTON-WS / Chrome / NVIDIA Lovelace fp32 WebGPU / CPU EP fallback disabled",
+  "nativeRelease": "https://github.com/lightvector/KataGo/releases/tag/v1.16.4",
+  "nativeAsset": "katago-v1.16.4-eigenavx2-windows-x64.zip",
+  "model": "kata1-b18c384nbt-s9996604416-d4316597426 SWA",
+  "checkpointSha256": "ed3f2681be01604fd51b467925de77cea4f19cf125383493449d8c002fb91a24",
+  "exportAndFeatureSource": "d91ea855110dae533f0aada947b2b7d78cc8a4e1",
+  "versionCaveat": "Native release is older than pinned exporter/feature oracle.",
+  "configuration": "numAnalysisThreads=1\nnumSearchThreads=1\nnumEigenThreadsPerModel=4\nnnMaxBatchSize=1\nnnCacheSizePowerOfTwo=8\nnnMutexPoolSizePowerOfTwo=4\nreportAnalysisWinratesAs=BLACK\nrootNumSymmetriesToSample=8\nrootPolicyOptimism=0\npolicyOptimism=0\nuseUncertainty=false\nignorePreRootHistory=false\nlogToStderr=false\n",
+  "artifacts": {
+    "nativeExecutable": {
+      "sha256": "bad55cf31ec42f58dec821a2e428c8d45d9e4697f9e2741b8aa644d03a37acfc",
+      "bytes": 4541440
+    },
+    "nativeModel": {
+      "sha256": "46a623a366ef6ef423fa2055f1b094fd8f64c518c065e7d254a9e0829c192c5c",
+      "bytes": 105532578
+    },
+    "onnxModel": {
+      "url": "model.fp32.onnx",
+      "bytes": 115423221,
+      "sha256": "f3a33ebdee29a5251cf7cdd98475e4d60c6e893e3a41731a356cb403691e82be",
+      "integrity": "sha256-86M+ve4ppSUc983ZhHXk1gxuiT46QXMaNWy0A2kegr4="
+    }
+  },
+  "oneVisitTolerances": {
+    "winrate": 0.002,
+    "scoreLead": 0.05,
+    "ownership": 0.002,
+    "policy": 0.002
+  },
+  "oneVisit": [
+    {
+      "id": "scan-0-root",
+      "visits": 1,
+      "winrateAbsDiff": 2.8033471591304426e-07,
+      "scoreLeadAbsDiff": 1.119533091675784e-06,
+      "ownershipMaxAbsDiff": 2.397837199741293e-06,
+      "ownershipStdevMaxAbsDiff": 0.0,
+      "policyMaxAbsDiff": 2.313773583395573e-06
+    },
+    {
+      "id": "scan-1-root",
+      "visits": 1,
+      "winrateAbsDiff": 2.393848989694358e-07,
+      "scoreLeadAbsDiff": 1.5806174098464965e-05,
+      "ownershipMaxAbsDiff": 1.2960198993439143e-06,
+      "ownershipStdevMaxAbsDiff": 0.0,
+      "policyMaxAbsDiff": 1.0053135578447225e-06
+    },
+    {
+      "id": "scan-2-root",
+      "visits": 1,
+      "winrateAbsDiff": 2.410065992608512e-07,
+      "scoreLeadAbsDiff": 5.9471170396063755e-06,
+      "ownershipMaxAbsDiff": 1.4364381219350575e-06,
+      "ownershipStdevMaxAbsDiff": 0.0,
+      "policyMaxAbsDiff": 2.159745428054194e-07
+    },
+    {
+      "id": "deep-0-root",
+      "visits": 1,
+      "winrateAbsDiff": 2.5803471591367977e-07,
+      "scoreLeadAbsDiff": 1.3466908255210797e-08,
+      "ownershipMaxAbsDiff": 2.397837199741293e-06,
+      "ownershipStdevMaxAbsDiff": 0.0,
+      "policyMaxAbsDiff": 2.4327735834162034e-06
+    },
+    {
+      "id": "deep-0-pass_probe",
+      "visits": 1,
+      "winrateAbsDiff": 1.4724595997139475e-08,
+      "scoreLeadAbsDiff": 2.675905001403578e-05,
+      "ownershipMaxAbsDiff": 1.1594974838324834e-06,
+      "ownershipStdevMaxAbsDiff": 0.0,
+      "policyMaxAbsDiff": 4.581608461368125e-06
+    },
+    {
+      "id": "deep-1-root",
+      "visits": 1,
+      "winrateAbsDiff": 2.1608489897059768e-07,
+      "scoreLeadAbsDiff": 1.6516174098590852e-05,
+      "ownershipMaxAbsDiff": 1.8156781662892474e-06,
+      "ownershipStdevMaxAbsDiff": 0.0,
+      "policyMaxAbsDiff": 1.0093016860057702e-06
+    },
+    {
+      "id": "deep-1-pass_probe",
+      "visits": 1,
+      "winrateAbsDiff": 1.5132964881203748e-09,
+      "scoreLeadAbsDiff": 2.002630731823274e-05,
+      "ownershipMaxAbsDiff": 1.2568558920289519e-06,
+      "ownershipStdevMaxAbsDiff": 0.0,
+      "policyMaxAbsDiff": 2.5967367139889674e-07
+    }
+  ],
+  "eightVisit": [
+    {
+      "id": "scan-0-root",
+      "visits": 1,
+      "winrateAbsDiff": 2.8413471590826855e-07,
+      "scoreLeadAbsDiff": 9.405330917422461e-07,
+      "ownershipMaxAbsDiff": 2.397837199741293e-06,
+      "ownershipStdevMaxAbsDiff": 0.0,
+      "policyMaxAbsDiff": 2.313773583395573e-06
+    },
+    {
+      "id": "scan-1-root",
+      "visits": 1,
+      "winrateAbsDiff": 2.402848989675743e-07,
+      "scoreLeadAbsDiff": 1.6276174098717178e-05,
+      "ownershipMaxAbsDiff": 1.8156781662892474e-06,
+      "ownershipStdevMaxAbsDiff": 0.0,
+      "policyMaxAbsDiff": 9.203016859693491e-07
+    },
+    {
+      "id": "scan-2-root",
+      "visits": 1,
+      "winrateAbsDiff": 3.830065992693754e-07,
+      "scoreLeadAbsDiff": 6.900117039632114e-06,
+      "ownershipMaxAbsDiff": 1.1195565162158694e-06,
+      "ownershipStdevMaxAbsDiff": 0.0,
+      "policyMaxAbsDiff": 5.139745428150988e-07
+    },
+    {
+      "id": "deep-0-root",
+      "visits": 8,
+      "winrateAbsDiff": 0.004433522295335862,
+      "scoreLeadAbsDiff": 0.08606018310536734,
+      "ownershipMaxAbsDiff": 0.17020650419815542,
+      "ownershipStdevMaxAbsDiff": 0.19239817048654345,
+      "policyMaxAbsDiff": 2.1947735833749427e-06
+    },
+    {
+      "id": "deep-0-pass_probe",
+      "visits": 8,
+      "winrateAbsDiff": 0.00015215632815513894,
+      "scoreLeadAbsDiff": 0.3850628455159306,
+      "ownershipMaxAbsDiff": 0.4379201639133607,
+      "ownershipStdevMaxAbsDiff": 0.18135957251362408,
+      "policyMaxAbsDiff": 4.655608461384686e-06
+    },
+    {
+      "id": "deep-1-root",
+      "visits": 8,
+      "winrateAbsDiff": 0.007127821444423359,
+      "scoreLeadAbsDiff": 0.5836401384423779,
+      "ownershipMaxAbsDiff": 0.3559086448588825,
+      "ownershipStdevMaxAbsDiff": 0.2730736490454255,
+      "policyMaxAbsDiff": 8.812332445429227e-07
+    },
+    {
+      "id": "deep-1-pass_probe",
+      "visits": 8,
+      "winrateAbsDiff": 0.0006180587247052172,
+      "scoreLeadAbsDiff": 1.7656539582528836,
+      "ownershipMaxAbsDiff": 0.33318050371148566,
+      "ownershipStdevMaxAbsDiff": 0.21979208879473472,
+      "policyMaxAbsDiff": 1.9641987582252884e-07
+    }
+  ],
+  "eightVisitCaveat": "Differences are reported without parity thresholds. Batched simplified PUCT and native search heuristics/defaults differ; root policy is the initial NN output, ownership/value are tree aggregates."
+}

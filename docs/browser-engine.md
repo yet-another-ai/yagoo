@@ -12,8 +12,9 @@ native KataGo. The checkpoint reports model version **14**, despite the version
   activations, fp32/fp16 ONNX files, provenance, SHA-256 hashes, a license notice,
   and a numerical warmup reference. Export uses upstream SWA weights explicitly.
 - Rust V7 feature encoding has 72 golden positions from upstream KataGo's Python
-  implementation (9/13/19 boards; Chinese, Chinese-OGS, Japanese). This does not
-  establish coverage for every ladder, ko, superko, or pass-alive edge case.
+  implementation (9/13/19 boards; Chinese, Chinese-OGS, Japanese), plus 40 targeted
+  C++ references for ladders, ko/superko, retained history, pass probes, large komi
+  and terminal boundaries. This is targeted coverage, not exhaustive rule proof.
 - `AnalysisEngine` keeps the existing analysis protocol and NDJSON pipeline,
   usable by native `AnalysisClient` and browser Rust/Wasm search. Game history
   is retained when building queries, including setup and pass moves.
@@ -29,6 +30,19 @@ native KataGo. The checkpoint reports model version **14**, despite the version
   including handicap compensation, draws and a Benson-alive enclosing chain.
   Japanese encore remains explicitly unsupported, including when search reaches
   it. No second pass is masked and no neural estimate substitutes for its score.
+- Entire-history guards reject Japanese encore, simple-ko third repetitions
+  (no-result), repeated-pass phase endings and resumed play after terminal states,
+  both at query entry and before evaluating searched leaves. Errors cannot be
+  hidden by appending further moves, and never emit a successful final response.
+- Value and lead postprocessing handle no-result according to the selected rules.
+  Ownership uses normalized visit-square tree weighting with a unit NN weight;
+  native uncertainty-dependent weighting is not implemented. Candidate standard
+  deviation can be requested independently. PV length accepts 1..1000, counts the
+  candidate move and reports matching visit arrays. Unsupported winrate LCB is
+  omitted rather than substituting a utility bound.
+- Dropping a native analysis future removes its route immediately and queues a
+  single-query termination. An independent writer completes JSON lines; unique
+  wire IDs prevent late old responses from reaching an immediately restarted query.
 
 ## Threading and hosting
 
@@ -57,6 +71,9 @@ overridden using `YAGOO_BASE`. Dev and preview serve COOP `same-origin` and COEP
 is supplied for compatible hosts). On static hosts that cannot set headers,
 the page offers an explicit, scoped service-worker opt-in with a one-reload guard.
 Serve over HTTPS or localhost. Model hosting must be same-origin or permit CORS.
+Production bundles also contain the KataGo code notice and matching ORT license
+and third-party notices. Export verifies the selected official checkpoint SHA
+before loading PyTorch, binding the manifest identity to those exact weights.
 
 ## Build and run locally
 
@@ -98,10 +115,10 @@ binaries are ignored by Git. The existing `@yagoo/ui` reviewer remains independe
 
 ## Local evidence (DELTON-WS, 2026-10-18)
 
-- Workspace Clippy with `-D warnings`, all 50 Rust tests (including the 72-position
-  golden comparison), Wasm release build, TypeScript check and Vite production
-  build passed. The five browser unit tests, 28 existing UI tests, UI typecheck
-  and documentation build also passed.
+- Workspace Clippy with `-D warnings`, all 59 Rust tests (including 72 Python V7,
+  40 targeted C++ and 30 scoring references), Wasm release build, TypeScript check,
+  seven browser unit tests and Vite production build passed after review fixes.
+  The unchanged reviewer previously passed 28 UI tests and its typecheck.
 - fp32 export matched PyTorch: maximum raw-head error `2.2888e-5`; maximum trunk
   activation error `9.1553e-5`. fp16 semantic head checks passed on native ORT CPU.
   These are numerical checks on the supplied warmup input, not strength claims.
@@ -140,6 +157,27 @@ binaries are ignored by Git. The existing `@yagoo/ui` reviewer remains independe
   two-pass ending: exact black score `-7.5`, zero continuation policy, no candidates,
   and no pass probe after the game ends. Japanese encore still produces a visible
   error without a false game-completion event.
+- A seven-query one-visit comparison against official KataGo v1.16.4 EigenAVX2
+  used the same SWA weights exported by pinned upstream code, eight symmetries,
+  retained pre-root history and black-positive results. Maximum absolute errors:
+  winrate `2.804e-7`, lead `2.676e-5`, ownership `2.398e-6`, policy `4.582e-6`.
+  Root and pass-probe results pass unchanged tolerances (0.002 for probability/
+  ownership, 0.05 points for lead). Native analysis defaults to hiding pre-root
+  history; the comparison explicitly disables that default to match browser inputs.
+  The release binary is older than the pinned feature oracle/export source.
+- The same corpus completed two eight-visit roots and their pass probes on both
+  engines. Root policies still agree within `4.656e-6`; searched values differ:
+  up to `0.007128` winrate, `1.766` points, `0.4380` ownership and `0.2731`
+  ownership standard deviation. These are recorded differences, not relaxed
+  acceptance tolerances. Native search heuristics/defaults and this batched PUCT
+  search are different; a single tiny-budget run does not establish strength or
+  search equivalence. See [the recorded comparison](./evidence/native-katago-comparison.json).
+- Two independent code reviews covered algorithms/rules and runtime/cancellation/
+  provenance. Confirmed defects were fixed, including friendly-pass history,
+  komi clipping, no-result output, ownership/PV fields, repeated-click event loss,
+  cancellation during a partial native JSON write, and missing deployed notices.
+  Functional cancellation tests include immediate same-ID restart, late responses,
+  termination acknowledgments and callback failure. No EOF/CLI changes were made.
 
 Reproduce functional browser checks after building with local model assets:
 
@@ -163,19 +201,30 @@ Regenerate scoring fixtures from the pinned upstream source without a model:
 ```sh
 python python/web/build_rules_reference.py --katago-source /path/to/KataGo --out .yagoo-data/rules-reference
 python python/web/rules_goldens.py --oracle .yagoo-data/rules-reference/rules_reference --out crates/yagoo-search/tests/fixtures/area.json
+python python/web/targeted_goldens.py --oracle .yagoo-data/rules-reference/rules_reference --out crates/yagoo-core/tests/fixtures/v7-targeted.json
 ```
 
 On Windows, use an x64 Visual Studio developer shell, add `--compiler cl`, and
 use `rules_reference.exe`. The checked fixture contains 30 exact area scores
 and three Japanese phase-transition examples documenting the unsupported boundary.
 
+For the small native comparison, set `SMOKE_DEEP_VISITS=1` when running
+`webgpu-batch` to save the reference corpus, then run `python/web/compare_native.py`
+with `--engine`, `--model`, `--browser-dir` and `--out`. The model must be exported
+from the same official checkpoint using upstream `export_model_pytorch.py -use-swa`.
+Without that environment override the smoke uses eight deep visits; the comparison
+reports their differences without claiming native search parity. No model downloads,
+native engine runs or browser GPU experiments are added to shared-runner CI.
+
 ## Remaining acceptance work
 
 See the [acceptance checklist](./issue-5-acceptance.md). Japanese encore legality,
 features and territory scoring remain open. Two-pass area scoring does not yet
-cover simple-ko long-cycle/no-result or repeated-pass phase endings. More targeted
-ladder/ko/superko fixtures and a native KataGo functional search comparison are
-needed; the PUCT implementation is still simplified. The implementation also needs
+cover simple-ko long-cycle/no-result or repeated-pass phase endings; these are
+reliably rejected. The PUCT implementation is still simplified: native uncertainty
+weights, confidence bounds, advanced passing strategies and strength alignment
+remain open. In particular, normal BoardHistory two-pass endings do not reproduce
+native Search's friendly-pass continuation heuristics. The implementation also needs
 model download resume, small-net/mobile support, propagation of extra raw heads
 through snapshots, GPU-resident activation/concept-head consumers, broader browser
 coverage and a deployed-host check. fp16 WebGPU remains unvalidated and falls back

@@ -1,12 +1,16 @@
 //! Legacy b18 area scoring, following upstream BoardHistory's TAX_NONE path.
 use super::{Evaluation, FeatureRules, GameState};
-use yagoo_core::{nn_features::area, Point, Stone};
+use yagoo_core::{
+    nn_features::{area, validate_history},
+    Point, Stone,
+};
 
 pub(super) fn evaluate(
     game: &GameState,
     rules: FeatureRules,
     komi: f32,
 ) -> Result<Option<Evaluation>, String> {
+    validate_history(game, rules)?;
     if game.consecutive_passes() < 2 {
         return Ok(None);
     }

@@ -18,6 +18,16 @@ HEADS = ["policy", "value", "miscvalue", "moremiscvalue", "ownership",
          "scoring", "futurepos", "seki", "scorebelief_logprobs"]
 MODEL = "kata1-b18c384nbt-s9996604416-d4316597426"
 SOURCE = f"https://media.katagotraining.org/uploaded/networks/zips/kata1/{MODEL}.zip"
+CHECKPOINT_SHA256 = "ed3f2681be01604fd51b467925de77cea4f19cf125383493449d8c002fb91a24"
+
+
+def verify_checkpoint(path: Path) -> str:
+    """Bind the published model identity to the selected official checkpoint."""
+    with path.open("rb") as checkpoint:
+        digest = hashlib.file_digest(checkpoint, "sha256").hexdigest()
+    if digest != CHECKPOINT_SHA256:
+        raise ValueError(f"Expected official {MODEL} checkpoint SHA-256 {CHECKPOINT_SHA256}; got {digest}")
+    return digest
 
 
 def artifact(path: Path) -> dict:
@@ -129,6 +139,7 @@ def main():
     args = parser.parse_args()
     if args.batch not in (0, 1):
         parser.error("batch must be 0 (dynamic) or 1")
+    checkpoint_digest = verify_checkpoint(args.checkpoint)
     sys.path.insert(0, str(args.katago_source.resolve() / "python"))
     import numpy as np
     import onnx
@@ -238,7 +249,7 @@ def main():
     (args.out / "warmup.json").write_text(json.dumps(warmup), encoding="utf-8")
     revision = subprocess.check_output(["git", "-C", str(args.katago_source), "rev-parse", "HEAD"], text=True).strip()
     manifest = {"schemaVersion": 1, "model": MODEL, "source": SOURCE, "swa": True,
-                "checkpointSha256": hashlib.sha256(args.checkpoint.read_bytes()).hexdigest(),
+                "checkpointSha256": checkpoint_digest,
                 "upstreamRevision": revision, "modelVersion": model.config["version"], "inputVersion": 7,
                 "boardSize": 19, "batch": args.batch, "maxBatch": 4 if args.batch == 0 else 1, "outputs": all_outputs, "variants": variants,
                 "warmup": artifact(args.out / "warmup.json"),

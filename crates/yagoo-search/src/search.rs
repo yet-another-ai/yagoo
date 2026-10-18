@@ -158,7 +158,6 @@ fn backup(nodes: &mut [Node], path: &[usize], evaluation: &Evaluation) {
         node.win_sum += evaluation.winrate;
         node.lead_sum += evaluation.lead;
         node.utility_sum += u;
-        node.utility_sq_sum += u * u;
     }
 }
 
@@ -185,7 +184,7 @@ impl<E: NnEvaluator> SearchEngine<E> {
             for (row, raw) in rows.into_iter().enumerate() {
                 let symmetry = chunk_index * self.options.batch_size + row;
                 let raw = symmetry::output(raw, game.board().size(), symmetry)?;
-                evaluations.push(process(raw, game, &input.legal, &self.postprocess)?);
+                evaluations.push(process(raw, game, rules, &input.legal, &self.postprocess)?);
             }
         }
         let weight = 1.0 / evaluations.len() as f64;
@@ -251,7 +250,13 @@ impl<E: NnEvaluator> SearchEngine<E> {
                 return Err("Evaluator returned the wrong batch length".into());
             }
             for (&i, raw) in unique.iter().zip(rows) {
-                let value = process(raw, &leaves[i].game, &inputs[i].legal, &self.postprocess)?;
+                let value = process(
+                    raw,
+                    &leaves[i].game,
+                    rules,
+                    &inputs[i].legal,
+                    &self.postprocess,
+                )?;
                 resolved.insert(keys[i].clone(), value.clone());
                 cache.insert(keys[i].clone(), value);
             }
@@ -298,6 +303,9 @@ impl<E: NnEvaluator> SearchEngine<E> {
     }
 
     fn validate(&self, query: &AnalysisQuery) -> Result<u32, String> {
+        if !(1..=1000).contains(&query.analysis_pv_len.unwrap_or(15)) {
+            return Err("analysisPVLen must be in 1..1000".into());
+        }
         for scale in [
             self.postprocess.scoremean_multiplier,
             self.postprocess.scorestdev_multiplier,

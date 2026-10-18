@@ -10,6 +10,10 @@ const input = (id: string) => document.querySelector<HTMLInputElement>(`#${id}`)
 let events: string[] = [];
 let analysisFailed = false;
 let batchSummary = '';
+let engineReady = false;
+let analysisRunning = false;
+let lifecycle = 0;
+const updateAnalysisButtons = () => { scan.disabled = deep.disabled = !engineReady || analysisRunning; };
 engine.onMessage = message => {
   if (message.type === 'download') status.textContent = `Downloading verified model: ${Math.round(Number(message.loaded) / Number(message.total) * 100)}%`;
   if (message.type === 'error') status.textContent = String(message.message);
@@ -21,29 +25,36 @@ engine.onMessage = message => {
   }
   if (message.type === 'stats') batchSummary = ` Largest actual NN batch: ${message.maxBatch}; neural evaluations: ${message.evaluations}.`;
   if (message.type === 'done' && !analysisFailed) status.textContent = 'Analysis complete. Download the NDJSON events to open them in the reviewer.' + batchSummary;
+  if (message.type === 'done' || message.type === 'error') { analysisRunning = false; updateAnalysisButtons(); }
 };
 document.querySelector('#load')!.addEventListener('click', async () => {
-  scan.disabled = deep.disabled = true; status.textContent = 'Initializing…';
+  const request = ++lifecycle;
+  engine.dispose();
+  engineReady = false; analysisRunning = false; updateAnalysisButtons(); status.textContent = 'Initializing…';
   try {
     const storage = await navigator.storage?.persist?.().catch(() => false);
+    if (request !== lifecycle) return;
     const result = await engine.initialize(input('manifest').value, { forceWasm: input('wasm').checked, wasmThreads: Number(input('threads').value) });
+    if (request !== lifecycle) return;
     status.textContent = `${result.backend} ${result.precision}; ORT ${result.ortThreads} thread(s), Rust search 1 on the same worker. Maximum neural batch: ${result.maxBatch}. SWA reference validated. Persistent cache: ${storage ? 'granted' : 'best effort'}. ${result.messages.join(' ')}`;
-    scan.disabled = deep.disabled = false;
-  } catch (error) { status.textContent = String(error); }
+    engineReady = true; updateAnalysisButtons();
+  } catch (error) { if (request === lifecycle) status.textContent = String(error); }
 });
 document.querySelector('#isolation')!.addEventListener('click', async () => {
   try { status.textContent = await enableIsolation(); } catch (error) { status.textContent = String(error); }
 });
-document.querySelector('#stop')!.addEventListener('click', () => { engine.dispose(); scan.disabled = deep.disabled = true; status.textContent = 'Stopped. Model memory and workers released.'; });
+document.querySelector('#stop')!.addEventListener('click', () => { lifecycle++; engine.dispose(); engineReady = false; analysisRunning = false; updateAnalysisButtons(); status.textContent = 'Stopped. Model memory and workers released.'; });
 for (const [button, count] of [[scan, 0], [deep, 12]] as const) button.addEventListener('click', () => {
+  if (analysisRunning) return;
   try {
     const visits = Number(input('visits').value);
     if (!Number.isInteger(visits) || visits < 1 || visits > 10000) throw new Error('Visit budget must be an integer from 1 to 10000.');
-    events = []; analysisFailed = false; batchSummary = ''; output.textContent = '';
     engine.analyze(document.querySelector<HTMLTextAreaElement>('#sgf')!.value, {
       rootVisits: visits, pvEndVisits: Math.min(visits, 100),
       deepenAll: count > 0 && input('all').checked, deepSelect: { maxDeepPlies: count },
     }, { rootSymmetries: input('symmetries').checked ? 8 : 1, batchSize: Number(input('batch').value) });
+    events = []; analysisFailed = false; batchSummary = ''; output.textContent = '';
+    analysisRunning = true; updateAnalysisButtons();
     status.textContent = 'Analyzing…';
   }
   catch (error) { status.textContent = String(error); }

@@ -60,6 +60,29 @@ fn engine(symmetries: usize, batch: usize) -> SearchEngine<Evaluator> {
 }
 
 #[test]
+fn pv_length_matches_native_query_bounds_before_evaluation() {
+    let engine = engine(1, 1);
+    for limit in [0, 1001] {
+        let query = AnalysisQueryBuilder::new("invalid-pv")
+            .analysis_pv_len(limit)
+            .build();
+        assert!(block_on(engine.analyze(&query))
+            .unwrap_err()
+            .to_string()
+            .contains("analysisPVLen"));
+    }
+    assert!(engine.evaluator.batches.borrow().is_empty());
+    for limit in [1, 1000] {
+        let query = AnalysisQueryBuilder::new("valid-pv")
+            .board_size(9)
+            .max_visits(1)
+            .analysis_pv_len(limit)
+            .build();
+        assert!(block_on(engine.analyze(&query)).is_ok());
+    }
+}
+
+#[test]
 fn root_averages_probabilities_after_inverse_transform_in_two_real_batches() {
     let engine = engine(8, 4);
     let query = AnalysisQueryBuilder::new("symmetry")

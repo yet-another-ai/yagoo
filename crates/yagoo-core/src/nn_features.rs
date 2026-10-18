@@ -5,6 +5,8 @@
 //! browser query adapter. They must never silently receive zero-filled features.
 use crate::{Board, Color, CoreError, GameState, Point, Stone};
 use std::collections::BTreeSet;
+mod history;
+pub use history::validate_history;
 
 pub const NN_LEN: u8 = 19;
 pub const NN_AREA: usize = 361;
@@ -309,9 +311,7 @@ pub fn encode_v7(
     if board.size() > NN_LEN || !komi.is_finite() {
         return Err("V7 requires a board at most 19 and finite komi".into());
     }
-    if rules == FeatureRules::Japanese && game.consecutive_passes() >= 2 {
-        return Err("Japanese encore is not implemented by the browser engine".into());
-    }
+    let history = validate_history(game, rules)?;
     let mut f = V7Features {
         spatial: vec![0.0; 22 * NN_AREA],
         global: vec![0.0; 19],
@@ -341,8 +341,12 @@ pub fn encode_v7(
             }
         }
     }
-    let suppress =
-        conservative_pass && game.consecutive_passes() >= 1 && rules != FeatureRules::Japanese;
+    // Named Chinese profiles enable friendly-pass featurization upstream.
+    // Special repeated-pass endings are never suppressed by friendly passes.
+    let suppress = rules != FeatureRules::Japanese
+        && history.pass_would_end_phase
+        && (conservative_pass
+            || (game.consecutive_passes() == 1 && !history.repeated_pass_would_end_phase));
     let count = if suppress {
         0
     } else if game.consecutive_passes() >= 2 {
@@ -403,7 +407,7 @@ pub fn encode_v7(
     } else if black_setup > 1 && white_setup == 0 {
         white_komi += f32::from(black_setup);
     }
-    let limit = f32::from(board.size()).powi(2) + 1.0;
+    let limit = f32::from(board.size()).powi(2) + 20.0;
     let self_komi =
         (white_komi * if pla == Color::White { 1.0 } else { -1.0 }).clamp(-limit, limit);
     f.global[5] = self_komi / 20.0;
@@ -411,7 +415,7 @@ pub fn encode_v7(
         f.global[6] = 1.0;
         f.global[7] = 0.5;
     }
-    f.global[14] = f32::from(u8::from(game.consecutive_passes() >= 1 && !suppress));
+    f.global[14] = f32::from(u8::from(history.pass_would_end_phase && !suppress));
     if rules != FeatureRules::Japanese {
         let parity = f32::from(board.size() % 2);
         let floor = ((self_komi - parity) / 2.0).floor() * 2.0 + parity;

@@ -1,6 +1,7 @@
 // Small functional oracle linked against a separately supplied MIT KataGo tree.
 // It does not run a neural network or benchmark search.
 #include "game/boardhistory.h"
+#include "neuralnet/nninputs.h"
 #include "external/nlohmann_json/json.hpp"
 #include <iostream>
 using json = nlohmann::json;
@@ -36,9 +37,21 @@ int main() {
         colors.push_back(board.colors[loc] == C_BLACK ? "B" : board.colors[loc] == C_WHITE ? "W" : ".");
       }
       legal.push_back(hist.isLegal(board,Board::PASS_LOC,hist.presumedNextMovePla));
-      std::cout << json{{"name",input.value("name",std::string())},{"encorePhase",hist.encorePhase},
+      json output = {{"name",input.value("name",std::string())},{"encorePhase",hist.encorePhase},
         {"finished",hist.isGameFinished},{"noResult",hist.isNoResult},{"scoreLead",-hist.finalWhiteMinusBlackScore},
-        {"ownership",ownership},{"legal",legal},{"board",colors},{"handicapBonus",hist.whiteHandicapBonusScore}}.dump() << std::endl;
+        {"ownership",ownership},{"legal",legal},{"board",colors},{"handicapBonus",hist.whiteHandicapBonusScore}};
+      if(input.value("includeFeatures",false)) {
+        float spatial[22*361], global[19];
+        MiscNNInputParams params;
+        params.conservativePassAndIsRoot = input.value("conservativePass",false);
+        NNInputs::fillRowV7(board,hist,hist.presumedNextMovePla,params,19,19,false,spatial,global);
+        json nonzero = json::array();
+        for(int i=0;i<22*361;i++) if(spatial[i] != 0.0f) nonzero.push_back(i);
+        output["spatial"] = nonzero;
+        output["globalInput"] = global;
+        output["passWouldEndPhase"] = hist.passWouldEndPhase(board,hist.presumedNextMovePla);
+      }
+      std::cout << output.dump() << std::endl;
     } catch(const std::exception& error) { std::cout << json{{"error",error.what()}}.dump() << std::endl; }
   }
 }

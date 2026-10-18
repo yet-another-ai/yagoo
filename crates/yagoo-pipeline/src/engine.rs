@@ -5,7 +5,9 @@ use yagoo_katago::{AnalysisQuery, AnalysisResponse, AnalysisUpdate, KatagoError,
 pub type UpdateCallback<'a> = dyn FnMut(AnalysisUpdate) -> KatagoResult<()> + 'a;
 
 /// Engines emit partials followed by exactly one final response, or return an error.
-/// Dropping the future cancels work owned by that query.
+/// Dropping the future cancels local work owned by that query. The native process
+/// adapter removes its route immediately and queues a best-effort single-query
+/// terminate after any pending complete JSON write; late responses are discarded.
 pub trait AnalysisEngine {
     fn analyze_streaming<'a>(
         &'a self,

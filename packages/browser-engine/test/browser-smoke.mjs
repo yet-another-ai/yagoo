@@ -9,9 +9,10 @@ import assert from 'node:assert/strict';
 const mode = process.argv[2] ?? 'wasm-threads';
 const gpu = mode.startsWith('webgpu');
 const batched = mode.endsWith('-batch');
+const deepVisits = Number(process.env.SMOKE_DEEP_VISITS ?? (batched ? 8 : 4));
 const isolated = mode !== 'wasm-single' && mode !== 'service-worker';
 const root = resolve('dist');
-const artifacts = resolve('../../.yagoo-data/browser-smoke', mode);
+const artifacts = resolve('../../.yagoo-data/browser-smoke', mode + (process.env.SMOKE_DEEP_VISITS ? '-reference' : ''));
 await mkdir(artifacts, { recursive: true });
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.wasm': 'application/wasm', '.json': 'application/json', '.css': 'text/css' };
 const server = createServer(async (request, response) => {
@@ -105,7 +106,7 @@ try {
   await writeFile(resolve(artifacts, 'result.json'), JSON.stringify({ mode, capabilities, status, scanSummary: await page.locator('#status').innerText(), ortWorkers, eventCount: events.length, positions: positions.length }, null, 2));
   if (gpu) {
     await page.locator('#sgf').fill('(;SZ[9]KM[7.5]RU[Chinese];B[cc])');
-    await page.locator('#visits').fill(batched ? '8' : '4');
+    await page.locator('#visits').fill(String(deepVisits));
     await page.locator('#all').check();
     await page.getByRole('button', { name: 'Scan and deepen', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('#events').textContent.includes('"type":"gameCompleted"') || /failed|not implemented|Error:/.test(document.querySelector('#status').textContent), null, { timeout: 300_000 });
@@ -118,9 +119,11 @@ try {
     assert.equal(deepEvents.filter(e => e.type === 'stageCompleted' && e.phase === 'deep' && e.stage === 'pass_probe' && !e.skipped).length, 2);
     const roots = deepEvents.filter(e => e.type === 'positionCompleted' && e.phase === 'deep');
     for (const { snapshot } of roots) {
-      assert.equal(snapshot.root.visits, batched ? 8 : 4);
-      assert.ok(snapshot.candidates.length > 0);
-      assert.ok(snapshot.candidates.every(c => c.pv.length > 0));
+      assert.equal(snapshot.root.visits, deepVisits);
+      if (deepVisits > 1) {
+        assert.ok(snapshot.candidates.length > 0);
+        assert.ok(snapshot.candidates.every(c => c.pv.length > 0));
+      }
     }
     await page.locator('#sgf').fill('(;SZ[9]KM[7.5]RU[Chinese];B[];W[])');
     await page.getByRole('button', { name: 'Scan and deepen', exact: true }).click();

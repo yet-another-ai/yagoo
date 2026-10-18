@@ -17,13 +17,20 @@ successful model load or build.
       numerical batch validation and a real-model multi-row browser smoke.
 - [x] Verified two-pass scoring for Chinese/Chinese-OGS (30 upstream cases); terminal
       leaves must bypass the NN and must not create additional legal continuations.
-- [ ] Targeted ladder, Benson, ko, history and scoring fixtures against upstream.
-      The 72 V7 and 30 scoring cases are present; targeted ladder/ko/superko and
-      simple-ko long-cycle/no-result and repeated-pass endings remain open.
+- [x] Targeted ladder, Benson, ko, history and scoring fixtures against upstream:
+      72 Python V7, 40 targeted C++ and 30 area-scoring cases. This is not exhaustive.
+- [x] Unsupported encore, long-cycle/no-result and repeated-pass boundaries are
+      detected from complete history, at entry and searched leaves, before NN or
+      successful final output. Implementing their actual scoring remains open.
 - [ ] Japanese encore legality, features and scoring, or an explicit unsupported
       boundary accepted as a staged delivery. Zero-filled encore features are forbidden.
-- [ ] Search behavior comparison against native KataGo on a small functional corpus,
-      with stated tolerances and limits. This is not a CI throughput benchmark.
+- [x] Search behavior comparison against native KataGo on a small functional corpus,
+      with stated tolerances and limits. Seven one-visit root/pass-probe queries
+      match official native SWA outputs. Four eight-visit queries completed, with
+      differences recorded (up to 1.766 points and 0.4380 ownership); full search
+      equivalence is not established and remains outside the completed scope.
+- [x] Independent algorithm and runtime reviews, with regression checks for the
+      confirmed output, cancellation, initialization and provenance defects.
 
 ## Subsequent enhancements, separately disclosed
 

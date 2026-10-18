@@ -21,7 +21,7 @@ def main():
     source = args.katago_source.resolve() / 'cpp'
     out = args.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
-    units = ['game/board.cpp', 'game/boardhistory.cpp', 'game/rules.cpp',
+    units = ['game/board.cpp', 'game/boardhistory.cpp', 'game/rules.cpp', 'neuralnet/nninputs.cpp',
              'core/global.cpp', 'core/hash.cpp', 'core/rand.cpp', 'core/md5.cpp',
              'core/sha2.cpp', 'core/timer.cpp', 'core/bsearch.cpp']
     sources = [str(Path(__file__).with_name('rules_reference.cpp').resolve())]

@@ -1,0 +1,39 @@
+{
+  "id": "fixture-1",
+  "isDuringSearch": false,
+  "moveInfos": [
+    {
+      "move": "D4",
+      "visits": 120,
+      "winrate": 0.52,
+      "scoreLead": 1.25,
+      "scoreStdev": 12.0,
+      "prior": 0.08,
+      "utility": 0.04,
+      "lcb": 0.48,
+      "order": 0,
+      "pv": ["D4", "Q16", "C16"],
+      "pvVisits": [120, 80, 40],
+      "ownership": [0.1, -0.2, 0.0],
+      "ownershipStdev": [0.05, 0.1, 0.2]
+    },
+    {
+      "move": "Q16",
+      "visits": 90,
+      "winrate": 0.49,
+      "scoreLead": -0.3,
+      "prior": 0.07,
+      "order": 1,
+      "pv": ["Q16", "D4"]
+    }
+  ],
+  "rootInfo": {
+    "winrate": 0.51,
+    "scoreLead": 0.8,
+    "visits": 500,
+    "ownership": [0.2, -0.1, 0.0],
+    "ownershipStdev": [0.05, 0.08, 0.15],
+    "policy": [0.01, 0.02, 0.03]
+  },
+  "policy": [0.01, 0.02, 0.03]
+}

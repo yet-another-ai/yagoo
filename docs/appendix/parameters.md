@@ -6,12 +6,12 @@ All values are **initial** and expect retuning on real games.
 | --- | --- | --- |
 | K (candidates) | 5–8 | Scenarios |
 | Visits (root / PV-end) | 500–2000 / 100–300 | Scenarios |
-| Stable threshold \(\varepsilon\) | 0.1 | Fate communities |
-| Keep-if-stdev \(s_i\) | 0.3 | Fate communities |
-| Affinity exponent \(\gamma\) | 2 | Fate communities |
-| Hierarchical cut \(r^\ast\) | 0.7 | Fate communities |
-| Min community size \(n_{\min}\) | 3 | Fate communities |
-| Adversarial color share | 20% | Fate communities |
+| Stable threshold \(\varepsilon\) | 0.1 | Groups |
+| Keep-if-stdev \(s_i\) | 0.3 | Groups |
+| Affinity exponent \(\gamma\) | 2 | Groups |
+| Hierarchical cut \(r^\ast\) | 0.7 | Groups |
+| Min group size \(n_{\min}\) | 3 | Groups |
+| Contested color share | 20% | Groups |
 | Status thresholds | 0.8 / 0.4 / 0.3 | Tempo |
 | Unsettled \(\Delta\) | 0.6 | Tempo |
 | scorebelief vs scoreLead flag | 3 points | Score |

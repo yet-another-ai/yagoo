@@ -1,8 +1,8 @@
 # Gain / loss ledger
 
-**Role.** Decompose why a move is valuable or a mistake: own territory, reducing the opponent, or changing a fate community’s life status — not a single opaque point count.
+**Role.** Decompose why a move is valuable or a mistake: own territory, reducing the opponent, or changing a group’s life status — not a single opaque point count.
 
-Whether this module is in the **2-week MVP** is still an [open question](../open-questions.md) (high teaching value vs time to validate fate communities).
+Whether this module is in the **2-week MVP** is still an [open question](../open-questions.md) (high teaching value vs time to validate groups).
 
 ## Inputs
 
@@ -20,7 +20,7 @@ Whether this module is in the **2-week MVP** is still an [open question](../open
 
 Let \(\delta_i=\sigma_P\,(o_i^{(m)}-o_i^{\mathrm{ref}})\). Assign points by priority:
 
-1. **Community term:** \(i\in C\) and \(C\)’s status changes between \(m\) and ref (or \(|\Delta g_C|\ge 0.3\)). All members of \(C\) go under “save / kill / strengthen / weaken \(C\)”.
+1. **Group term:** \(i\in C\) and \(C\)’s status changes between \(m\) and ref (or \(|\Delta g_C|\ge 0.3\)). All members of \(C\) go under “save / kill / strengthen / weaken \(C\)”.
 2. **Own territory:** empty and \(\sigma_P o_i^{\mathrm{ref}}\ge 0\) under the reference.
 3. **Reduce opponent:** empty and \(\sigma_P o_i^{\mathrm{ref}}<0\) under the reference.
 4. **Other:** remaining stone points (scattered dead stones, etc.).
@@ -42,7 +42,7 @@ If \(\big|\sum_k E_k-\sigma_P\Delta\mathrm{scoreLead}\big|\) exceeds **initial**
   "value": 11.2,
   "ledger": [
     {
-      "kind": "community",
+      "kind": "group",
       "id": "C5",
       "change": "weak->settled",
       "points": 7.9
@@ -58,7 +58,7 @@ If \(\big|\sum_k E_k-\sigma_P\Delta\mathrm{scoreLead}\big|\) exceeds **initial**
 
 - “~11 points: ~8 from settling C5.”
 - “−7 vs best: mostly failing to save C3 (−9); the territory grab (+2) does not compensate.”
-- Link to pivotal communities in the score module when a mistake creates a “game hangs on this” region.
+- Link to pivotal groups in the score module when a mistake creates a “game hangs on this” region.
 
 ## Known limits
 

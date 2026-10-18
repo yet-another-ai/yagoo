@@ -5,11 +5,11 @@
 ## Inputs
 
 - Root analysis (side \(P\) to play) and pass-probe analysis (after `pass`, \(\bar{P}\) to play)
-- Fate-community partition from the root + scenario set (computed once; the pass probe is itself one scenario)
+- Group partition from the root + scenario set (computed once; the pass probe is itself one scenario)
 
 ## Computation
 
-For the \(p\)-side portion of community \(C\):
+For the \(p\)-side portion of group \(C\):
 
 \[
 g^{p,+}_C=\begin{cases}
@@ -27,9 +27,9 @@ g^p_C(\mathrm{root}) & p=\bar{P}
 \Delta_C^{p}=g^{p,+}_C-g^{p,-}_C
 \]
 
-Adversarial communities report \(\Delta\) for both colors. Usually same sign and similar magnitude → merge narratively as “race tempo gap”.
+Contested groups report \(\Delta\) for both colors. Usually same sign and similar magnitude → merge narratively as “race tempo gap”.
 
-## Community status (**initial** thresholds; retune)
+## Group status (**initial** thresholds; retune)
 
 | Status | Condition (side \(p\)) | Teaching gloss |
 | --- | --- | --- |
@@ -43,7 +43,7 @@ Auxiliary: if \(\Delta_C^{p}\ge 0.6\), mark **unsettled** even when status is �
 
 ## Output
 
-Per community: `g_plus`, `g_minus`, `delta`, `status`.
+Per group: `g_plus`, `g_minus`, `delta`, `status`.
 
 ## Teaching uses
 

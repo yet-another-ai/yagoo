@@ -39,7 +39,7 @@ Ownership arrays from the engine are row-major starting at **A19**. PyTorch tens
 
 ## Scenario set \(\mathcal{S}\)
 
-Shared by fate communities and score distribution. Built once per analyzed position:
+Shared by groups and score distribution. Built once per analyzed position:
 
 | Scenario type | Count | Initial weight \(w_s\) |
 | --- | --- | --- |
@@ -48,7 +48,7 @@ Shared by fate communities and score distribution. Built once per analyzed posit
 | Pass-probe root ownership | 1 | Same weight as the top candidate |
 | (Optional) top-K′ `movesOwnership` under pass probe | K′ = 3 | Same rule |
 
-Roughly **12–20** scenarios. Small \(N\) is the main statistical limit for fate communities.
+Roughly **12–20** scenarios. Small \(N\) is the main statistical limit for groups.
 
 ## Per-position cost (**estimate**, not measured end-to-end)
 

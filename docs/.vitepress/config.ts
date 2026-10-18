@@ -29,7 +29,7 @@ export default defineConfig({
       {
         text: "Modules",
         items: [
-          { text: "Fate communities", link: "/modules/fate-communities" },
+          { text: "Groups", link: "/modules/groups" },
           { text: "Tempo sensitivity", link: "/modules/tempo-sensitivity" },
           { text: "Score distribution", link: "/modules/score-distribution" },
           { text: "Positional zoning", link: "/modules/positional-zoning" },

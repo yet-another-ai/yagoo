@@ -1,5 +1,9 @@
 [workspace]
-members = ["crates/yagoo-core"]
+members = [
+    "crates/yagoo-core",
+    "crates/yagoo-sgf",
+    "crates/yagoo-katago",
+]
 resolver = "2"
 
 [workspace.package]
@@ -10,9 +14,13 @@ license = "Apache-2.0"
 repository = "https://github.com/yet-another-ai/yagoo"
 
 [workspace.dependencies]
+yagoo-core = { path = "crates/yagoo-core" }
+yagoo-sgf = { path = "crates/yagoo-sgf" }
+yagoo-katago = { path = "crates/yagoo-katago" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
+tokio = { version = "1", default-features = false, features = ["io-util", "macros", "process", "rt", "rt-multi-thread", "sync", "time", "test-util"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -20,3 +28,7 @@ unsafe_code = "forbid"
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
+# Prefer concise API docs over `# Errors` on every fallible helper.
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+doc_markdown = "allow"

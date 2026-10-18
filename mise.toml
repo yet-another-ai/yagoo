@@ -58,8 +58,8 @@ description = "Run Rust Clippy"
 depends = ["rust:clippy"]
 
 [tasks.check]
-description = "Format check, Clippy, cargo check, and docs build"
-depends = ["format-check", "lint", "rust:check", "docs-build"]
+description = "Format check, Clippy, cargo test, and docs build"
+depends = ["format-check", "lint", "rust:test", "docs-build"]
 
 [tasks."python:sync"]
 description = "Sync the uv-managed Python environment"
@@ -68,3 +68,7 @@ run = "uv sync --project python"
 [tasks.ci]
 description = "CI entrypoint (no performance or timing tests)"
 depends = ["check"]
+
+[tasks."katago:fetch-dev"]
+description = "Download b18 checkpoint for local dev (not used in CI)"
+run = "bash scripts/fetch-katago-dev.sh"

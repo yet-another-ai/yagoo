@@ -9,8 +9,10 @@ flowchart TB
   end
 
   subgraph host [Host process]
-    Core[Rust workspace<br/>SGF · rules · scenario orchestration · modules]
-    AEClient[Async Analysis Engine client]
+    Core[yagoo-core<br/>board · chains · rules]
+    Sgf[yagoo-sgf]
+    AEClient[yagoo-katago<br/>Analysis Engine client]
+    Teach[Teaching modules<br/>groups · tempo · …]
     Facts[Fact JSON + templates]
   end
 
@@ -24,12 +26,14 @@ flowchart TB
     Net[b18c384nbt SWA ckpt]
   end
 
-  UI --> Core
-  Core --> AEClient --> KG
-  Core --> UV --> PT --> Net
-  AEClient --> Core
-  PT --> Core
-  Core --> Facts --> UI
+  UI --> Teach
+  Sgf --> Core
+  Teach --> Core
+  Teach --> AEClient --> KG
+  Teach --> UV --> PT --> Net
+  AEClient --> Teach
+  PT --> Teach
+  Teach --> Facts --> UI
 ```
 
 | Concern | Choice |
@@ -41,11 +45,21 @@ flowchart TB
 | Python | **uv** under mise — model utilities, activation extract, concept-head training |
 | CI | GitHub Actions, **latest major** action tags; Renovate updates them. **No** performance / timing tests in CI |
 
+## Rust crate split
+
+| Crate | Responsibility |
+| --- | --- |
+| `yagoo-core` | Coordinates (GTP / SGF), board, **chains** (串), liberties, captures, ko / positional superko, move legality, pass |
+| `yagoo-sgf` | SGF → game record (main line, `AB`/`AW`, komi, rules, size, handicap) |
+| `yagoo-katago` | Async JSON-lines client for `katago analysis`; typed queries/responses; fixture tests (no binary in CI) |
+
+Teaching algorithms (groups, tempo, …) will land in dedicated crates or grow out of `yagoo-core` later — not implemented yet.
+
 ## Module data flow
 
 ```mermaid
 flowchart TD
-  SGF[SGF] --> P[Rust: parse / rebuild / chains]
+  SGF[SGF] --> P[yagoo-sgf + yagoo-core]
   P --> SCAN[Coarse scan: low-visit root<br/>pick critical positions]
   SCAN --> Q
 
@@ -73,7 +87,7 @@ flowchart TD
   QP --> SC
   QV --> SC
 
-  SC --> FC[Fate communities<br/>correlation → cluster → intra connectivity]
+  SC --> FC[Groups<br/>correlation → cluster → intra connectivity]
   FC --> TS[Tempo sensitivity<br/>g+ / g− / Δ / status]
   QP --> TS
   SK --> TS
@@ -105,19 +119,19 @@ flowchart TD
   TPL --> UI
 ```
 
-## Repository layout (scaffold)
+## Repository layout
 
 ```text
 .
-├── README.md                 # Landing overview
+├── README.md
 ├── docs/                     # Design docs + VitePress site
-├── crates/                   # Rust workspace members
-│   └── yagoo-core/           # Stub crate (algorithms later)
+├── crates/
+│   ├── yagoo-core/           # Board / rules
+│   ├── yagoo-sgf/            # SGF parsing
+│   └── yagoo-katago/         # Analysis Engine client
 ├── python/                   # uv-managed utilities (later)
-├── mise.toml                 # Tool versions + tasks
-├── Cargo.toml                # Workspace root
-├── package.json              # Node workspace root
-└── .github/workflows/ci.yml  # Docs + lint + cargo check
+├── scripts/                  # Local-dev helpers (model download, …)
+├── mise.toml
+├── Cargo.toml
+└── .github/workflows/ci.yml
 ```
-
-Algorithms are **not** implemented in the first documentation PR; crates and Python dirs exist so tooling and CI have a real shape.

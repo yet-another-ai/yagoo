@@ -4,7 +4,7 @@ Maintainer decisions needed. Design defaults are noted where they exist.
 
 ## 1. Geometry in zoning heuristics?
 
-Fate communities deliberately forbid geometric liaison rules. Moyo / thickness heuristics currently use distance ≤ 4–5. Is that an acceptable exception, or should thickness/moyo be redefined from pure fate signals (e.g. opponent invasion candidates’ `movesOwnership`)?
+Groups deliberately forbid geometric liaison rules. Moyo / thickness heuristics currently use distance ≤ 4–5. Is that an acceptable exception, or should thickness/moyo be redefined from pure fate signals (e.g. opponent invasion candidates’ `movesOwnership`)?
 
 ## 2. Weak remote bindings — hide or show?
 
@@ -12,11 +12,11 @@ Low-confidence “weak binding” parts: hide from teaching text, or surface as 
 
 ## 3. Score MC mean shift?
 
-Should community Monte Carlo shift its mean onto `scoreLead` (shape-only comparison), or also show the raw mean bias?
+Should group Monte Carlo shift its mean onto `scoreLead` (shape-only comparison), or also show the raw mean bias?
 
 ## 4. Ledger in the first validation spike?
 
-High teaching value, but competes with time validating fate communities. Include in the first spike or defer?
+High teaching value, but competes with time validating groups. Include in the first spike or defer?
 
 ## 5. Network lock — confirmed
 

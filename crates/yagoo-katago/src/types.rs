@@ -1,0 +1,171 @@
+//! Typed Analysis Engine query / response fields used by Yagoo.
+//!
+//! Field coverage follows `docs/data-sources.md` (Path A).
+
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::collections::HashMap;
+
+/// `"B"` / `"W"` as used in Analysis Engine JSON.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum PlayerToken {
+    B,
+    W,
+}
+
+impl PlayerToken {
+    #[must_use]
+    pub const fn from_color(color: yagoo_core::Color) -> Self {
+        match color {
+            yagoo_core::Color::Black => Self::B,
+            yagoo_core::Color::White => Self::W,
+        }
+    }
+}
+
+/// One element of `initialStones` / `moves`: `[color, gtpCoord]`.
+pub type MoveListEntry = (PlayerToken, String);
+
+/// `overrideSettings` bag — pass through known keys as JSON values.
+pub type OverrideSettings = HashMap<String, Value>;
+
+/// Analysis Engine query (request line).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalysisQuery {
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub initial_player: Option<PlayerToken>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub initial_stones: Vec<MoveListEntry>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub moves: Vec<MoveListEntry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rules: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub komi: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub board_x_size: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub board_y_size: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_visits: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub analysis_pv_len: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include_ownership: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include_ownership_stdev: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include_moves_ownership: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include_moves_ownership_stdev: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include_policy: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include_pv_visits: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub avoid_moves: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allow_moves: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub focus_moves: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub override_settings: Option<OverrideSettings>,
+}
+
+/// `rootInfo` object.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RootInfo {
+    #[serde(default)]
+    pub winrate: Option<f64>,
+    #[serde(default)]
+    pub score_lead: Option<f64>,
+    #[serde(default)]
+    pub score_selfplay: Option<f64>,
+    #[serde(default)]
+    pub utility: Option<f64>,
+    #[serde(default)]
+    pub visits: Option<u64>,
+    #[serde(default)]
+    pub raw_st_wr_error: Option<f64>,
+    #[serde(default)]
+    pub raw_st_score_error: Option<f64>,
+    #[serde(default)]
+    pub raw_var_time_left: Option<f64>,
+    /// Row-major from A19, values in [-1, 1], black-positive when configured.
+    #[serde(default)]
+    pub ownership: Option<Vec<f64>>,
+    #[serde(default)]
+    pub ownership_stdev: Option<Vec<f64>>,
+    #[serde(default)]
+    pub policy: Option<Vec<f64>>,
+    #[serde(default)]
+    pub human_policy: Option<Vec<f64>>,
+}
+
+/// One entry in `moveInfos`.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveInfo {
+    #[serde(rename = "move")]
+    pub move_: String,
+    #[serde(default)]
+    pub visits: Option<u64>,
+    #[serde(default)]
+    pub winrate: Option<f64>,
+    #[serde(default)]
+    pub score_lead: Option<f64>,
+    #[serde(default)]
+    pub score_stdev: Option<f64>,
+    #[serde(default)]
+    pub prior: Option<f64>,
+    #[serde(default)]
+    pub human_prior: Option<f64>,
+    #[serde(default)]
+    pub utility: Option<f64>,
+    #[serde(default)]
+    pub lcb: Option<f64>,
+    #[serde(default)]
+    pub order: Option<u32>,
+    #[serde(default)]
+    pub pv: Option<Vec<String>>,
+    #[serde(default)]
+    pub pv_visits: Option<Vec<u64>>,
+    #[serde(default)]
+    pub ownership: Option<Vec<f64>>,
+    #[serde(default)]
+    pub ownership_stdev: Option<Vec<f64>>,
+}
+
+impl MoveInfo {
+    /// GTP coordinate or `"pass"`.
+    #[must_use]
+    pub fn gtp_move(&self) -> &str {
+        &self.move_
+    }
+}
+
+/// Full analysis response line.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalysisResponse {
+    pub id: String,
+    #[serde(default)]
+    pub is_during_search: Option<bool>,
+    #[serde(default)]
+    pub error: Option<String>,
+    #[serde(default)]
+    pub warning: Option<String>,
+    #[serde(default)]
+    pub move_infos: Option<Vec<MoveInfo>>,
+    #[serde(default)]
+    pub root_info: Option<RootInfo>,
+    #[serde(default)]
+    pub policy: Option<Vec<f64>>,
+    /// Catch-all for forward compatibility.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}

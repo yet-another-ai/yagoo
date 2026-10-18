@@ -20,7 +20,7 @@ flowchart LR
 
 | Module | Question it answers |
 | --- | --- |
-| **Fate communities** | Which stones move together across futures? |
+| **Groups** | Which stones move together across futures? |
 | **Tempo sensitivity** | Is this group “whoever plays first wins”? |
 | **Score distribution** | Fine endgame or unresolved fight? |
 | **Positional zoning** | Territory, moyo, thickness, weak groups |
@@ -32,7 +32,7 @@ flowchart LR
 
 - Black-box winrate / “R4” style judging alone
 - Academic interpretability research as the product
-- Designing for rare adversarial KataGo failure modes
+- Designing for rare adversarial KataGo failure modes (e.g. cyclic groups)
 - Tsumego solvers
 
 Details: [Goals & non-goals](docs/goals.md).
@@ -60,7 +60,13 @@ mise run check
 mise run docs          # VitePress docs site
 ```
 
-Algorithms are not implemented yet. This repository currently holds design documentation and a minimal toolchain scaffold.
+Foundation crates (`yagoo-core`, `yagoo-sgf`, `yagoo-katago`) are in place. Teaching algorithms (groups, tempo, …) are not implemented yet.
+
+Optional local KataGo assets (not CI):
+
+```sh
+mise run katago:fetch-dev
+```
 
 ## License
 

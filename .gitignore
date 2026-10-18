@@ -35,3 +35,6 @@ coverage/
 # Editors
 .idea/
 .vscode/
+
+# Local KataGo / model downloads (mise run katago:fetch-dev)
+.yagoo-data/

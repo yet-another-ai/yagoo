@@ -1,0 +1,10 @@
+[project]
+name = "yagoo-python"
+version = "0.1.0"
+description = "Python utilities for Yagoo (model conversion, activation extract, concept heads)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.uv]
+package = false

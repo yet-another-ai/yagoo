@@ -1,0 +1,70 @@
+min_version = "2025.10.0"
+
+[tools]
+node = "22"
+pnpm = "10"
+rust = { channel = "stable", version = "latest", components = "rustfmt,clippy" }
+uv = "latest"
+
+[settings]
+lockfile = true
+
+[tasks.install]
+description = "Install JavaScript workspace dependencies"
+run = "pnpm install --frozen-lockfile --prefer-offline"
+sources = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "docs/package.json"]
+outputs = ["node_modules/.pnpm/lock.yaml"]
+
+[tasks."rust:format"]
+hide = true
+run = "cargo fmt --all"
+
+[tasks."rust:format:check"]
+hide = true
+run = "cargo fmt --all --check"
+
+[tasks."rust:clippy"]
+hide = true
+run = "cargo clippy --workspace --all-targets -- -D warnings"
+
+[tasks."rust:check"]
+hide = true
+run = "cargo check --workspace --all-targets"
+
+[tasks."rust:test"]
+description = "Run Rust workspace tests"
+run = "cargo test --workspace"
+
+[tasks.docs]
+description = "Start the documentation site"
+depends = ["install"]
+run = "pnpm --filter @yagoo/docs dev"
+
+[tasks."docs-build"]
+description = "Build the documentation site"
+depends = ["install"]
+run = "pnpm --filter @yagoo/docs build"
+
+[tasks.format]
+description = "Format Rust sources"
+depends = ["rust:format"]
+
+[tasks."format-check"]
+description = "Check Rust formatting without modifying files"
+depends = ["rust:format:check"]
+
+[tasks.lint]
+description = "Run Rust Clippy"
+depends = ["rust:clippy"]
+
+[tasks.check]
+description = "Format check, Clippy, cargo check, and docs build"
+depends = ["format-check", "lint", "rust:check", "docs-build"]
+
+[tasks."python:sync"]
+description = "Sync the uv-managed Python environment"
+run = "uv sync --project python"
+
+[tasks.ci]
+description = "CI entrypoint (no performance or timing tests)"
+depends = ["check"]

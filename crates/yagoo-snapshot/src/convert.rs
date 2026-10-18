@@ -2,7 +2,7 @@
 
 use crate::schema::{BoardSnapshot, CandidateSnapshot, ChainSnapshot, ColorToken, EngineAnalysis};
 use yagoo_core::{Color, GameState, Stone};
-use yagoo_katago::{AnalysisResponse, MoveInfo, RootInfo};
+use yagoo_katago::{AnalysisResponse, MoveInfo};
 
 #[must_use]
 pub fn board_from_game(game: &GameState) -> BoardSnapshot {
@@ -37,28 +37,23 @@ pub fn chains_from_game(game: &GameState) -> Vec<ChainSnapshot> {
         .collect()
 }
 
+/// Build [`EngineAnalysis`] from a full Analysis Engine response.
+///
+/// Root scalars come from `rootInfo`; ownership / ownershipStdev / policy are
+/// read from the **top level** of the response (KataGo protocol).
 #[must_use]
-pub fn engine_from_root(root: &RootInfo, policy_fallback: Option<&[f64]>) -> EngineAnalysis {
-    EngineAnalysis {
+pub fn engine_from_response(resp: &AnalysisResponse) -> Option<EngineAnalysis> {
+    let root = resp.root_info.as_ref()?;
+    Some(EngineAnalysis {
         visits: root.visits,
         winrate: root.winrate,
         score_lead: root.score_lead,
         score_stdev: None,
         utility: root.utility,
-        ownership: root.ownership.clone(),
-        ownership_stdev: root.ownership_stdev.clone(),
-        policy: root
-            .policy
-            .clone()
-            .or_else(|| policy_fallback.map(<[f64]>::to_vec)),
-    }
-}
-
-#[must_use]
-pub fn engine_from_response(resp: &AnalysisResponse) -> Option<EngineAnalysis> {
-    resp.root_info
-        .as_ref()
-        .map(|r| engine_from_root(r, resp.policy.as_deref()))
+        ownership: resp.ownership.clone(),
+        ownership_stdev: resp.ownership_stdev.clone(),
+        policy: resp.policy.clone(),
+    })
 }
 
 #[must_use]
@@ -114,16 +109,41 @@ mod tests {
     #[test]
     fn engine_from_fixture() {
         let json = r#"{
-          "id":"t","rootInfo":{"visits":500,"ownership":[0.1,-0.2],
-          "ownershipStdev":[0.05,0.1],"winrate":0.5,"scoreLead":1.0},
+          "id":"t",
+          "rootInfo":{"visits":500,"winrate":0.5,"scoreLead":1.0},
+          "ownership":[0.1,-0.2],
+          "ownershipStdev":[0.05,0.1],
+          "policy":[0.2,0.3,0.5],
           "moveInfos":[{"move":"D4","visits":10,"order":0,"ownership":[0.2]}]
         }"#;
         let resp = AnalysisClient::parse_response(json).unwrap();
         let eng = engine_from_response(&resp).unwrap();
         assert_eq!(eng.visits, Some(500));
         assert_eq!(eng.ownership.as_ref().unwrap().len(), 2);
+        assert_eq!(eng.ownership_stdev.as_ref().unwrap().len(), 2);
+        assert_eq!(eng.policy.as_ref().unwrap().len(), 3);
         let cands = candidates_from_response(&resp, 8);
         assert_eq!(cands.len(), 1);
         assert_eq!(cands[0].move_, "D4");
+    }
+
+    #[test]
+    fn ownership_nested_under_root_info_is_ignored() {
+        // Realistic mistake: nesting ownership in rootInfo (not KataGo's layout).
+        let json = r#"{
+          "id":"t",
+          "rootInfo":{"visits":10,"winrate":0.5,"scoreLead":0.0,
+            "ownership":[0.9,0.9],"ownershipStdev":[0.1,0.1],"policy":[1.0]},
+          "moveInfos":[]
+        }"#;
+        let resp = AnalysisClient::parse_response(json).unwrap();
+        let eng = engine_from_response(&resp).unwrap();
+        assert!(eng.ownership.is_none());
+        assert!(eng.ownership_stdev.is_none());
+        assert!(eng.policy.is_none());
+        // Nested arrays land in rootInfo's unknown extras only if RootInfo
+        // used flatten; without that they are dropped by serde — either way
+        // they must not appear on EngineAnalysis.
+        assert!(resp.ownership.is_none());
     }
 }

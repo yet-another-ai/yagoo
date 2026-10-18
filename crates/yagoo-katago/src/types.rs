@@ -51,6 +51,9 @@ pub struct AnalysisQuery {
     pub board_y_size: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_visits: Option<u32>,
+    /// Seconds between during-search progress reports (KataGo `reportDuringSearchEvery`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub report_during_search_every: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub analysis_pv_len: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]

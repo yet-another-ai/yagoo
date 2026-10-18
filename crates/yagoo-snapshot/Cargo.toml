@@ -1,0 +1,22 @@
+[package]
+name = "yagoo-snapshot"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Versioned analysis snapshot schema and streaming events for Yagoo"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+yagoo-core.workspace = true
+yagoo-katago.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

@@ -72,3 +72,7 @@ depends = ["check"]
 [tasks."katago:fetch-dev"]
 description = "Download b18 checkpoint for local dev (not used in CI)"
 run = "bash scripts/fetch-katago-dev.sh"
+
+[tasks."yagoo:analyze"]
+description = "Run yagoo analyze (requires YAGOO_KATAGO, YAGOO_MODEL, YAGOO_ANALYSIS_CONFIG)"
+run = "cargo run -p yagoo-cli -- analyze"

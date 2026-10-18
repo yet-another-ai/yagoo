@@ -4,17 +4,20 @@ export interface Manifest {
   boardSize: 19; batch: number; maxBatch?: number; outputs: string[];
   variants: { fp32: Artifact; fp16?: Artifact }; warmup: Artifact;
   postprocess: Record<string, number>; license: string; source: string;
+  checkpointSha256: string; upstreamRevision: string;
 }
 
 export function validateManifest(value: unknown): Manifest {
   const m = value as Manifest;
   if (!m || m.schemaVersion !== 1 || m.swa !== true || m.inputVersion !== 7 || m.boardSize !== 19 || ![0, 1].includes(m.batch) ||
-      ![14, 15].includes(m.modelVersion) || !m.model?.startsWith('kata1-b18c384nbt-')) {
+      m.modelVersion !== 14 || m.model !== 'kata1-b18c384nbt-s9996604416-d4316597426' ||
+      m.checkpointSha256 !== 'ed3f2681be01604fd51b467925de77cea4f19cf125383493449d8c002fb91a24' ||
+      !/^[0-9a-f]{40}$/.test(m.upstreamRevision ?? '')) {
     throw new Error('Expected a validated b18 SWA V7 model bundle with fixed batch 1 or bounded dynamic batches.');
   }
   if (m.batch === 0 && (!Number.isInteger(m.maxBatch) || m.maxBatch! < 1 || m.maxBatch! > 4)) throw new Error('Dynamic model maxBatch must be 1..4.');
-  for (const name of ['policy', 'value', 'miscvalue', 'ownership', 'scorebelief_logprobs']) {
-    if (!m.outputs.includes(name)) throw new Error(`Model is missing ${name}.`);
+  for (const name of ['policy', 'value', 'miscvalue', 'moremiscvalue', 'ownership', 'scoring', 'scorebelief_logprobs', 'seki', 'futurepos']) {
+    if (!Array.isArray(m.outputs) || !m.outputs.includes(name)) throw new Error(`Model is missing ${name}.`);
   }
   for (const key of ['scoremean_multiplier', 'scorestdev_multiplier', 'lead_multiplier']) {
     if (!(m.postprocess?.[key] > 0) || !Number.isFinite(m.postprocess[key])) throw new Error(`Invalid model postprocess ${key}.`);

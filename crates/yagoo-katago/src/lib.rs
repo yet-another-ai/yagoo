@@ -17,7 +17,7 @@ pub use query::AnalysisQueryBuilder;
 pub use types::AnalysisUpdate;
 pub use types::{
     AnalysisQuery, AnalysisResponse, MoveInfo, MoveListEntry, OverrideSettings, PlayerToken,
-    RootInfo,
+    RootInfo, RootNeuralOutput,
 };
 
 /// Crate version string from Cargo.

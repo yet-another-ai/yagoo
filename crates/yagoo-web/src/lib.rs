@@ -3,15 +3,17 @@ use std::sync::Arc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use yagoo_core::nn_features::V7Features;
-use yagoo_search::{NnEvaluator, Postprocess, RawHeads, SearchEngine, SearchOptions};
+use yagoo_search::{NnEvaluator, Postprocess, RawHeads, RootContext, SearchEngine, SearchOptions};
 
 struct WebEvaluator {
     callback: js_sys::Function,
+    on_root: js_sys::Function,
 }
-impl NnEvaluator for WebEvaluator {
-    fn evaluate_batch<'a>(
+impl WebEvaluator {
+    fn evaluate<'a>(
         &'a self,
         inputs: &'a [V7Features],
+        root_identity_batch: bool,
     ) -> LocalBoxFuture<'a, Result<Vec<RawHeads>, String>> {
         Box::pin(async move {
             let spatial: Vec<_> = inputs
@@ -27,7 +29,13 @@ impl NnEvaluator for WebEvaluator {
             let count = u32::try_from(inputs.len()).map_err(|e| e.to_string())?;
             let result = self
                 .callback
-                .call3(&JsValue::NULL, &spatial, &global, &JsValue::from(count))
+                .call4(
+                    &JsValue::NULL,
+                    &spatial,
+                    &global,
+                    &JsValue::from(count),
+                    &JsValue::from(root_identity_batch),
+                )
                 .map_err(|e| format!("{e:?}"))?;
             let json = JsFuture::from(js_sys::Promise::resolve(&result))
                 .await
@@ -35,6 +43,28 @@ impl NnEvaluator for WebEvaluator {
             serde_json::from_str(&json.as_string().ok_or("evaluator must return JSON heads")?)
                 .map_err(|e| e.to_string())
         })
+    }
+}
+
+impl NnEvaluator for WebEvaluator {
+    fn begin_root(&self, context: &RootContext) -> Result<(), String> {
+        let json = serde_json::to_string(context).map_err(|e| e.to_string())?;
+        self.on_root
+            .call1(&JsValue::NULL, &JsValue::from_str(&json))
+            .map_err(|e| format!("{e:?}"))?;
+        Ok(())
+    }
+    fn evaluate_batch<'a>(
+        &'a self,
+        inputs: &'a [V7Features],
+    ) -> LocalBoxFuture<'a, Result<Vec<RawHeads>, String>> {
+        self.evaluate(inputs, false)
+    }
+    fn evaluate_root_batch<'a>(
+        &'a self,
+        inputs: &'a [V7Features],
+    ) -> LocalBoxFuture<'a, Result<Vec<RawHeads>, String>> {
+        self.evaluate(inputs, true)
     }
 }
 
@@ -47,6 +77,7 @@ pub async fn analyze(
     search_options_json: String,
     evaluator: js_sys::Function,
     emit: js_sys::Function,
+    on_root: js_sys::Function,
 ) -> Result<(), JsValue> {
     let postprocess: Postprocess =
         serde_json::from_str(&postprocess_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
@@ -58,6 +89,7 @@ pub async fn analyze(
     let engine = Arc::new(SearchEngine {
         evaluator: WebEvaluator {
             callback: evaluator,
+            on_root,
         },
         postprocess,
         options,

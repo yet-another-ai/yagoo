@@ -9,11 +9,24 @@ use yagoo_search::{NnEvaluator, Postprocess, RawHeads, SearchEngine, SearchOptio
 
 #[derive(Default)]
 struct Evaluator {
+    roots: RefCell<Vec<yagoo_search::RootContext>>,
+    root_batches: RefCell<Vec<usize>>,
     batches: RefCell<Vec<Vec<V7Features>>>,
     fail_at: Option<usize>,
     prefer_pass: bool,
 }
 impl NnEvaluator for Evaluator {
+    fn begin_root(&self, context: &yagoo_search::RootContext) -> Result<(), String> {
+        self.roots.borrow_mut().push(context.clone());
+        Ok(())
+    }
+    fn evaluate_root_batch<'a>(
+        &'a self,
+        inputs: &'a [V7Features],
+    ) -> LocalBoxFuture<'a, Result<Vec<RawHeads>, String>> {
+        self.root_batches.borrow_mut().push(inputs.len());
+        self.evaluate_batch(inputs)
+    }
     fn evaluate_batch<'a>(
         &'a self,
         inputs: &'a [V7Features],
@@ -90,6 +103,8 @@ fn root_averages_probabilities_after_inverse_transform_in_two_real_batches() {
         .max_visits(1)
         .build();
     let result = block_on(engine.analyze(&query)).unwrap();
+    assert_eq!(*engine.evaluator.root_batches.borrow(), vec![4]);
+    assert_eq!(engine.evaluator.roots.borrow()[0].query_id, "symmetry");
     let policy = result.policy.unwrap();
     for corner in [8, 72, 80] {
         assert!((policy[corner] - policy[0]).abs() < 1e-12);
@@ -107,6 +122,20 @@ fn root_averages_probabilities_after_inverse_transform_in_two_real_batches() {
         [4, 4]
     );
     assert_eq!(result.root_info.unwrap().visits, Some(1));
+}
+
+#[test]
+fn terminal_root_notifies_activation_lifetime_without_neural_inference() {
+    let engine = engine(8, 4);
+    let query = AnalysisQueryBuilder::new("terminal-root")
+        .board_size(9)
+        .rules("chinese")
+        .push_move(yagoo_core::Color::Black, "pass")
+        .push_move(yagoo_core::Color::White, "pass")
+        .build();
+    assert!(block_on(engine.analyze(&query)).is_ok());
+    assert_eq!(engine.evaluator.roots.borrow()[0].query_id, "terminal-root");
+    assert!(engine.evaluator.batches.borrow().is_empty());
 }
 
 #[test]

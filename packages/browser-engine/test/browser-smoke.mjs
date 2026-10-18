@@ -10,9 +10,10 @@ const mode = process.argv[2] ?? 'wasm-threads';
 const gpu = mode.startsWith('webgpu');
 const batched = mode.endsWith('-batch');
 const deepVisits = Number(process.env.SMOKE_DEEP_VISITS ?? (batched ? 8 : 4));
+const outputsOnly = process.env.SMOKE_OUTPUTS_ONLY === '1';
 const isolated = mode !== 'wasm-single' && mode !== 'service-worker';
 const root = resolve('dist');
-const artifacts = resolve('../../.yagoo-data/browser-smoke', mode + (process.env.SMOKE_DEEP_VISITS ? '-reference' : ''));
+const artifacts = resolve('../../.yagoo-data/browser-smoke', mode + (outputsOnly ? '-outputs' : process.env.SMOKE_DEEP_VISITS ? '-reference' : ''));
 await mkdir(artifacts, { recursive: true });
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.wasm': 'application/wasm', '.json': 'application/json', '.css': 'text/css' };
 const server = createServer(async (request, response) => {
@@ -58,6 +59,7 @@ try {
   console.log(JSON.stringify({ mode, capabilities }));
   if (!gpu) await page.locator('#wasm').check();
   await page.locator('#threads').fill('4');
+  if (outputsOnly) await page.locator('#activations').check();
   await page.getByRole('button', { name: 'Load and validate model' }).click();
   // Generous liveness bound; no recorded duration or throughput requirement.
   await page.waitForFunction(() => !document.querySelector('#scan').disabled || /failed:|Error:/.test(document.querySelector('#status').textContent), null, { timeout: 300_000 });
@@ -101,10 +103,44 @@ try {
     assert.ok(Math.abs(snapshot.root.policy.reduce((a, b) => a + b, 0) - 1) < 1e-6);
     assert.ok(snapshot.root.winrate >= 0 && snapshot.root.winrate <= 1);
     assert.ok(Number.isFinite(snapshot.root.scoreLead));
+    const neural = snapshot.root.neural;
+    assert.equal(neural.sampleToPlay, snapshot.toPlay);
+    assert.equal(neural.sampleSymmetry, 'identity');
+    assert.equal(neural.aggregation, 'none');
+    assert.equal(neural.tensorLayout, 'CHW');
+    assert.equal(neural.boardSize, 9);
+    assert.equal(neural.modelBoardSize, 19);
+    assert.equal(neural.scoreBeliefLogProbs.length, 842);
+    assert.equal(neural.scoreBinFirstCenter, -420.5);
+    assert.equal(neural.sekiLogits.length, 1444);
+    assert.equal(neural.futurePositionPreTanh.length, 722);
+    assert.ok([...neural.scoreBeliefLogProbs, ...neural.sekiLogits, ...neural.futurePositionPreTanh].every(Number.isFinite));
+    assert.ok(Math.abs(neural.scoreBeliefLogProbs.reduce((sum, x) => sum + Math.exp(x), 0) - 1) < 0.002);
+    assert.doesNotMatch(JSON.stringify(snapshot), /trunk_after_block|trunkfinal|gpu-buffer/);
+  }
+  if (outputsOnly) {
+    if (gpu) {
+      const leaseText = await page.locator('#activation-status').getAttribute('data-lease');
+      assert.ok(leaseText, await page.locator('#activation-status').innerText());
+      const lease = JSON.parse(leaseText);
+      assert.equal(lease.location, 'gpu-buffer'); assert.equal(lease.sampleSymmetry, 'identity');
+      assert.equal(lease.toPlay, 'B'); assert.equal(lease.boardSize, 9);
+      assert.equal(lease.layers.length, 19);
+      for (const layer of lease.layers) {
+        assert.deepEqual(layer.dims, [1, 384, 19, 19]);
+        assert.equal(layer.type, 'float32'); assert.equal(layer.bytes, 554496);
+      }
+      await writeFile(resolve(artifacts, 'root-activations.json'), JSON.stringify(lease, null, 2));
+      await page.getByRole('button', { name: 'Release root activations', exact: true }).click();
+      await page.waitForFunction(() => document.querySelector('#activation-status').textContent.includes('released'));
+      assert.equal(await page.locator('#activation-status').getAttribute('data-lease'), '');
+    } else {
+      assert.match(await page.locator('#activation-status').innerText(), /unavailable on the Wasm backend/);
+    }
   }
   await page.screenshot({ path: resolve(artifacts, 'page.png'), fullPage: true });
   await writeFile(resolve(artifacts, 'result.json'), JSON.stringify({ mode, capabilities, status, scanSummary: await page.locator('#status').innerText(), ortWorkers, eventCount: events.length, positions: positions.length }, null, 2));
-  if (gpu) {
+  if (gpu && !outputsOnly) {
     await page.locator('#sgf').fill('(;SZ[9]KM[7.5]RU[Chinese];B[cc])');
     await page.locator('#visits').fill(String(deepVisits));
     await page.locator('#all').check();
@@ -137,6 +173,7 @@ try {
     assert.equal(ended.length, 2, 'Final position completes both scan and deep');
     for (const { snapshot } of ended) {
       assert.equal(snapshot.root.visits, 1);
+      assert.equal(snapshot.root.neural, undefined);
       assert.equal(snapshot.root.scoreLead, -7.5);
       assert.equal(snapshot.root.winrate, 0);
       assert.ok(snapshot.root.policy.every(v => v === 0));

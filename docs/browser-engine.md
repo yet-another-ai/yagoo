@@ -43,6 +43,12 @@ native KataGo. The checkpoint reports model version **14**, despite the version
 - Dropping a native analysis future removes its route immediately and queues a
   single-query termination. An independent writer completes JSON lines; unique
   wire IDs prevent late old responses from reaching an immediately restarted query.
+- Completed browser snapshots carry score-belief, seki and future-position heads
+  in the optional `neural` field. These are the root's identity sample, with an
+  explicit player perspective; they are not symmetry- or search-averaged. Native,
+  terminal and partial responses omit them. See the [snapshot schema](./pipeline/snapshots).
+- Optional root trunk retention keeps GPU tensors inside the engine worker and
+  sends only ephemeral-handle metadata to the page. See [Root activations](#root-activations).
 
 ## Threading and hosting
 
@@ -66,7 +72,10 @@ tolerances on retries; a failed fp16 warmup is never labeled as validated fp16.
 
 Vite copies the installed ORT `.wasm` and `.mjs` worker assets into `ort/`, and
 bundles the Rust Wasm URL. Base paths default to `/yagoo-engine/` and can be
-overridden using `YAGOO_BASE`. Dev and preview serve COOP `same-origin` and COEP
+overridden using `YAGOO_BASE`, an absolute path with a trailing slash (for example
+`/engine/`). Relative paths, query strings and URL hosts are rejected at build
+time so ORT and service-worker URLs cannot silently resolve elsewhere.
+Dev and preview serve COOP `same-origin` and COEP
 `require-corp`. Deployments should supply those response headers (`public/_headers`
 is supplied for compatible hosts). On static hosts that cannot set headers,
 the page offers an explicit, scoped service-worker opt-in with a one-reload guard.
@@ -87,6 +96,11 @@ pnpm --filter @yagoo/browser-engine check
 pnpm --filter @yagoo/browser-engine build
 pnpm --filter @yagoo/browser-engine preview
 ```
+
+Open the preview URL printed by Vite, normally
+`http://localhost:4173/yagoo-engine/`. This is the runnable engine entry point;
+the existing reviewer imports its downloaded NDJSON. The engine is not embedded
+in the reviewer's UI in this stage.
 
 `build:wasm` installs a matching wasm-bindgen CLI into the repository's ignored
 `.yagoo-data/wasm-tools` directory when needed. `WASM_BINDGEN` can select an
@@ -113,11 +127,52 @@ Copy `manifest.json`, `warmup.json`, the exported `.onnx` files and
 building, or supply a hosted manifest URL in the page. Generated model and runtime
 binaries are ignored by Git. The existing `@yagoo/ui` reviewer remains independent.
 
-## Local evidence (DELTON-WS, 2026-10-18)
+Serve the built `packages/browser-engine/dist` directory at the configured base
+path, including its `ort/`, Wasm, model and license assets. Check that `.wasm`
+responses have the WebAssembly MIME type and that COOP/COEP headers apply to the
+entry document. A remote model host must also allow the page's origin through
+CORS. The page verifies file hashes and nine required heads against the selected
+official model manifest before analysis; a missing model is an explicit load
+error. Public-host deployment has not been performed or verified.
 
-- Workspace Clippy with `-D warnings`, all 59 Rust tests (including 72 Python V7,
+## Root activations
+
+Retention is off by default. Enable the page's GPU retention checkbox before
+loading a bundle exported with `--trunk`, or call
+`BrowserEngine.initialize(url, { retainRootActivations: true })`. A validated
+WebGPU session retains the first identity row of the first root-symmetry batch:
+18 block outputs and `trunkfinal`, each `[1, 384, 19, 19]`. It copies those outputs
+into owned GPU buffers, without reading them back to the CPU. With the tested
+fp32 bundle the retained buffers total 10,535,424 bytes (about 10.05 MiB), in
+addition to the model's normal working memory. Other symmetry rows are released.
+
+The `onMessage` callback receives `rootActivations` messages separately from
+NDJSON events. An available message contains a `lease` with the root query ID,
+board size, actual player to move, model SHA, opaque handle and layer shapes.
+This is the **latest evaluated query root**; deep analysis can replace it with
+a pass-probe or PV-end root. It is not necessarily the position currently shown
+by another UI. No tensor values or GPU buffers cross the worker boundary.
+
+Only one root is retained. A new root, including a terminal root, invalidates
+the previous handle. `releaseRootActivations()` releases buffers without
+cancelling analysis and disables further retention until reload. Stop, errors
+and GPU device loss also invalidate the handle. Wasm reports that GPU retention
+is unavailable; an optional capture failure reports its reason while preserving
+validated analysis heads.
+
+`RootActivationStore.use(handle, consume)` is a worker-local extension point for
+future GPU consumers on the ORT device. A consumer must submit its GPU work
+synchronously inside that callback before the handle can expire. No trained
+concept head, activation visualization, persistent activation archive, or
+main-thread tensor-access API is implemented. Large activations never enter the
+snapshot schema or NDJSON. The small extra neural heads have documented raw
+semantics and should not be presented as calibrated teaching conclusions.
+
+## Local evidence (DELTON-WS, 2026-10-18 to 2026-10-19)
+
+- Workspace Clippy with `-D warnings`, all 63 Rust tests (including 72 Python V7,
   40 targeted C++ and 30 scoring references), Wasm release build, TypeScript check,
-  seven browser unit tests and Vite production build passed after review fixes.
+  seventeen browser unit tests and Vite production build passed after review fixes.
   The unchanged reviewer previously passed 28 UI tests and its typecheck.
 - fp32 export matched PyTorch: maximum raw-head error `2.2888e-5`; maximum trunk
   activation error `9.1553e-5`. fp16 semantic head checks passed on native ORT CPU.
@@ -148,6 +203,13 @@ binaries are ignored by Git. The existing `@yagoo/ui` reviewer remains independe
   maximum absolute error across all exported outputs was `0.000123978`. Real WebGPU and four-thread Wasm both
   passed the three-position scan using eight root symmetries and actual batch
   four (24 neural evaluations). Browser warmup validates both one and four rows.
+- A further real WebGPU/four-thread Wasm scan checked all three extra heads,
+  their dimensions, finite values, normalized score-belief and player metadata
+  in completed snapshots. The GPU run retained and released all 19 root layers
+  at `[1,384,19,19]`, with GPU validation errors checked; the Wasm run accurately
+  reported retention unavailable. Both still used 24 neural evaluations for
+  three positions. This validates GPU residence and lifetime, not a new readback
+  comparison of activation values. See [the recorded evidence](./evidence/browser-extra-outputs.json).
 - Search contract tests cover inverse symmetry, normalized root averaging,
   distinct leaf reservations, exact visit budgets, inference failure cleanup,
   and a mixed batch containing scored terminal and neural leaves. Terminal
@@ -189,7 +251,13 @@ node test/browser-smoke.mjs service-worker
 node test/browser-smoke.mjs webgpu
 node test/browser-smoke.mjs wasm-batch
 node test/browser-smoke.mjs webgpu-batch
+# Optional retention and extra-head checks, limited to the three-position scan:
+SMOKE_OUTPUTS_ONLY=1 node test/browser-smoke.mjs webgpu-batch
+SMOKE_OUTPUTS_ONLY=1 node test/browser-smoke.mjs wasm-batch
 ```
+
+In PowerShell, set `$env:SMOKE_OUTPUTS_ONLY='1'` before the last two commands and
+remove it afterward with `Remove-Item Env:SMOKE_OUTPUTS_ONLY`.
 
 These use an installed Chrome in a temporary headless profile (or set
 `BROWSER_CHANNEL=msedge`), a temporary localhost server, and save evidence under
@@ -225,9 +293,10 @@ reliably rejected. The PUCT implementation is still simplified: native uncertain
 weights, confidence bounds, advanced passing strategies and strength alignment
 remain open. In particular, normal BoardHistory two-pass endings do not reproduce
 native Search's friendly-pass continuation heuristics. The implementation also needs
-model download resume, small-net/mobile support, propagation of extra raw heads
-through snapshots, GPU-resident activation/concept-head consumers, broader browser
+model download resume, small-net/mobile support, trained concept-head consumers,
+activation visualization, broader browser
 coverage and a deployed-host check. fp16 WebGPU remains unvalidated and falls back
 to fp32. No full-game strength,
-throughput, or shared-runner performance claim is made. These gaps must stay open
-when the first draft PR is published; it must not close issue #5.
+throughput, or shared-runner performance claim is made. The usable supported path
+is demonstrated locally, while acceptance of these staged boundaries remains a
+review decision. The draft must not close issue #5.

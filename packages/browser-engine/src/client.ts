@@ -4,6 +4,7 @@ export type EngineStatus = {
   backend: 'webgpu' | 'wasm'; precision: 'fp16' | 'fp32'; ortThreads: number;
   searchThreads: 1; validated: boolean; messages: string[];
   maxBatch: number;
+  rootActivationLayers?: number; rootActivationReason?: string;
 };
 export type EngineMessage = { type: string; [key: string]: unknown };
 
@@ -14,10 +15,12 @@ export class BrowserEngine {
   private ready = false;
   private generation = 0;
   private cancelInitialization?: () => void;
+  private retainRootActivations = false;
   onMessage: (event: EngineMessage) => void = () => {};
 
-  async initialize(manifestUrl: string, options: { wasmThreads?: number; forceWasm?: boolean } = {}): Promise<EngineStatus> {
+  async initialize(manifestUrl: string, options: { wasmThreads?: number; forceWasm?: boolean; retainRootActivations?: boolean } = {}): Promise<EngineStatus> {
     this.dispose();
+    this.retainRootActivations = options.retainRootActivations === true;
     const generation = this.generation;
     const messages: string[] = [];
     const backends: ('webgpu' | 'wasm')[] = options.forceWasm ? ['wasm'] : ['webgpu', 'wasm'];
@@ -41,7 +44,8 @@ export class BrowserEngine {
               else this.onMessage(data);
             };
             worker.postMessage({ type: 'initialize', manifestUrl: new URL(manifestUrl, location.href).href,
-              backend, precision, ortThreads: threads, assetBase: new URL(`${import.meta.env.BASE_URL}ort/`, location.origin).href });
+              backend, precision, ortThreads: threads, retainRootActivations: this.retainRootActivations,
+              assetBase: new URL(`${import.meta.env.BASE_URL}ort/`, location.origin).href });
           });
           this.cancelInitialization = undefined;
           if (generation !== this.generation) throw new DOMException('Engine initialization was cancelled.', 'AbortError');
@@ -77,5 +81,12 @@ export class BrowserEngine {
     this.generation++;
     this.cancelInitialization?.(); this.cancelInitialization = undefined;
     this.worker?.terminate(); this.worker = undefined; this.running = false; this.ready = false;
+    this.retainRootActivations = false;
+  }
+
+  /** Releases only ephemeral activation buffers; does not cancel active analysis. */
+  releaseRootActivations(): void {
+    this.retainRootActivations = false;
+    this.worker?.postMessage({ type: 'releaseRootActivations' });
   }
 }

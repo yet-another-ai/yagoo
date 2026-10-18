@@ -37,12 +37,35 @@ pub struct RawHeads {
     pub futurepos: Vec<f32>,
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RootContext {
+    pub query_id: String,
+    pub board_size: u8,
+    pub to_play: PlayerToken,
+}
+
 pub trait NnEvaluator {
+    /// Root lifecycle notification, including terminal roots that bypass inference.
+    /// Browser implementations release the previous ephemeral GPU activation lease.
+    fn begin_root(&self, _context: &RootContext) -> Result<(), String> {
+        Ok(())
+    }
+
     /// One asynchronous inference call, preserving the input row order.
     fn evaluate_batch<'a>(
         &'a self,
         inputs: &'a [V7Features],
     ) -> LocalBoxFuture<'a, Result<Vec<RawHeads>, String>>;
+
+    /// The first row is the root identity sample; remaining rows may be symmetries.
+    /// Implementations may retain GPU activations without serializing them to Rust.
+    fn evaluate_root_batch<'a>(
+        &'a self,
+        inputs: &'a [V7Features],
+    ) -> LocalBoxFuture<'a, Result<Vec<RawHeads>, String>> {
+        self.evaluate_batch(inputs)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -217,6 +240,17 @@ fn process(
     {
         return Err("Neural outputs do not match b18 raw-head shapes".into());
     }
+    let has_extra =
+        !raw.scorebelief_logprobs.is_empty() || !raw.seki.is_empty() || !raw.futurepos.is_empty();
+    if has_extra
+        && (raw.scorebelief_logprobs.len() != 842
+            || raw.seki.len() != 4 * NN_AREA
+            || raw.futurepos.len() != 2 * NN_AREA)
+    {
+        return Err(
+            "Extra neural heads must be scorebelief[842], seki[4,19,19], futurepos[2,19,19]".into(),
+        );
+    }
     if raw
         .policy
         .iter()
@@ -229,6 +263,18 @@ fn process(
         .any(|x| !x.is_finite())
     {
         return Err("Nonfinite model output".into());
+    }
+    if has_extra
+        && (raw
+            .scorebelief_logprobs
+            .iter()
+            .map(|x| f64::from(*x).exp())
+            .sum::<f64>()
+            - 1.0)
+            .abs()
+            > 0.002
+    {
+        return Err("Score-belief log probabilities are not normalized".into());
     }
     let size = game.board().size();
     let n = usize::from(size).pow(2);
@@ -428,8 +474,20 @@ fn response(
         "rootInfo": { "visits": root.visits, "winrate": root.mean(root.win_sum), "scoreLead": root.mean(root.lead_sum), "utility": root.mean(root.utility_sum) },
         "moveInfos": infos });
     if let Some(raw) = &root.eval.raw {
-        value["raw"] = json!({ "perspective": "toPlay", "sampleSymmetry": "identity", "scoreBeliefLogProbs": raw.scorebelief_logprobs,
-            "seki": raw.seki, "futurepos": raw.futurepos });
+        if !partial && !raw.scorebelief_logprobs.is_empty() {
+            value["neural"] = json!(yagoo_katago::RootNeuralOutput {
+                to_play: PlayerToken::from_color(root.game.to_play()),
+                sample_symmetry: "identity".into(),
+                aggregation: "none".into(),
+                tensor_layout: "CHW".into(),
+                board_size: root.game.board().size(),
+                model_board_size: NN_LEN,
+                score_belief_log_probs: raw.scorebelief_logprobs.clone(),
+                score_bin_first_center: -420.5,
+                seki_logits: raw.seki.clone(),
+                futurepos_pretanh: raw.futurepos.clone(),
+            });
+        }
     }
     if query.include_policy == Some(true) {
         value["policy"] = json!(root.eval.policy);

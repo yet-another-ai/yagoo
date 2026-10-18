@@ -167,7 +167,13 @@ impl<E: NnEvaluator> SearchEngine<E> {
         game: &GameState,
         rules: FeatureRules,
         komi: f32,
+        query_id: &str,
     ) -> Result<Evaluation, String> {
+        self.evaluator.begin_root(&super::RootContext {
+            query_id: query_id.into(),
+            board_size: game.board().size(),
+            to_play: super::PlayerToken::from_color(game.to_play()),
+        })?;
         if let Some(value) = terminal::evaluate(game, rules, komi)? {
             return Ok(value);
         }
@@ -177,7 +183,11 @@ impl<E: NnEvaluator> SearchEngine<E> {
             .collect();
         let mut evaluations = Vec::new();
         for (chunk_index, chunk) in inputs.chunks(self.options.batch_size).enumerate() {
-            let rows = self.evaluator.evaluate_batch(chunk).await?;
+            let rows = if chunk_index == 0 {
+                self.evaluator.evaluate_root_batch(chunk).await?
+            } else {
+                self.evaluator.evaluate_batch(chunk).await?
+            };
             if rows.len() != chunk.len() {
                 return Err("Evaluator returned the wrong batch length".into());
             }
@@ -340,7 +350,7 @@ impl<E: NnEvaluator> AnalysisEngine for SearchEngine<E> {
             let (game, rules) = replay(query).map_err(error)?;
             let komi = query.komi.unwrap_or(7.5) as f32;
             let root = self
-                .evaluate_root(&game, rules, komi)
+                .evaluate_root(&game, rules, komi, &query.id)
                 .await
                 .map_err(error)?;
             let mut nodes = vec![Node::new(game, root.clone())];

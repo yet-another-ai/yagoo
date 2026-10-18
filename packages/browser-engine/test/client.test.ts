@@ -46,3 +46,36 @@ it('retries a failed GPU precision in a fresh worker before changing backends', 
   expect(result.messages[0]).toMatch(/Nonfinite neural output/);
   engine.dispose();
 });
+
+it('activation release and status messages do not unlock an active analysis', async () => {
+  environment();
+  const engine = new BrowserEngine();
+  const pending = engine.initialize('models/manifest.json', { retainRootActivations: true });
+  const worker = TestWorker.instances[0];
+  expect(worker.sent[0].retainRootActivations).toBe(true);
+  worker.onmessage!({ data: { type: 'ready', status: { backend: 'webgpu', precision: 'fp32', ortThreads: 1, searchThreads: 1, validated: true, messages: [] } } });
+  await pending;
+  engine.analyze('(;SZ[9])');
+  engine.releaseRootActivations();
+  expect(worker.sent.at(-1)).toEqual({ type: 'releaseRootActivations' });
+  worker.onmessage!({ data: { type: 'rootActivations', available: false, reason: 'Released' } });
+  expect(() => engine.analyze('(;SZ[9])')).toThrow(/already running/);
+  worker.onmessage!({ data: { type: 'done' } });
+  expect(() => engine.analyze('(;SZ[9])')).not.toThrow();
+  engine.dispose();
+});
+
+it('keeps activation release in effect across initialization fallback workers', async () => {
+  environment();
+  const engine = new BrowserEngine();
+  const pending = engine.initialize('models/manifest.json', { retainRootActivations: true });
+  const first = TestWorker.instances[0];
+  engine.releaseRootActivations();
+  first.onmessage!({ data: { type: 'error', message: 'GPU warmup failed' } });
+  await Promise.resolve();
+  const second = TestWorker.instances[1];
+  expect(second.sent[0].retainRootActivations).toBe(false);
+  second.onmessage!({ data: { type: 'ready', status: { backend: 'webgpu', precision: 'fp32', ortThreads: 1, searchThreads: 1, validated: true, messages: [] } } });
+  await pending;
+  engine.dispose();
+});

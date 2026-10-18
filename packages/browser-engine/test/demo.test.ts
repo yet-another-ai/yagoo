@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 
 const { mockEngine } = vi.hoisted(() => ({ mockEngine: {
   onMessage: (_message: Record<string, unknown>) => {},
-  initialize: vi.fn(), analyze: vi.fn(), dispose: vi.fn(),
+  initialize: vi.fn(), analyze: vi.fn(), dispose: vi.fn(), releaseRootActivations: vi.fn(),
 } }));
 vi.mock('../src/client', () => ({ BrowserEngine: class { constructor() { return mockEngine; } } }));
 
@@ -10,12 +10,12 @@ afterEach(() => { vi.unstubAllGlobals(); vi.resetModules(); vi.resetAllMocks(); 
 
 async function setup(persist = async () => false) {
   const nodes = new Map<string, {
-    value: string; checked: boolean; disabled: boolean; textContent: string;
+    value: string; checked: boolean; disabled: boolean; textContent: string; dataset: Record<string, string>;
     listeners: Record<string, () => unknown>; addEventListener: (type: string, callback: () => unknown) => void;
   }>();
-  for (const id of ['status', 'events', 'scan', 'deep', 'load', 'isolation', 'stop', 'download', 'visits', 'sgf', 'all', 'symmetries', 'batch', 'manifest', 'wasm', 'threads']) {
+  for (const id of ['status', 'events', 'scan', 'deep', 'load', 'isolation', 'stop', 'download', 'visits', 'sgf', 'all', 'symmetries', 'batch', 'manifest', 'wasm', 'threads', 'activation-status', 'activations', 'release-activations']) {
     nodes.set(id, { value: ({ visits: '8', sgf: '(;SZ[9])', batch: '4', threads: '4' } as Record<string, string>)[id] ?? '',
-      checked: false, disabled: false, textContent: '', listeners: {},
+      checked: false, disabled: false, textContent: '', dataset: {}, listeners: {},
       addEventListener(type, callback) { this.listeners[type] = callback; } });
   }
   const node = (id: string) => nodes.get(id)!;
@@ -65,4 +65,17 @@ it('does not start a model load after Stop while the storage permission promise 
   expect(mockEngine.initialize).not.toHaveBeenCalled();
   expect(node('status').textContent).toMatch(/^Stopped/);
   expect(node('scan').disabled).toBe(true);
+});
+
+it('clears stale lease metadata on reload and honors release while storage is pending', async () => {
+  let resolvePersist!: (value: boolean) => void;
+  const node = await setup(() => new Promise<boolean>(resolve => { resolvePersist = resolve; }));
+  node('activation-status').dataset.lease = '{"handle":"old-root"}';
+  node('activations').checked = true;
+  const loading = node('load').listeners.click();
+  expect(node('activation-status').dataset.lease).toBe('');
+  node('release-activations').listeners.click();
+  resolvePersist(false);
+  await loading;
+  expect(mockEngine.initialize).toHaveBeenCalledWith('', expect.objectContaining({ retainRootActivations: false }));
 });

@@ -153,6 +153,28 @@ impl MoveInfo {
     }
 }
 
+/// A root identity-symmetry NN sample, separate from search-averaged estimates.
+/// Spatial arrays retain the model's 19x19 padding and channel-first order.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RootNeuralOutput {
+    #[serde(rename = "sampleToPlay")]
+    pub to_play: PlayerToken,
+    pub sample_symmetry: String,
+    pub aggregation: String,
+    pub tensor_layout: String,
+    pub board_size: u8,
+    pub model_board_size: u8,
+    /// Natural log probabilities. Bin i is score_bin_first_center + i.
+    pub score_belief_log_probs: Vec<f32>,
+    pub score_bin_first_center: f64,
+    /// Four 19x19 channels: first three softmax together, fourth sigmoid alone.
+    pub seki_logits: Vec<f32>,
+    /// Two 19x19 channels, pretanh stone occupancy at +8 / +32 half-moves.
+    #[serde(rename = "futurePositionPreTanh")]
+    pub futurepos_pretanh: Vec<f32>,
+}
+
 /// Full analysis response line.
 ///
 /// Top-level per-position arrays match the Analysis Engine protocol:
@@ -182,6 +204,9 @@ pub struct AnalysisResponse {
     pub policy: Option<Vec<f64>>,
     #[serde(default)]
     pub human_policy: Option<Vec<f64>>,
+    /// Browser extension, absent from native KataGo and terminal positions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub neural: Option<RootNeuralOutput>,
     /// Catch-all for forward compatibility.
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,

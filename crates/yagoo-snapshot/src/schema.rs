@@ -63,6 +63,10 @@ pub struct EngineAnalysis {
     pub ownership: Option<Vec<f64>>,
     pub ownership_stdev: Option<Vec<f64>>,
     pub policy: Option<Vec<f64>>,
+    /// Optional single root NN sample; its to-play perspective is independent of
+    /// this snapshot's black-positive search estimates. Never contains activations.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub neural: Option<yagoo_katago::RootNeuralOutput>,
 }
 
 /// One top candidate from `moveInfos` (includes movesOwnership when present).

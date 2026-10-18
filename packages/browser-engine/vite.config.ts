@@ -7,9 +7,13 @@ const require = createRequire(import.meta.url);
 const ortDist = dirname(require.resolve('onnxruntime-web'));
 const ortVersion: string = JSON.parse(readFileSync(resolve(ortDist, '../package.json'), 'utf8')).version;
 const headers = { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' };
+const base = process.env.YAGOO_BASE ?? '/yagoo-engine/';
+if (!base.startsWith('/') || base.startsWith('//') || !base.endsWith('/') || /[?#\\]/.test(base)) {
+  throw new Error('YAGOO_BASE must be an absolute URL path with a trailing slash, for example /yagoo-engine/.');
+}
 
 export default defineConfig({
-  base: process.env.YAGOO_BASE ?? '/yagoo-engine/',
+  base,
   worker: { format: 'es' },
   server: { headers, fs: { allow: ['../..'] } },
   preview: { headers },

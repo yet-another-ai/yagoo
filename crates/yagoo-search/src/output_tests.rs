@@ -14,6 +14,83 @@ fn raw() -> RawHeads {
     }
 }
 
+fn complete_raw() -> RawHeads {
+    let mut value = raw();
+    value.scorebelief_logprobs = vec![-(842.0_f32).ln(); 842];
+    value.seki = (0..4 * 361).map(|i| i as f32 / 1000.0).collect();
+    value.futurepos = (0..2 * 361).map(|i| i as f32 / 1000.0).collect();
+    value
+}
+
+#[test]
+fn extra_heads_remain_an_identity_sample_with_the_querys_own_perspective() {
+    let mut root = node(1, 0.0);
+    root.game = GameState::new(9, Ruleset::Japanese).unwrap();
+    root.game.play_pass().unwrap(); // pass probe: White, although parent was Black
+    root.eval.raw = Some(complete_raw());
+    let query = AnalysisQueryBuilder::new("pass-probe")
+        .board_size(9)
+        .build();
+    let nodes = vec![root];
+    let response = response(&nodes, &query, false).unwrap();
+    let sample = response.neural.unwrap();
+    assert_eq!(sample.to_play, PlayerToken::W);
+    assert_eq!(sample.sample_symmetry, "identity");
+    assert_eq!(sample.aggregation, "none");
+    assert_eq!((sample.board_size, sample.model_board_size), (9, 19));
+    assert_eq!(sample.score_belief_log_probs.len(), 842);
+    assert!((sample.score_bin_first_center + 420.5).abs() < f64::EPSILON);
+    assert_eq!(sample.seki_logits.len(), 1444);
+    assert_eq!(sample.futurepos_pretanh.len(), 722);
+    // A padded 9x9 board keeps stride 19, not 9, and channels stay independent.
+    assert!((sample.futurepos_pretanh[19 + 8] - 0.027).abs() < 1e-6);
+    assert!((sample.seki_logits[3 * 361] - 1.083).abs() < 1e-6);
+    assert!(super::response(&nodes, &query, true)
+        .unwrap()
+        .neural
+        .is_none());
+    let mut terminal = nodes;
+    terminal[0].eval.raw = None;
+    assert!(super::response(&terminal, &query, false)
+        .unwrap()
+        .neural
+        .is_none());
+}
+
+#[test]
+fn malformed_or_unnormalized_extra_heads_are_rejected() {
+    let game = GameState::new(9, Ruleset::Japanese).unwrap();
+    let post = Postprocess {
+        scoremean_multiplier: 20.0,
+        scorestdev_multiplier: 20.0,
+        lead_multiplier: 20.0,
+    };
+    for field in 0..4 {
+        let mut raw = complete_raw();
+        match field {
+            0 => {
+                raw.scorebelief_logprobs.pop();
+            }
+            1 => {
+                raw.seki.pop();
+            }
+            2 => {
+                raw.futurepos.pop();
+            }
+            _ => raw.scorebelief_logprobs.fill(0.0),
+        }
+        assert!(process(raw, &game, FeatureRules::Chinese, &[true; 82], &post).is_err());
+    }
+    assert!(process(
+        complete_raw(),
+        &game,
+        FeatureRules::Chinese,
+        &[true; 82],
+        &post
+    )
+    .is_ok());
+}
+
 #[test]
 fn value_and_lead_follow_rule_dependent_no_result_postprocessing() {
     // Expected from upstream nneval.cpp: win/loss/no-result softmax, no-result

@@ -53,6 +53,7 @@ pub fn engine_from_response(resp: &AnalysisResponse) -> Option<EngineAnalysis> {
         ownership: resp.ownership.clone(),
         ownership_stdev: resp.ownership_stdev.clone(),
         policy: resp.policy.clone(),
+        neural: resp.neural.clone(),
     })
 }
 
@@ -145,5 +146,21 @@ mod tests {
         // used flatten; without that they are dropped by serde — either way
         // they must not appear on EngineAnalysis.
         assert!(resp.ownership.is_none());
+    }
+
+    #[test]
+    fn neural_sample_survives_snapshot_conversion_without_activations() {
+        let raw = serde_json::json!({ "id": "p0-pass", "rootInfo": {"visits": 1},
+            "neural": { "sampleToPlay": "W", "sampleSymmetry": "identity", "aggregation": "none", "tensorLayout": "CHW",
+                "boardSize": 9, "modelBoardSize": 19, "scoreBeliefLogProbs": vec![-(842.0_f32).ln(); 842],
+                "scoreBinFirstCenter": -420.5, "sekiLogits": vec![0.0; 1444], "futurePositionPreTanh": vec![0.0; 722] } });
+        let response: AnalysisResponse = serde_json::from_value(raw).unwrap();
+        let snapshot = engine_from_response(&response).unwrap();
+        assert_eq!(snapshot.neural, response.neural);
+        let encoded = serde_json::to_string(&snapshot).unwrap();
+        assert!(encoded.contains("sampleToPlay"));
+        assert!(!encoded.contains("trunk"));
+        let decoded: EngineAnalysis = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded, snapshot);
     }
 }

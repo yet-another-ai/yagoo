@@ -1,8 +1,10 @@
 # Issue #5 acceptance checklist
 
-The draft remains open until a usable browser analysis path is demonstrated.
-Search-equivalence and unverified optimizations must not be inferred from a
-successful model load or build.
+The usable supported browser path has been demonstrated locally with real b18
+SWA inference, scan/deep analysis, NDJSON export and bounded Wasm threading.
+This draft remains open for review of the staged delivery below; it does not
+close issue #5. Search equivalence and unverified optimizations must not be
+inferred from a successful model load or build.
 
 ## Required for a usable supported path
 
@@ -31,14 +33,34 @@ successful model load or build.
       equivalence is not established and remains outside the completed scope.
 - [x] Independent algorithm and runtime reviews, with regression checks for the
       confirmed output, cancellation, initialization and provenance defects.
+- [x] Root score-belief, seki and future-position heads propagated through final
+      analysis responses and snapshots, with shapes, normalization, raw semantics
+      and actual player perspective documented; no large activations in NDJSON.
+- [x] Optional GPU-resident root activations, identity sample only, explicit query
+      identity and bounded lifetime; replacement/release/failure cleanup and an
+      accurate Wasm-unavailable status. Real GPU capture/release smoke passed.
+- [x] Runnable browser entry point, reproducible model export/copy instructions,
+      hashed assets, packaged runtime licenses and validated deployment base path.
+
+The current local checks pass: 63 Rust tests, workspace Clippy, Wasm release build,
+TypeScript, 17 browser unit tests and the production bundle. Extra-head and root
+activation checks passed real fp32 WebGPU and four-thread Wasm with eight root
+symmetries and batch four. See [browser setup and evidence](./browser-engine).
 
 ## Subsequent enhancements, separately disclosed
 
 - fp16 GPU numerical alignment (fp32 GPU already works); other GPUs and browsers.
 - Download resume, smaller/mobile models, deployed public-host verification.
-- GPU-resident activation/concept consumers and extra-head snapshot propagation.
+- Trained concept-head consumers, activation visualization and persistent storage.
 - Additional KataGo search heuristics and strength alignment beyond the first
   supported search path. A simplified PUCT implementation must retain that label.
+
+The remaining decision is whether to review this supported browser stage with
+explicit rule/search limits, or extend it with the missing native rule/search
+behavior first. Encore and long-cycle/repeated-pass scoring are still absent;
+they are rejected, not approximated. Native eight-visit differences are recorded
+without relaxed tolerances or a strength claim. No individual heuristic has been
+shown to account for a specific measured difference.
 
 Rust search currently runs on one dedicated worker and waits for ORT. Batch
 formation and virtual reservations can execute on that worker without another

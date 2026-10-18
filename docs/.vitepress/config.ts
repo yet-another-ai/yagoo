@@ -1,4 +1,9 @@
+import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vitepress";
+
+const emptyShim = fileURLToPath(
+  new URL("../../packages/ui/src/shims/empty.ts", import.meta.url),
+);
 
 export default defineConfig({
   title: "Yagoo",
@@ -10,6 +15,7 @@ export default defineConfig({
     nav: [
       { text: "Overview", link: "/" },
       { text: "Architecture", link: "/architecture" },
+      { text: "Demo", link: "/demo/" },
       { text: "MVP", link: "/mvp" },
       {
         text: "GitHub",
@@ -52,6 +58,7 @@ export default defineConfig({
         text: "Plan",
         items: [
           { text: "Architecture & data flow", link: "/architecture" },
+          { text: "Frontend demo", link: "/demo/" },
           { text: "MVP & validation", link: "/mvp" },
           { text: "Open questions", link: "/open-questions" },
         ],
@@ -82,6 +89,45 @@ export default defineConfig({
         }
         return self.renderToken(tokens, idx, options);
       };
+    },
+  },
+  vite: {
+    resolve: {
+      alias: [
+        {
+          find: "@yagoo/ui/styles.css",
+          replacement: fileURLToPath(
+            new URL("../../packages/ui/src/styles/index.css", import.meta.url),
+          ),
+        },
+        {
+          find: "@yagoo/ui/goban.css",
+          replacement: fileURLToPath(
+            new URL(
+              "../../packages/ui/src/goban/styles/goban.css",
+              import.meta.url,
+            ),
+          ),
+        },
+        {
+          find: /^@yagoo\/ui$/,
+          replacement: fileURLToPath(
+            new URL("../../packages/ui/src/index.ts", import.meta.url),
+          ),
+        },
+        // @sabaki/sgf browser usage: parse only (see its README).
+        { find: /^fs$/, replacement: emptyShim },
+        { find: "iconv-lite", replacement: emptyShim },
+        { find: "jschardet", replacement: emptyShim },
+      ],
+    },
+    ssr: {
+      noExternal: ["@yagoo/ui", "@sabaki/sgf", "@sabaki/go-board", "@sabaki/immutable-gametree"],
+    },
+    server: {
+      fs: {
+        allow: ["../.."],
+      },
     },
   },
 });

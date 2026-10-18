@@ -1,0 +1,40 @@
+{
+  "name": "@yagoo/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Yagoo Vue board and reviewer UI (Shudan-compatible goban, Sabaki-inspired chrome)",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./styles.css": "./src/styles/index.css",
+    "./goban.css": "./src/goban/styles/goban.css",
+    "./demo": "./src/demo/sampleData.ts"
+  },
+  "scripts": {
+    "check": "vue-tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "vitest --ui"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.0"
+  },
+  "dependencies": {
+    "@sabaki/go-board": "^1.4.3",
+    "@sabaki/immutable-gametree": "^1.9.4",
+    "@sabaki/sgf": "^3.4.7"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "@vue/test-utils": "^2.4.6",
+    "happy-dom": "^17.4.4",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.2",
+    "vitest": "^3.0.9",
+    "vue": "^3.5.13",
+    "vue-tsc": "^2.2.8"
+  }
+}

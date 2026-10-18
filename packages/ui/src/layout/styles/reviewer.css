@@ -1,0 +1,268 @@
+/* Sabaki-inspired reviewer chrome (colors from Sabaki style/index.css). */
+
+.yagoo-reviewer {
+  --yagoo-bg: #111;
+  --yagoo-panel: #181818;
+  --yagoo-panel-2: #222;
+  --yagoo-text: #eee;
+  --yagoo-muted: #d0d0d0;
+  --yagoo-accent: #0082f0;
+  --yagoo-danger: #ff3b30;
+  --yagoo-success: #4cd964;
+  --yagoo-tatami: #c2cb9c;
+  --yagoo-bar-height: 40px;
+  --yagoo-sidebar-width: 280px;
+  --yagoo-font: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr var(--yagoo-sidebar-width);
+  grid-template-rows: 1fr var(--yagoo-bar-height);
+  width: 100%;
+  height: 100%;
+  min-height: 480px;
+  background: var(--yagoo-bg);
+  color: var(--yagoo-text);
+  font-family: var(--yagoo-font);
+  overflow: hidden;
+}
+
+.yagoo-reviewer__main {
+  grid-column: 1;
+  grid-row: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--yagoo-tatami);
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.04) 0,
+    rgba(0, 0, 0, 0.04) 2px,
+    transparent 2px,
+    transparent 8px
+  );
+  overflow: auto;
+}
+
+.yagoo-reviewer__board-wrap {
+  box-shadow: 0 5px 20px rgba(20, 0, 15, 0.8);
+}
+
+.yagoo-reviewer__sidebar {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--yagoo-bg);
+  min-width: 0;
+  min-height: 0;
+  z-index: 10;
+}
+
+.yagoo-reviewer__bar {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+.yagoo-winrate {
+  flex: 0 0 auto;
+  min-height: 96px;
+  background: var(--yagoo-panel);
+  box-shadow: 10px 0 10px #111;
+  color: var(--yagoo-muted);
+  overflow: hidden;
+}
+
+.yagoo-winrate__svg {
+  display: block;
+  width: 100%;
+  height: 80px;
+}
+
+.yagoo-winrate__line {
+  fill: none;
+  stroke: var(--yagoo-accent);
+  stroke-width: 1.5;
+}
+
+.yagoo-winrate__change {
+  stroke: var(--yagoo-danger);
+  stroke-width: 1;
+}
+
+.yagoo-winrate__grid {
+  stroke: #333;
+  stroke-dasharray: 2 3;
+  stroke-width: 1;
+}
+
+.yagoo-gametree-placeholder {
+  flex: 1 1 auto;
+  min-height: 80px;
+  background: var(--yagoo-bg);
+  color: #888;
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  border-top: 1px solid #333;
+  overflow: auto;
+}
+
+.yagoo-comment {
+  flex: 0 0 30%;
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  background: var(--yagoo-panel);
+  box-shadow: 10px 0 10px #111;
+  border-top: 1px solid #333;
+}
+
+.yagoo-comment__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.75rem;
+  color: #bbb;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #333;
+}
+
+.yagoo-comment__body {
+  flex: 1;
+  margin: 0;
+  padding: 0.75rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  color: var(--yagoo-text);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.yagoo-bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--yagoo-bar-height);
+  background: #292a2d;
+  color: var(--yagoo-text);
+  line-height: var(--yagoo-bar-height);
+  box-shadow: 0 0 10px #111;
+  gap: 0.5rem;
+  padding: 0 0.75rem;
+  font-size: 0.9rem;
+}
+
+.yagoo-bottom-bar__player {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.yagoo-bottom-bar__player--white {
+  justify-content: flex-start;
+}
+
+.yagoo-bottom-bar__player--black {
+  justify-content: flex-end;
+}
+
+.yagoo-bottom-bar__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.yagoo-bottom-bar__rank {
+  opacity: 0.4;
+  flex: 0 1 auto;
+}
+
+.yagoo-bottom-bar__captures {
+  display: inline-block;
+  height: 20px;
+  min-width: 10px;
+  border-radius: 10px;
+  padding: 0 5px;
+  background: black;
+  line-height: 20px;
+  text-align: center;
+  opacity: 0.7;
+  font-size: 0.8em;
+}
+
+.yagoo-bottom-bar__turn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex: none;
+  padding: 0 8px;
+}
+
+.yagoo-stone-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  opacity: 0.45;
+  transition: transform 0.15s, opacity 0.15s;
+}
+
+.yagoo-stone-icon--black {
+  background: #222;
+}
+
+.yagoo-stone-icon--white {
+  background: #eee;
+  border: 1px solid #999;
+}
+
+.yagoo-stone-icon--active {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+.yagoo-bottom-bar__nav {
+  display: flex;
+  gap: 0.35rem;
+  flex: none;
+}
+
+.yagoo-bottom-bar__nav button {
+  background: var(--yagoo-panel-2);
+  color: var(--yagoo-text);
+  border: none;
+  border-radius: 3px;
+  padding: 0.2rem 0.55rem;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.yagoo-bottom-bar__nav button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.yagoo-bottom-bar__nav button:not(:disabled):hover {
+  background: var(--yagoo-accent);
+}
+
+@media (max-width: 720px) {
+  .yagoo-reviewer {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(280px, 1fr) minmax(200px, 40%) var(--yagoo-bar-height);
+  }
+
+  .yagoo-reviewer__sidebar {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .yagoo-reviewer__bar {
+    grid-row: 3;
+  }
+}

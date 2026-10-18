@@ -127,7 +127,9 @@ flowchart TD
 ```text
 .
 ├── README.md
-├── docs/                     # Design docs + VitePress site
+├── docs/                     # Design docs + VitePress site (+ /demo)
+├── packages/
+│   └── ui/                   # @yagoo/ui — Vue goban + reviewer chrome
 ├── crates/
 │   ├── yagoo-core/           # Board / rules
 │   ├── yagoo-sgf/            # SGF parse + replay
@@ -139,5 +141,20 @@ flowchart TD
 ├── scripts/                  # Local-dev helpers (model download, …)
 ├── mise.toml
 ├── Cargo.toml
+├── pnpm-workspace.yaml
 └── .github/workflows/ci.yml
 ```
+
+## Frontend (`packages/ui` / `@yagoo/ui`)
+
+Vue 3 component library, embeddable in the VitePress docs and intended to grow into the WebGPU web app (not Electron). UI chrome imitates [Sabaki](https://github.com/SabakiHQ/Sabaki); the goban reimplements [Shudan](https://github.com/SabakiHQ/Shudan)’s DOM / `shudan-*` classes / `--shudan-*` variables / map-style props (MIT; see `packages/ui/THIRD_PARTY_NOTICES.md`).
+
+| Area | Notes |
+| --- | --- |
+| `Goban` | `signMap`, `markerMap`, `ghostStoneMap`, `heatMap`, `paintMap`, `lines`, coordinates, fuzzy placement + collision (`readjustShifts`), click events; optional `fuzzySeed` for deterministic shifts |
+| `useGame` | `@sabaki/sgf` (parse only; `fs` / `iconv-lite` aliased empty) + `@sabaki/immutable-gametree` + `@sabaki/go-board` |
+| `ReviewerLayout` | Tatami main + right sidebar (`WinrateGraph`, game-tree placeholder, `CommentBox`) + 40px `BottomBar` |
+| Overlays | `BoardGeometry` + `OverlayRenderer` interface; `SvgOverlayRenderer` / `OverlayLayer` (group-outline demo). WebGPU renderer can swap in later without changing callers |
+| Custom element | `<yagoo-board>` via `defineCustomElement` / `registerYagooBoard()` |
+
+Docs consume the package through a ClientOnly / async demo page (`docs/demo/`). mise tasks: `ui:test`, `ui:check`, `ui:dev`, `ui:build`; wired into `mise run check` and CI (no performance/timing tests).

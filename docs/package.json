@@ -7,6 +7,9 @@
     "build": "vitepress build",
     "preview": "vitepress preview"
   },
+  "dependencies": {
+    "@yagoo/ui": "workspace:*"
+  },
   "devDependencies": {
     "mermaid": "^11.6.0",
     "vitepress": "^1.6.3",

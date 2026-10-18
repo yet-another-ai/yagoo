@@ -2,9 +2,10 @@
 
 use crate::config::{PipelineConfig, PipelineStrategy};
 use crate::error::{PipelineError, PipelineResult};
+use crate::select::{select_deep_plies, DeepPlyReason};
 use async_stream::try_stream;
 use futures::stream::Stream;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::pin::Pin;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -67,6 +68,7 @@ pub async fn analyze_game_collected(
     Ok(events)
 }
 
+#[allow(clippy::too_many_lines)]
 async fn drive(
     sgf: &str,
     client: Arc<AnalysisClient>,
@@ -101,6 +103,7 @@ async fn drive(
     )?;
 
     let mut snapshots: BTreeMap<u32, PositionSnapshot> = BTreeMap::new();
+    let position_refs: Vec<&ReplayedPosition> = positions.iter().collect();
 
     match config.strategy {
         PipelineStrategy::ScanThenDeep => {
@@ -109,33 +112,49 @@ async fn drive(
                 config.scan_visits,
                 PhaseMode::Scan,
                 &record,
-                &positions,
+                &position_refs,
                 &client,
                 &config,
                 &tx,
                 &mut snapshots,
             )
             .await?;
-            run_phase(
-                AnalysisPhase::Deep,
-                config.root_visits,
-                PhaseMode::Deep,
-                &record,
-                &positions,
-                &client,
-                &config,
-                &tx,
-                &mut snapshots,
-            )
-            .await?;
+
+            let (deep_positions, mode, reasons) =
+                choose_deep_positions(&positions, &snapshots, &config);
+            emit_deep_plies_selected(&tx, mode, &deep_positions, &reasons)?;
+
+            if deep_positions.is_empty() {
+                send(
+                    &tx,
+                    PipelineEvent::Warning {
+                        v: SCHEMA_VERSION,
+                        message: "no plies selected for deep phase".into(),
+                    },
+                )?;
+            } else {
+                run_phase(
+                    AnalysisPhase::Deep,
+                    config.root_visits,
+                    PhaseMode::Deep,
+                    &record,
+                    &deep_positions,
+                    &client,
+                    &config,
+                    &tx,
+                    &mut snapshots,
+                )
+                .await?;
+            }
         }
         PipelineStrategy::DeepOnly => {
+            emit_deep_plies_selected(&tx, "range", &position_refs, &[])?;
             run_phase(
                 AnalysisPhase::Deep,
                 config.root_visits,
                 PhaseMode::Deep,
                 &record,
-                &positions,
+                &position_refs,
                 &client,
                 &config,
                 &tx,
@@ -168,6 +187,42 @@ async fn drive(
     Ok(())
 }
 
+fn choose_deep_positions<'a>(
+    positions: &'a [ReplayedPosition],
+    snapshots: &BTreeMap<u32, PositionSnapshot>,
+    config: &PipelineConfig,
+) -> (Vec<&'a ReplayedPosition>, &'static str, Vec<DeepPlyReason>) {
+    if config.deepen_all {
+        return (positions.iter().collect(), "all", Vec::new());
+    }
+
+    let scan: Vec<(u32, &PositionSnapshot)> = positions
+        .iter()
+        .filter_map(|p| snapshots.get(&p.ply).map(|s| (p.ply, s)))
+        .collect();
+    let reasons = select_deep_plies(&scan, &config.deep_select);
+    let want: HashSet<u32> = reasons.iter().map(|r| r.ply).collect();
+    let deep: Vec<&ReplayedPosition> = positions.iter().filter(|p| want.contains(&p.ply)).collect();
+    (deep, "swing", reasons)
+}
+
+fn emit_deep_plies_selected(
+    tx: &Tx,
+    mode: &str,
+    positions: &[&ReplayedPosition],
+    reasons: &[DeepPlyReason],
+) -> PipelineResult<()> {
+    send(
+        tx,
+        PipelineEvent::DeepPliesSelected {
+            v: SCHEMA_VERSION,
+            mode: mode.into(),
+            plies: positions.iter().map(|p| p.ply).collect(),
+            reasons: reasons.iter().cloned().map(Into::into).collect(),
+        },
+    )
+}
+
 #[derive(Clone, Copy)]
 enum PhaseMode {
     Scan,
@@ -180,7 +235,7 @@ async fn run_phase(
     visits: u32,
     mode: PhaseMode,
     record: &GameRecord,
-    positions: &[ReplayedPosition],
+    positions: &[&ReplayedPosition],
     client: &AnalysisClient,
     config: &PipelineConfig,
     tx: &Tx,

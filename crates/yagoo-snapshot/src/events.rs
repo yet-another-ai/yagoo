@@ -22,6 +22,18 @@ pub enum AnalysisStage {
     PvEnd,
 }
 
+/// One ply chosen for the deep phase (swing magnitude + deltas).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeepPlySelection {
+    pub ply: u32,
+    /// Combined priority score (higher = more important).
+    pub score: f64,
+    pub winrate_delta: f64,
+    pub score_lead_delta: f64,
+    pub ownership_delta: f64,
+}
+
 /// Streaming events for CLI NDJSON and future WebGPU consumers.
 ///
 /// Typical order for strategy `scan_then_deep`:
@@ -30,10 +42,11 @@ pub enum AnalysisStage {
 /// 3. per ply: `position_started` → optional `stage_partial`* → `stage_completed` (root)
 ///    → `position_completed`
 /// 4. `phase_completed` (scan)
-/// 5. `phase_started` (deep)
-/// 6. per ply: root (partials + completed) → pass_probe → optional pv_end* → `position_completed`
-/// 7. `phase_completed` (deep)
-/// 8. `game_completed`
+/// 5. `deep_plies_selected` (auto-picked from scan swings, unless `--deepen-all`)
+/// 6. `phase_started` (deep)
+/// 7. per selected ply: root (partials + completed) → pass_probe → optional pv_end* → `position_completed`
+/// 8. `phase_completed` (deep)
+/// 9. `game_completed`
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum PipelineEvent {
@@ -56,6 +69,16 @@ pub enum PipelineEvent {
     },
     #[serde(rename_all = "camelCase")]
     PhaseCompleted { v: u32, phase: AnalysisPhase },
+    /// Announces which plies will be deepened (after scan, before deep phase).
+    #[serde(rename_all = "camelCase")]
+    DeepPliesSelected {
+        v: u32,
+        /// `swing` | `all` | `range` (deep_only / explicit deepen-all / filtered).
+        mode: String,
+        plies: Vec<u32>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        reasons: Vec<DeepPlySelection>,
+    },
     #[serde(rename_all = "camelCase")]
     PositionStarted {
         v: u32,

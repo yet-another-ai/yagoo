@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
 use yagoo_katago::AnalysisClient;
-use yagoo_pipeline::{analyze_game, PipelineConfig, PipelineStrategy};
+use yagoo_pipeline::{analyze_game, DeepSelectConfig, PipelineConfig, PipelineStrategy};
 use yagoo_snapshot::{GameSnapshot, PipelineEvent};
 
 #[derive(Debug, Parser)]
@@ -49,7 +49,7 @@ enum Commands {
         /// Top-K candidates to retain from moveInfos.
         #[arg(long, default_value_t = 6)]
         top_k: usize,
-        /// First ply (0 = setup position).
+        /// First ply (0 = setup position). Optional range filter for scan + deep.
         #[arg(long, default_value_t = 0)]
         from: u32,
         /// Last ply inclusive (default: end of game).
@@ -61,12 +61,27 @@ enum Commands {
         /// Query PV-end ownership for top candidates (deep phase).
         #[arg(long, default_value_t = false)]
         pv_ends: bool,
-        /// Disable during-search partial events.
+        /// Opt-in during-search `stagePartial` events (off by default).
         #[arg(long, default_value_t = false)]
-        no_partials: bool,
-        /// Seconds for KataGo `reportDuringSearchEvery`.
+        partials: bool,
+        /// Seconds for KataGo `reportDuringSearchEvery` (requires `--partials`).
         #[arg(long, default_value_t = 0.5)]
         report_every: f64,
+        /// Deepen every ply in the scanned range (skip swing auto-pick).
+        #[arg(long, default_value_t = false)]
+        deepen_all: bool,
+        /// |\Delta winrate| threshold for swing selection (fraction).
+        #[arg(long, default_value_t = 0.05)]
+        swing_wr: f64,
+        /// |\Delta scoreLead| threshold for swing selection (points).
+        #[arg(long, default_value_t = 3.0)]
+        swing_sl: f64,
+        /// Mean |Δownership| threshold for swing selection.
+        #[arg(long, default_value_t = 0.08)]
+        swing_own: f64,
+        /// Max plies to deepen after ranking by swing magnitude.
+        #[arg(long, default_value_t = 24)]
+        max_deep_plies: usize,
         /// Testing only: JSON array of engine response lines.
         #[arg(long, hide = true)]
         scripted_fixture: Option<PathBuf>,
@@ -107,8 +122,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             to,
             strategy,
             pv_ends,
-            no_partials,
+            partials,
             report_every,
+            deepen_all,
+            swing_wr,
+            swing_sl,
+            swing_own,
+            max_deep_plies,
             scripted_fixture,
         } => {
             let sgf_text = tokio::fs::read_to_string(&sgf).await?;
@@ -139,12 +159,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 from_ply: from,
                 to_ply: to,
                 include_pv_ends: pv_ends,
-                report_during_search_every: if no_partials {
-                    None
-                } else {
-                    Some(report_every)
-                },
+                report_during_search_every: if partials { Some(report_every) } else { None },
                 emit_game_aggregate: final_json.is_some(),
+                deepen_all,
+                deep_select: DeepSelectConfig {
+                    winrate_threshold: swing_wr,
+                    score_lead_threshold: swing_sl,
+                    ownership_threshold: swing_own,
+                    max_deep_plies,
+                },
                 ..PipelineConfig::default()
             };
 

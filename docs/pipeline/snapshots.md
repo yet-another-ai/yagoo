@@ -16,6 +16,7 @@ Versioned, typed JSON consumed by teaching modules (groups, tempo, zoning, ledge
 
 - **`PositionSnapshot`** — one ply: board, chains, root analysis, optional pass probe, top-K candidates (`movesOwnership` when present), optional PV ends.
 - **`GameSnapshot`** — `{ size, komi, rules, positions[] }` aggregate written by the CLI `--final-json` flag after the stream completes.
+- **`deepPliesSelected`** (stream event) — after scan, lists which plies will deepen (`mode`: `swing` | `all` | `range`) plus swing `reasons` for the UI.
 
 ## Pass probe
 

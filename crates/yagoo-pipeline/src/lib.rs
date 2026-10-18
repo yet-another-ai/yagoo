@@ -7,10 +7,12 @@
 mod config;
 mod error;
 mod run;
+mod select;
 
 pub use config::{PipelineConfig, PipelineStrategy};
 pub use error::{PipelineError, PipelineResult};
 pub use run::{analyze_game, analyze_game_collected};
+pub use select::{select_deep_plies, DeepPlyReason, DeepSelectConfig};
 
 /// Crate version string from Cargo.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

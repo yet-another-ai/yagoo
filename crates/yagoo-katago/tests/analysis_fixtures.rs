@@ -57,3 +57,46 @@ async fn engine_error_surfaces() {
         other => panic!("unexpected {other:?}"),
     }
 }
+
+#[tokio::test]
+async fn demux_concurrent_queries_by_id() {
+    use yagoo_katago::AnalysisUpdate;
+    // Responses out of write order: b final, a partial, a final.
+    let lines = vec![
+        r#"{"id":"b","isDuringSearch":false,"rootInfo":{"visits":20}}"#.into(),
+        r#"{"id":"a","isDuringSearch":true,"rootInfo":{"visits":5}}"#.into(),
+        r#"{"id":"a","isDuringSearch":false,"rootInfo":{"visits":50}}"#.into(),
+    ];
+    let client = AnalysisClient::scripted(lines);
+
+    let client_a = client.clone();
+    let client_b = client.clone();
+    let a = tokio::spawn(async move {
+        let mut partials = 0u32;
+        let mut final_visits = None;
+        let q = AnalysisQueryBuilder::new("a").max_visits(50).build();
+        client_a
+            .analyze_streaming(&q, |u| {
+                match u {
+                    AnalysisUpdate::Partial(_) => partials += 1,
+                    AnalysisUpdate::Final(r) => {
+                        final_visits = r.root_info.and_then(|ri| ri.visits);
+                    }
+                }
+                Ok(())
+            })
+            .await
+            .unwrap();
+        (partials, final_visits)
+    });
+    let b = tokio::spawn(async move {
+        let q = AnalysisQueryBuilder::new("b").max_visits(20).build();
+        client_b.analyze(&q).await.unwrap()
+    });
+
+    let (partials, a_visits) = a.await.unwrap();
+    let b_resp = b.await.unwrap();
+    assert_eq!(partials, 1);
+    assert_eq!(a_visits, Some(50));
+    assert_eq!(b_resp.root_info.unwrap().visits, Some(20));
+}

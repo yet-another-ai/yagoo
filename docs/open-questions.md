@@ -34,14 +34,14 @@ How many raters, what ranks, how the ~20-game corpus is composed, and whether th
 
 Whether inserting `pass` midgame leaves the training distribution: **unverified**. Needs a validation study before relying on status labels in production copy.
 
-## 9. Multi-query KataGo demux?
+## 9. Multi-query KataGo demux? — decided
 
-The Analysis Engine supports concurrent queries by id. Today each `AnalysisClient` is single-flight (streaming partials for one query). Prefer one process with demux, or N processes for parallelism?
+**One process, query demux by `id`.** Do not spawn N KataGo processes for parallelism. Concurrent in-flight queries share a single `AnalysisClient`.
 
-## 10. Deep-phase position selection?
+## 10. Deep-phase position selection? — decided
 
-Scan-then-deep currently deepens the **same** `--from`/`--to` range. Should deep auto-select “critical” plies from scan swings (`scoreLead` / winrate), per the design doc’s coarse-scan advice?
+**Yes — auto-pick from scan swings.** After the low-visit scan, deepen plies with large winrate / scoreLead / ownership changes (thresholds in [parameters](./appendix/parameters.md)). `--from`/`--to` remain an optional range filter; `--deepen-all` deepens every scanned ply. Emit `deepPliesSelected` for the UI.
 
-## 11. Emit `stagePartial` to WebGPU by default?
+## 11. Emit `stagePartial` by default? — decided
 
-Partials can be chatty. Keep them on for local CLI, but default off for browser streams?
+**Off by default** (CLI and future browser). Opt in with `--partials` / `report_during_search_every: Some(…)`.

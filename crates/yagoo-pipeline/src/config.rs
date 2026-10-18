@@ -1,21 +1,23 @@
 //! Pipeline knobs (defaults from `docs/appendix/parameters.md`).
 
+use crate::select::DeepSelectConfig;
 use serde::{Deserialize, Serialize};
 
 /// How to prioritize positions across the game.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum PipelineStrategy {
-    /// Low-visit root-only scan of the range, then a deep pass with full stages.
+    /// Low-visit root-only scan of the range, then a deep pass on swing-selected plies.
     #[default]
     ScanThenDeep,
-    /// Single deep pass only (no scan phase).
+    /// Single deep pass only (no scan phase); deepens every ply in `--from`/`--to`.
     DeepOnly,
 }
 
 /// Configurable analysis parameters.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_excessive_bools)]
 pub struct PipelineConfig {
     pub strategy: PipelineStrategy,
     /// Deep / primary root visits (default mid of 500–2000).
@@ -26,7 +28,7 @@ pub struct PipelineConfig {
     pub pv_end_visits: u32,
     /// Top-K candidates to keep from `moveInfos` (default mid of 5–8).
     pub top_k: usize,
-    /// Inclusive ply range start (0 = setup position).
+    /// Inclusive ply range start (0 = setup position). Optional filter for scan + deep.
     pub from_ply: u32,
     /// Inclusive ply range end (`None` = last position).
     pub to_ply: Option<u32>,
@@ -34,7 +36,7 @@ pub struct PipelineConfig {
     pub include_pv_ends: bool,
     /// Max number of PV ends to query per position (capped by `top_k`).
     pub pv_end_count: usize,
-    /// KataGo `reportDuringSearchEvery` seconds; `None` disables partials.
+    /// KataGo `reportDuringSearchEvery` seconds; `None` disables partials (default).
     pub report_during_search_every: Option<f64>,
     /// Include movesOwnership stdev on deep root queries.
     pub include_moves_ownership_stdev: bool,
@@ -42,6 +44,10 @@ pub struct PipelineConfig {
     pub rules_override: Option<String>,
     /// Emit aggregate `GameSnapshot` on `game_completed`.
     pub emit_game_aggregate: bool,
+    /// Deepen every ply in the scanned range (skip swing auto-pick).
+    pub deepen_all: bool,
+    /// Swing thresholds / max deep plies (ignored when `deepen_all`).
+    pub deep_select: DeepSelectConfig,
 }
 
 impl Default for PipelineConfig {
@@ -56,10 +62,12 @@ impl Default for PipelineConfig {
             to_ply: None,
             include_pv_ends: false,
             pv_end_count: 3,
-            report_during_search_every: Some(0.5),
+            report_during_search_every: None,
             include_moves_ownership_stdev: true,
             rules_override: None,
             emit_game_aggregate: true,
+            deepen_all: false,
+            deep_select: DeepSelectConfig::default(),
         }
     }
 }

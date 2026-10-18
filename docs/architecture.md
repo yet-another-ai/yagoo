@@ -51,9 +51,9 @@ flowchart TB
 | --- | --- |
 | `yagoo-core` | Coordinates (GTP / SGF), board, **chains** (串), liberties, captures, ko / positional superko, move legality, pass |
 | `yagoo-sgf` | SGF → game record + **main-line replay** into `GameState` |
-| `yagoo-katago` | Async JSON-lines client; streaming partials via `reportDuringSearchEvery`; fixture tests (no binary in CI) |
+| `yagoo-katago` | Async JSON-lines client; **single-process id demux**; optional partials via `reportDuringSearchEvery`; fixture tests (no binary in CI) |
 | `yagoo-snapshot` | Versioned `PositionSnapshot` / `GameSnapshot` + `PipelineEvent` NDJSON types (black-positive) |
-| `yagoo-pipeline` | Async **stream** of analysis events (scan-then-deep); drives KataGo; fills snapshots |
+| `yagoo-pipeline` | Async **stream** of analysis events (scan → swing-select → deep); drives KataGo; fills snapshots |
 | `yagoo-cli` | `yagoo analyze` binary — NDJSON stream + optional aggregate JSON |
 
 Teaching algorithms (groups, tempo, …) consume **snapshots only** — not implemented yet.

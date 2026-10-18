@@ -5,7 +5,10 @@
   "scripts": {
     "docs:dev": "pnpm --filter @yagoo/docs dev",
     "docs:build": "pnpm --filter @yagoo/docs build",
-    "docs:preview": "pnpm --filter @yagoo/docs preview"
+    "docs:preview": "pnpm --filter @yagoo/docs preview",
+    "ui:test": "pnpm --filter @yagoo/ui test",
+    "ui:check": "pnpm --filter @yagoo/ui check",
+    "test:js": "pnpm --filter @yagoo/ui test"
   },
   "pnpm": {
     "onlyBuiltDependencies": ["esbuild"]

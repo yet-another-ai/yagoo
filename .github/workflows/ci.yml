@@ -49,5 +49,8 @@ jobs:
       - name: Rust tests
         run: mise run rust:test
 
+      - name: UI unit tests
+        run: mise run ui:test
+
       - name: Build documentation
         run: mise run docs-build

@@ -60,7 +60,13 @@ mise run check
 mise run docs          # VitePress docs site
 ```
 
-Foundation crates (`yagoo-core`, `yagoo-sgf`, `yagoo-katago`) are in place. Teaching algorithms (groups, tempo, …) are not implemented yet.
+Foundation crates (`yagoo-core`, `yagoo-sgf`, `yagoo-katago`) are in place. The Vue UI package (`packages/ui` / `@yagoo/ui`) provides a Shudan-compatible goban and Sabaki-inspired reviewer chrome embeddable in the docs (`mise run docs`, then open **Frontend demo**). Teaching algorithms (groups, tempo, …) are not implemented yet.
+
+```sh
+mise run ui:test       # Vitest (incl. fuzzy-shift / collision)
+mise run docs          # VitePress, with interactive /demo
+```
+
 
 Optional local KataGo assets (not CI):
 

@@ -12,7 +12,13 @@ lockfile = true
 [tasks.install]
 description = "Install JavaScript workspace dependencies"
 run = "pnpm install --frozen-lockfile --prefer-offline"
-sources = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "docs/package.json"]
+sources = [
+  "package.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+  "docs/package.json",
+  "packages/*/package.json",
+]
 outputs = ["node_modules/.pnpm/lock.yaml"]
 
 [tasks."rust:format"]
@@ -34,6 +40,25 @@ run = "cargo check --workspace --all-targets"
 [tasks."rust:test"]
 description = "Run Rust workspace tests"
 run = "cargo test --workspace"
+
+[tasks."ui:dev"]
+description = "Watch UI package tests (vitest)"
+depends = ["install"]
+run = "pnpm --filter @yagoo/ui test:watch"
+
+[tasks."ui:test"]
+description = "Run @yagoo/ui unit tests"
+depends = ["install"]
+run = "pnpm --filter @yagoo/ui test"
+
+[tasks."ui:check"]
+description = "Typecheck @yagoo/ui"
+depends = ["install"]
+run = "pnpm --filter @yagoo/ui check"
+
+[tasks."ui:build"]
+description = "Typecheck UI (library is consumed via source exports)"
+depends = ["ui:check"]
 
 [tasks.docs]
 description = "Start the documentation site"
@@ -58,8 +83,8 @@ description = "Run Rust Clippy"
 depends = ["rust:clippy"]
 
 [tasks.check]
-description = "Format check, Clippy, cargo test, and docs build"
-depends = ["format-check", "lint", "rust:test", "docs-build"]
+description = "Format check, Clippy, cargo test, UI tests, and docs build"
+depends = ["format-check", "lint", "rust:test", "ui:test", "docs-build"]
 
 [tasks."python:sync"]
 description = "Sync the uv-managed Python environment"

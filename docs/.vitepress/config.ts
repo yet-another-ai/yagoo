@@ -42,6 +42,13 @@ export default defineConfig({
         ],
       },
       {
+        text: "Pipeline",
+        items: [
+          { text: "Snapshots", link: "/pipeline/snapshots" },
+          { text: "Streaming events", link: "/pipeline/streaming" },
+        ],
+      },
+      {
         text: "Plan",
         items: [
           { text: "Architecture & data flow", link: "/architecture" },

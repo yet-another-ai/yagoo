@@ -67,7 +67,19 @@ impl Transport {
     }
 }
 
+/// One update from a streaming analysis query.
+#[derive(Clone, Debug)]
+pub enum AnalysisUpdate {
+    /// `isDuringSearch: true` progress report.
+    Partial(AnalysisResponse),
+    /// Final response for the query id.
+    Final(AnalysisResponse),
+}
+
 /// Client for one `katago analysis` process (or a scripted stand-in).
+///
+/// Queries are single-flight (one in-flight query at a time per client). Spawn
+/// multiple clients for process-level concurrency.
 pub struct AnalysisClient {
     transport: Mutex<Transport>,
 }
@@ -123,8 +135,31 @@ impl AnalysisClient {
         }
     }
 
-    /// Send one query and wait for the matching finished response (`isDuringSearch` false/absent).
+    /// Send one query and wait for the matching finished response (skips partials).
     pub async fn analyze(&self, query: &AnalysisQuery) -> KatagoResult<AnalysisResponse> {
+        let mut final_resp = None;
+        self.analyze_streaming(query, |update| {
+            if let AnalysisUpdate::Final(resp) = update {
+                final_resp = Some(resp);
+            }
+            Ok(())
+        })
+        .await?;
+        final_resp.ok_or(KatagoError::ProcessExited)
+    }
+
+    /// Stream during-search partials then the final response for `query`.
+    ///
+    /// Callback is invoked in order. Holds the client lock for the whole query
+    /// (single-flight).
+    pub async fn analyze_streaming<F>(
+        &self,
+        query: &AnalysisQuery,
+        mut on_update: F,
+    ) -> KatagoResult<()>
+    where
+        F: FnMut(AnalysisUpdate) -> KatagoResult<()>,
+    {
         let line = serde_json::to_string(query)?;
         let mut guard = self.transport.lock().await;
         guard.write_line(&line).await?;
@@ -144,9 +179,11 @@ impl AnalysisClient {
                 });
             }
             if resp.is_during_search.unwrap_or(false) {
+                on_update(AnalysisUpdate::Partial(resp))?;
                 continue;
             }
-            return Ok(resp);
+            on_update(AnalysisUpdate::Final(resp))?;
+            return Ok(());
         }
     }
 

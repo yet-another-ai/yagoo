@@ -33,3 +33,15 @@ How many raters, what ranks, how the ~20-game corpus is composed, and whether th
 ## 8. Pass midgame OOD?
 
 Whether inserting `pass` midgame leaves the training distribution: **unverified**. Needs a validation study before relying on status labels in production copy.
+
+## 9. Multi-query KataGo demux?
+
+The Analysis Engine supports concurrent queries by id. Today each `AnalysisClient` is single-flight (streaming partials for one query). Prefer one process with demux, or N processes for parallelism?
+
+## 10. Deep-phase position selection?
+
+Scan-then-deep currently deepens the **same** `--from`/`--to` range. Should deep auto-select “critical” plies from scan swings (`scoreLead` / winrate), per the design doc’s coarse-scan advice?
+
+## 11. Emit `stagePartial` to WebGPU by default?
+
+Partials can be chatty. Keep them on for local CLI, but default off for browser streams?

@@ -2,6 +2,8 @@
 
 Two pipelines feed every teaching module. Do not mix their semantics without converting coordinates (see [conventions](./appendix/conventions.md)).
 
+Downstream teaching code should read versioned **[snapshots](./pipeline/snapshots.md)** produced by the **[streaming pipeline](./pipeline/streaming.md)** rather than calling the Analysis Engine ad hoc.
+
 ## Path A — Analysis Engine
 
 - **What:** `katago analysis` JSON protocol, consumed by an async **Rust** client.

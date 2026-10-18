@@ -9,7 +9,7 @@ mod error;
 mod query;
 mod types;
 
-pub use client::AnalysisClient;
+pub use client::{AnalysisClient, AnalysisUpdate};
 pub use error::{KatagoError, KatagoResult};
 pub use query::AnalysisQueryBuilder;
 pub use types::{

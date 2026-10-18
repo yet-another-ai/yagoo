@@ -33,3 +33,15 @@ How many raters, what ranks, how the ~20-game corpus is composed, and whether th
 ## 8. Pass midgame OOD?
 
 Whether inserting `pass` midgame leaves the training distribution: **unverified**. Needs a validation study before relying on status labels in production copy.
+
+## 9. Multi-query KataGo demux? — decided
+
+**One process, query demux by `id`.** Do not spawn N KataGo processes for parallelism. Concurrent in-flight queries share a single `AnalysisClient`.
+
+## 10. Deep-phase position selection? — decided
+
+**Yes — auto-pick from scan swings.** After the low-visit scan, deepen plies with large winrate / scoreLead / ownership changes (thresholds in [parameters](./appendix/parameters.md)). `--from`/`--to` remain an optional range filter; `--deepen-all` deepens every scanned ply. Emit `deepPliesSelected` for the UI.
+
+## 11. Emit `stagePartial` by default? — decided
+
+**Off by default** (CLI and future browser). Opt in with `--partials` / `report_during_search_every: Some(…)`.

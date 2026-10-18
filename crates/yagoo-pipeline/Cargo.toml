@@ -1,0 +1,27 @@
+[package]
+name = "yagoo-pipeline"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Async streaming SGF → KataGo snapshot pipeline for Yagoo"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+yagoo-core.workspace = true
+yagoo-sgf.workspace = true
+yagoo-katago.workspace = true
+yagoo-snapshot.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+futures = { version = "0.3", default-features = false, features = ["std"] }
+async-stream = "0.3"
+
+[lints]
+workspace = true

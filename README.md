@@ -69,10 +69,21 @@ mise run docs          # VitePress, with interactive /demo
 
 
 Optional local KataGo assets (not CI):
+Foundation: board/SGF/KataGo client, **streaming snapshot pipeline**, and `yagoo analyze` CLI. Teaching algorithms (groups, tempo, …) come next.
 
 ```sh
+# Local KataGo assets (not CI) — downloads b18 .bin.gz + sample analysis.cfg;
+# install the KataGo binary from upstream releases onto PATH first.
 mise run katago:fetch-dev
+
+export YAGOO_KATAGO=.yagoo-data/bin/katago
+export YAGOO_MODEL=.yagoo-data/models/kata1-b18c384nbt-s9996604416-d4316597426.bin.gz
+export YAGOO_ANALYSIS_CONFIG=.yagoo-data/config/analysis.cfg
+
+cargo run -p yagoo-cli -- analyze game.sgf -o events.ndjson --final-json game.json
 ```
+
+See [streaming pipeline](docs/pipeline/streaming.md) and [snapshot schema](docs/pipeline/snapshots.md).
 
 ## License
 

@@ -51,6 +51,9 @@ pub struct AnalysisQuery {
     pub board_y_size: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_visits: Option<u32>,
+    /// Seconds between during-search progress reports (KataGo `reportDuringSearchEvery`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub report_during_search_every: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub analysis_pv_len: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -76,6 +79,10 @@ pub struct AnalysisQuery {
 }
 
 /// `rootInfo` object.
+///
+/// Per KataGo Analysis Engine docs, scalars live here. Per-point arrays
+/// (`ownership`, `ownershipStdev`, `policy`, `humanPolicy`) are top-level
+/// on [`AnalysisResponse`], not nested under `rootInfo`.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct RootInfo {
@@ -95,15 +102,6 @@ pub struct RootInfo {
     pub raw_st_score_error: Option<f64>,
     #[serde(default)]
     pub raw_var_time_left: Option<f64>,
-    /// Row-major from A19, values in [-1, 1], black-positive when configured.
-    #[serde(default)]
-    pub ownership: Option<Vec<f64>>,
-    #[serde(default)]
-    pub ownership_stdev: Option<Vec<f64>>,
-    #[serde(default)]
-    pub policy: Option<Vec<f64>>,
-    #[serde(default)]
-    pub human_policy: Option<Vec<f64>>,
 }
 
 /// One entry in `moveInfos`.
@@ -149,6 +147,11 @@ impl MoveInfo {
 }
 
 /// Full analysis response line.
+///
+/// Top-level per-position arrays match the Analysis Engine protocol:
+/// `ownership` / `ownershipStdev` (when `includeOwnership*`), `policy` /
+/// `humanPolicy` (when `includePolicy`). Candidate ownership still lives on
+/// each [`MoveInfo`] when `includeMovesOwnership*` is set.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AnalysisResponse {
@@ -163,8 +166,15 @@ pub struct AnalysisResponse {
     pub move_infos: Option<Vec<MoveInfo>>,
     #[serde(default)]
     pub root_info: Option<RootInfo>,
+    /// Row-major from A19, values in [-1, 1], black-positive when configured.
+    #[serde(default)]
+    pub ownership: Option<Vec<f64>>,
+    #[serde(default)]
+    pub ownership_stdev: Option<Vec<f64>>,
     #[serde(default)]
     pub policy: Option<Vec<f64>>,
+    #[serde(default)]
+    pub human_policy: Option<Vec<f64>>,
     /// Catch-all for forward compatibility.
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,

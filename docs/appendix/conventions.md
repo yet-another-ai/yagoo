@@ -20,8 +20,9 @@ The whole system uses **black-positive** ownership and score.
 
 ## Pass probe
 
-- Append `"pass"` to the end of `moves`.
-- If the previous move was already `pass`, **skip** the probe (consecutive passes may end the game).
+- Append `"pass"` to the end of `moves` for the side to play (equivalently: leave stones fixed and let the opponent “move first” after a pass). Yagoo uses **append pass** on a query built from the current `GameState` (`initialStones` + `initialPlayer`, then `moves: [["B"|"W","pass"]]`).
+- If the previous action was already a pass (`consecutive_passes >= 1`), **skip** the probe — consecutive passes may end the game. Snapshot field: `passProbeSkipped: "previous_was_pass"`.
+- Scan phase skips the probe by design (`passProbeSkipped: "disabled_in_phase"`).
 
 ## Network (v1)
 

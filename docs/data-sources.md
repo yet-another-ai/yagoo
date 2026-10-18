@@ -2,6 +2,8 @@
 
 Two pipelines feed every teaching module. Do not mix their semantics without converting coordinates (see [conventions](./appendix/conventions.md)).
 
+Downstream teaching code should read versioned **[snapshots](./pipeline/snapshots.md)** produced by the **[streaming pipeline](./pipeline/streaming.md)** rather than calling the Analysis Engine ad hoc.
+
 ## Path A — Analysis Engine
 
 - **What:** `katago analysis` JSON protocol, consumed by an async **Rust** client.
@@ -22,7 +24,7 @@ Two pipelines feed every teaching module. Do not mix their semantics without con
 
 | Signal | Symbol | Source | Notes |
 | --- | --- | --- | --- |
-| Root ownership / stdev | \(o^{\mathrm{root}}, s\) | A: `rootInfo.ownership` / `ownershipStdev` | Post-search |
+| Root ownership / stdev | \(o^{\mathrm{root}}, s\) | A: top-level `ownership` / `ownershipStdev` | Post-search (not inside `rootInfo`) |
 | Candidate ownership / stdev | \(o^{(m)}\) | A: `moveInfos[k].ownership` / `ownershipStdev` | Only moves that enter `moveInfos` |
 | Candidate scalars | — | A: `move`, `visits`, `winrate`, `scoreLead`, `scoreStdev`, `prior`, `utility`, `lcb`, `order`, `pv`, `pvVisits` | `scoreStdev` is systematically high — relative use only |
 | Root score lead | — | A: `rootInfo.scoreLead` | |

@@ -23,6 +23,7 @@ impl AnalysisQueryBuilder {
                 board_x_size: Some(19),
                 board_y_size: Some(19),
                 max_visits: Some(500),
+                report_during_search_every: None,
                 analysis_pv_len: None,
                 include_ownership: Some(true),
                 include_ownership_stdev: Some(true),
@@ -62,6 +63,26 @@ impl AnalysisQueryBuilder {
     #[must_use]
     pub fn max_visits(mut self, visits: u32) -> Self {
         self.query.max_visits = Some(visits);
+        self
+    }
+
+    /// Emit during-search progress every `seconds` (KataGo analysis field).
+    #[must_use]
+    pub fn report_during_search_every(mut self, seconds: f64) -> Self {
+        self.query.report_during_search_every = Some(seconds);
+        self
+    }
+
+    #[must_use]
+    pub fn include_moves_ownership(mut self, on: bool) -> Self {
+        self.query.include_moves_ownership = Some(on);
+        self
+    }
+
+    #[must_use]
+    pub fn include_ownership(mut self, on: bool) -> Self {
+        self.query.include_ownership = Some(on);
+        self.query.include_ownership_stdev = Some(on);
         self
     }
 

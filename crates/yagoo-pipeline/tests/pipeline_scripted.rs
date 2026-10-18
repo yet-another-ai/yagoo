@@ -5,20 +5,20 @@ use yagoo_snapshot::{AnalysisPhase, OwnershipConvention, PipelineEvent, SCHEMA_V
 
 fn root_line(id: &str, visits: u64) -> String {
     format!(
-        r#"{{"id":"{id}","isDuringSearch":false,"rootInfo":{{"visits":{visits},"winrate":0.55,"scoreLead":1.5,"ownership":[0.2,-0.1,0.0],"ownershipStdev":[0.05,0.05,0.1],"policy":[0.1,0.2,0.3]}},"moveInfos":[{{"move":"C3","visits":40,"order":0,"winrate":0.56,"scoreLead":1.6,"prior":0.1,"pv":["C3","G7"],"ownership":[0.3,-0.1,0.0]}},{{"move":"G7","visits":20,"order":1,"winrate":0.52,"scoreLead":0.5,"prior":0.08,"pv":["G7"]}}],"policy":[0.1,0.2,0.3]}}"#
+        r#"{{"id":"{id}","isDuringSearch":false,"rootInfo":{{"visits":{visits},"winrate":0.55,"scoreLead":1.5}},"ownership":[0.2,-0.1,0.0],"ownershipStdev":[0.05,0.05,0.1],"policy":[0.1,0.2,0.3],"moveInfos":[{{"move":"C3","visits":40,"order":0,"winrate":0.56,"scoreLead":1.6,"prior":0.1,"pv":["C3","G7"],"ownership":[0.3,-0.1,0.0]}},{{"move":"G7","visits":20,"order":1,"winrate":0.52,"scoreLead":0.5,"prior":0.08,"pv":["G7"]}}]}}"#
     )
 }
 
 fn root_line_vals(id: &str, visits: u64, wr: f64, sl: f64, own: &str) -> String {
     format!(
-        r#"{{"id":"{id}","isDuringSearch":false,"rootInfo":{{"visits":{visits},"winrate":{wr},"scoreLead":{sl},"ownership":{own},"ownershipStdev":[0.05,0.05,0.1],"policy":[0.1,0.2,0.3]}},"moveInfos":[{{"move":"C3","visits":40,"order":0,"winrate":{wr},"scoreLead":{sl},"prior":0.1,"pv":["C3"],"ownership":{own}}}],"policy":[0.1,0.2,0.3]}}"#
+        r#"{{"id":"{id}","isDuringSearch":false,"rootInfo":{{"visits":{visits},"winrate":{wr},"scoreLead":{sl}}},"ownership":{own},"ownershipStdev":[0.05,0.05,0.1],"policy":[0.1,0.2,0.3],"moveInfos":[{{"move":"C3","visits":40,"order":0,"winrate":{wr},"scoreLead":{sl},"prior":0.1,"pv":["C3"],"ownership":{own}}}]}}"#
     )
 }
 
 fn partial_then_final(id: &str) -> Vec<String> {
     vec![
         format!(
-            r#"{{"id":"{id}","isDuringSearch":true,"rootInfo":{{"visits":10,"winrate":0.5,"scoreLead":0.0,"ownership":[0.0,0.0,0.0]}}}}"#
+            r#"{{"id":"{id}","isDuringSearch":true,"rootInfo":{{"visits":10,"winrate":0.5,"scoreLead":0.0}},"ownership":[0.0,0.0,0.0]}}"#
         ),
         root_line(id, 100),
     ]
@@ -165,6 +165,71 @@ async fn scan_then_deep_auto_picks_swing_ply() {
         })
         .collect();
     assert_eq!(deep_plies, vec![2]);
+}
+
+#[tokio::test]
+async fn scan_then_deep_auto_picks_ownership_only_swing() {
+    // Flat winrate / scoreLead; ownership mean |Δ| ≥ 0.08 into ply 2.
+    let own0 = "[0.0,0.0,0.0,0.0]";
+    let own1 = "[0.0,0.0,0.0,0.0]";
+    let own2 = "[0.2,0.2,0.2,0.2]"; // mean abs Δ vs ply1 = 0.2
+    let lines = vec![
+        root_line_vals("p0-scan-root", 50, 0.50, 1.0, own0),
+        root_line_vals("p1-scan-root", 50, 0.50, 1.0, own1),
+        root_line_vals("p2-scan-root", 50, 0.50, 1.0, own2),
+        root_line("p2-deep-root", 200),
+        root_line("p2-deep-pass", 200),
+    ];
+    let client = Arc::new(AnalysisClient::scripted(lines));
+    let sgf = "(;SZ[9]KM[7.5];B[cc];W[gg])";
+    let cfg = PipelineConfig {
+        strategy: PipelineStrategy::ScanThenDeep,
+        scan_visits: 50,
+        root_visits: 200,
+        from_ply: 0,
+        to_ply: Some(2),
+        report_during_search_every: None,
+        include_pv_ends: false,
+        emit_game_aggregate: false,
+        deepen_all: false,
+        deep_select: DeepSelectConfig::default(),
+        ..PipelineConfig::default()
+    };
+    let events = analyze_game_collected(sgf, client, cfg).await.unwrap();
+    let selected = events.iter().find_map(|e| match e {
+        PipelineEvent::DeepPliesSelected {
+            mode,
+            plies,
+            reasons,
+            ..
+        } => Some((mode.as_str(), plies.clone(), reasons.clone())),
+        _ => None,
+    });
+    let (mode, plies, reasons) = selected.expect("deep_plies_selected");
+    assert_eq!(mode, "swing");
+    assert_eq!(plies, vec![2]);
+    assert_eq!(reasons.len(), 1);
+    assert!(reasons[0].winrate_delta < 0.05);
+    assert!(reasons[0].score_lead_delta < 3.0);
+    assert!(reasons[0].ownership_delta >= 0.08);
+
+    // Scan snapshots must carry top-level ownership into EngineAnalysis.
+    let scan_ply2 = events.iter().find_map(|e| match e {
+        PipelineEvent::PositionCompleted {
+            phase: AnalysisPhase::Scan,
+            snapshot,
+            ..
+        } if snapshot.ply == 2 => Some(snapshot.as_ref()),
+        _ => None,
+    });
+    let own = scan_ply2
+        .expect("scan ply 2")
+        .root
+        .as_ref()
+        .and_then(|r| r.ownership.as_ref())
+        .expect("ownership on scan snapshot");
+    assert_eq!(own.len(), 4);
+    assert!((own[0] - 0.2).abs() < 1e-9);
 }
 
 #[tokio::test]

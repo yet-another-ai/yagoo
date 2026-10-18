@@ -202,4 +202,18 @@ mod tests {
         // After truncate by score then re-sort by ply:
         assert!(picked.iter().any(|r| r.ply == 3));
     }
+
+    #[test]
+    fn ownership_only_swing_triggers_selection() {
+        // Winrate / scoreLead stay flat; only mean |Δownership| clears τ_own.
+        let s0 = snap(0, 0.50, 1.0, vec![0.0, 0.0, 0.0, 0.0]);
+        let s1 = snap(1, 0.50, 1.0, vec![0.2, 0.2, 0.2, 0.2]); // mean abs Δ = 0.2
+        let list = [(0, &s0), (1, &s1)];
+        let picked = select_deep_plies(&list, &DeepSelectConfig::default());
+        assert_eq!(picked.len(), 1);
+        assert_eq!(picked[0].ply, 1);
+        assert!(picked[0].winrate_delta < 0.05);
+        assert!(picked[0].score_lead_delta < 3.0);
+        assert!(picked[0].ownership_delta >= 0.08);
+    }
 }

@@ -24,7 +24,7 @@ Downstream teaching code should read versioned **[snapshots](./pipeline/snapshot
 
 | Signal | Symbol | Source | Notes |
 | --- | --- | --- | --- |
-| Root ownership / stdev | \(o^{\mathrm{root}}, s\) | A: `rootInfo.ownership` / `ownershipStdev` | Post-search |
+| Root ownership / stdev | \(o^{\mathrm{root}}, s\) | A: top-level `ownership` / `ownershipStdev` | Post-search (not inside `rootInfo`) |
 | Candidate ownership / stdev | \(o^{(m)}\) | A: `moveInfos[k].ownership` / `ownershipStdev` | Only moves that enter `moveInfos` |
 | Candidate scalars | — | A: `move`, `visits`, `winrate`, `scoreLead`, `scoreStdev`, `prior`, `utility`, `lcb`, `order`, `pv`, `pvVisits` | `scoreStdev` is systematically high — relative use only |
 | Root score lead | — | A: `rootInfo.scoreLead` | |

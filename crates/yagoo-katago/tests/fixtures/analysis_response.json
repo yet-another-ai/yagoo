@@ -1,6 +1,7 @@
 {
   "id": "fixture-1",
   "isDuringSearch": false,
+  "turnNumber": 2,
   "moveInfos": [
     {
       "move": "D4",
@@ -30,10 +31,14 @@
   "rootInfo": {
     "winrate": 0.51,
     "scoreLead": 0.8,
+    "scoreSelfplay": 1.1,
+    "utility": 0.04,
     "visits": 500,
-    "ownership": [0.2, -0.1, 0.0],
-    "ownershipStdev": [0.05, 0.08, 0.15],
-    "policy": [0.01, 0.02, 0.03]
+    "rawStWrError": 0.02,
+    "rawStScoreError": 1.5,
+    "rawVarTimeLeft": 40.0
   },
-  "policy": [0.01, 0.02, 0.03]
+  "ownership": [0.2, -0.1, 0.0],
+  "ownershipStdev": [0.05, 0.08, 0.15],
+  "policy": [0.01, 0.02, 0.03, 0.94]
 }

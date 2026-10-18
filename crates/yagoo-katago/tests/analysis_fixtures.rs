@@ -7,8 +7,12 @@ async fn parses_fixture_response() {
     assert_eq!(resp.id, "fixture-1");
     let root = resp.root_info.as_ref().unwrap();
     assert_eq!(root.visits, Some(500));
-    assert_eq!(root.ownership.as_ref().unwrap().len(), 3);
-    assert_eq!(root.ownership_stdev.as_ref().unwrap().len(), 3);
+    assert_eq!(root.winrate, Some(0.51));
+    // Ownership / stdev / policy are top-level, not inside rootInfo.
+    assert_eq!(resp.ownership.as_ref().unwrap().len(), 3);
+    assert_eq!(resp.ownership_stdev.as_ref().unwrap().len(), 3);
+    assert_eq!(resp.policy.as_ref().unwrap().len(), 4);
+    assert!(!resp.extra.contains_key("ownership"));
     let moves = resp.move_infos.as_ref().unwrap();
     assert_eq!(moves[0].gtp_move(), "D4");
     assert_eq!(moves[0].visits, Some(120));

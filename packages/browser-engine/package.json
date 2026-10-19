@@ -1,0 +1,27 @@
+{
+  "name": "@yagoo/browser-engine",
+  "description": "EXPERIMENTAL in-browser KataGo analysis (WebGPU / Wasm). Not a native replacement.",
+  "private": true,
+  "type": "module",
+  "exports": "./src/client.ts",
+  "scripts": {
+    "build:wasm": "node scripts/build-wasm.mjs",
+    "dev": "vite --host 127.0.0.1",
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "vite build",
+    "smoke": "node test/browser-smoke.mjs",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "onnxruntime-web": "1.30.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "@types/node": "^22.19.0",
+    "@webgpu/types": "^0.1.64",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1",
+    "vitest": "^3.2.4"
+  }
+}

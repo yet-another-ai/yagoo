@@ -52,6 +52,10 @@ Pinned teaching net for v1 work: **`kata1-b18c384nbt-s9996604416-d4316597426`** 
 
 Start at **[docs/](docs/index.md)** — glossary, data sources, one page per module, architecture, MVP plan, open questions.
 
+## Experimental browser engine
+
+An **EXPERIMENTAL** in-browser KataGo path (`packages/browser-engine`) can load a self-hosted official b18 SWA ONNX bundle over WebGPU (Wasm fallback), run simplified Rust/Wasm search, and emit the same NDJSON event stream the reviewer already opens. It is **not** search-equivalent to native KataGo and does not change the native `yagoo analyze` / CLI path. Setup, limits, and evidence: [docs/browser-engine.md](docs/browser-engine.md). Research tracking: issue #5.
+
 ## Development
 
 ```sh

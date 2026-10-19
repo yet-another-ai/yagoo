@@ -12,6 +12,7 @@ mod color;
 mod coord;
 mod error;
 mod game;
+pub mod nn_features;
 
 pub use board::{Board, MovePlay, Stone};
 pub use chain::Chain;

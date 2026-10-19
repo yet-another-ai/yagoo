@@ -19,9 +19,10 @@ yagoo-snapshot.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-tokio.workspace = true
 futures = { version = "0.3", default-features = false, features = ["std"] }
-async-stream = "0.3"
+
+[dev-dependencies]
+tokio.workspace = true
 
 [lints]
 workspace = true

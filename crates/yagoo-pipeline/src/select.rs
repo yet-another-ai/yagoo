@@ -158,6 +158,7 @@ mod tests {
             },
             chains: vec![],
             root: Some(EngineAnalysis {
+                neural: None,
                 visits: Some(100),
                 winrate: Some(wr),
                 score_lead: Some(sl),

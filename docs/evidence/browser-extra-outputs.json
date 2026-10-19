@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-19",
+  "environment": "DELTON-WS; installed headless Chrome; NVIDIA Lovelace; localhost COOP/COEP",
+  "model": {
+    "name": "kata1-b18c384nbt-s9996604416-d4316597426",
+    "weights": "official SWA",
+    "onnxSha256": "f3a33ebdee29a5251cf7cdd98475e4d60c6e893e3a41731a356cb403691e82be",
+    "sourceRevision": "d91ea855110dae533f0aada947b2b7d78cc8a4e1"
+  },
+  "commandEnvironment": {
+    "SMOKE_OUTPUTS_ONLY": "1"
+  },
+  "runs": [
+    {
+      "command": "node test/browser-smoke.mjs webgpu-batch",
+      "backend": "webgpu",
+      "precision": "fp32",
+      "eventCount": 18,
+      "positions": 3,
+      "rootSymmetries": 8,
+      "largestBatch": 4,
+      "neuralEvaluations": 24,
+      "observedPthreadWorkers": 0,
+      "completedExtraHeadSamples": [
+        {
+          "toPlay": "B",
+          "symmetry": "identity",
+          "aggregation": "none",
+          "boardSize": 9,
+          "modelBoardSize": 19,
+          "scoreBeliefLength": 842,
+          "scoreBeliefProbabilitySum": 1.0000000504729534,
+          "sekiLength": 1444,
+          "futurePositionLength": 722
+        },
+        {
+          "toPlay": "W",
+          "symmetry": "identity",
+          "aggregation": "none",
+          "boardSize": 9,
+          "modelBoardSize": 19,
+          "scoreBeliefLength": 842,
+          "scoreBeliefProbabilitySum": 1.0000001033518149,
+          "sekiLength": 1444,
+          "futurePositionLength": 722
+        },
+        {
+          "toPlay": "B",
+          "symmetry": "identity",
+          "aggregation": "none",
+          "boardSize": 9,
+          "modelBoardSize": 19,
+          "scoreBeliefLength": 842,
+          "scoreBeliefProbabilitySum": 0.9999999560787681,
+          "sekiLength": 1444,
+          "futurePositionLength": 722
+        }
+      ],
+      "activationStatus": "GPU capture and explicit release passed"
+    },
+    {
+      "command": "node test/browser-smoke.mjs wasm-batch",
+      "backend": "wasm",
+      "precision": "fp32",
+      "eventCount": 18,
+      "positions": 3,
+      "rootSymmetries": 8,
+      "largestBatch": 4,
+      "neuralEvaluations": 24,
+      "observedPthreadWorkers": 3,
+      "completedExtraHeadSamples": [
+        {
+          "toPlay": "B",
+          "symmetry": "identity",
+          "aggregation": "none",
+          "boardSize": 9,
+          "modelBoardSize": 19,
+          "scoreBeliefLength": 842,
+          "scoreBeliefProbabilitySum": 1.0000001792276227,
+          "sekiLength": 1444,
+          "futurePositionLength": 722
+        },
+        {
+          "toPlay": "W",
+          "symmetry": "identity",
+          "aggregation": "none",
+          "boardSize": 9,
+          "modelBoardSize": 19,
+          "scoreBeliefLength": 842,
+          "scoreBeliefProbabilitySum": 1.0000000046405042,
+          "sekiLength": 1444,
+          "futurePositionLength": 722
+        },
+        {
+          "toPlay": "B",
+          "symmetry": "identity",
+          "aggregation": "none",
+          "boardSize": 9,
+          "modelBoardSize": 19,
+          "scoreBeliefLength": 842,
+          "scoreBeliefProbabilitySum": 1.0000002827226173,
+          "sekiLength": 1444,
+          "futurePositionLength": 722
+        }
+      ],
+      "activationStatus": "explicitly unavailable on Wasm"
+    }
+  ],
+  "limits": [
+    "Functional smoke only; no performance threshold or strength claim.",
+    "GPU residence and lifetime checked without CPU activation readback.",
+    "Concept heads and activation visualization are not implemented.",
+    "GPU fp16 remains unvalidated; these sessions used fp32."
+  ],
+  "gpuRetention": {
+    "queryId": "p2-scan-root",
+    "toPlay": "B",
+    "location": "gpu-buffer",
+    "sampleSymmetry": "identity",
+    "layerNames": [
+      "trunk_after_block0",
+      "trunk_after_block1",
+      "trunk_after_block2",
+      "trunk_after_block3",
+      "trunk_after_block4",
+      "trunk_after_block5",
+      "trunk_after_block6",
+      "trunk_after_block7",
+      "trunk_after_block8",
+      "trunk_after_block9",
+      "trunk_after_block10",
+      "trunk_after_block11",
+      "trunk_after_block12",
+      "trunk_after_block13",
+      "trunk_after_block14",
+      "trunk_after_block15",
+      "trunk_after_block16",
+      "trunk_after_block17",
+      "trunkfinal"
+    ],
+    "dimensionsPerLayer": [
+      1,
+      384,
+      19,
+      19
+    ],
+    "typePerLayer": "float32",
+    "bytesPerLayer": 554496,
+    "totalRetainedBytes": 10535424,
+    "maximumRetainedRoots": 1,
+    "noActivationValuesInNdjson": true
+  }
+}

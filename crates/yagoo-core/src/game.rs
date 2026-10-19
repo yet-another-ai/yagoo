@@ -28,6 +28,7 @@ struct HistoryEntry {
     ko_point: Option<Point>,
     consecutive_passes: u8,
     history_len: usize,
+    move_count: usize,
 }
 
 /// Mutable game position with move legality.
@@ -42,6 +43,7 @@ pub struct GameState {
     /// Hashes of positions **after** each completed ply (including setup baseline).
     position_history: Vec<u64>,
     undo_stack: Vec<HistoryEntry>,
+    moves: Vec<(Color, Option<Point>)>,
 }
 
 impl GameState {
@@ -57,6 +59,7 @@ impl GameState {
             consecutive_passes: 0,
             position_history: vec![hash],
             undo_stack: Vec::new(),
+            moves: Vec::new(),
         })
     }
 
@@ -85,6 +88,37 @@ impl GameState {
         self.consecutive_passes
     }
 
+    /// Moves since the last setup edit. Passes are retained for neural features.
+    #[must_use]
+    pub fn moves(&self) -> &[(Color, Option<Point>)] {
+        &self.moves
+    }
+
+    #[must_use]
+    pub fn initial_board(&self) -> &Board {
+        self.undo_stack
+            .first()
+            .map_or(&self.board, |entry| &entry.board)
+    }
+
+    #[must_use]
+    pub fn initial_player(&self) -> Color {
+        self.undo_stack
+            .first()
+            .map_or(self.to_play, |entry| entry.to_play)
+    }
+
+    /// Board before `turns` moves, or the setup board if history is shorter.
+    #[must_use]
+    pub fn recent_board(&self, turns: usize) -> &Board {
+        if turns == 0 {
+            return &self.board;
+        }
+        self.undo_stack
+            .get(self.undo_stack.len().saturating_sub(turns))
+            .map_or(&self.board, |entry| &entry.board)
+    }
+
     /// Place handicap / setup stones. Does not change side to play by itself.
     pub fn setup_stone(&mut self, point: Point, color: Color) -> CoreResult<()> {
         self.board.place_setup(point, color)?;
@@ -105,11 +139,13 @@ impl GameState {
         self.position_history.clear();
         self.position_history.push(hash);
         self.undo_stack.clear();
+        self.moves.clear();
     }
 
     /// Pass. Two consecutive passes leave `consecutive_passes == 2`.
     pub fn play_pass(&mut self) -> CoreResult<()> {
         self.push_undo();
+        self.moves.push((self.to_play, None));
         self.to_play = self.to_play.opponent();
         self.ko_point = None;
         self.consecutive_passes = self.consecutive_passes.saturating_add(1);
@@ -161,6 +197,7 @@ impl GameState {
         self.consecutive_passes = 0;
         self.to_play = color.opponent();
         self.position_history.push(new_hash);
+        self.moves.push((color, Some(point)));
 
         Ok(MovePlay {
             point,
@@ -192,6 +229,7 @@ impl GameState {
             ko_point: self.ko_point,
             consecutive_passes: self.consecutive_passes,
             history_len: self.position_history.len(),
+            move_count: self.moves.len(),
         });
     }
 
@@ -202,6 +240,7 @@ impl GameState {
         self.ko_point = entry.ko_point;
         self.consecutive_passes = entry.consecutive_passes;
         self.position_history.truncate(entry.history_len);
+        self.moves.truncate(entry.move_count);
         Ok(())
     }
 

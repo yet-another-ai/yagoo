@@ -26,6 +26,7 @@ fn position_snapshot_json_roundtrip_and_convention() {
             ownership: Some(vec![0.2, -0.5]),
             ownership_stdev: Some(vec![0.1, 0.2]),
             policy: None,
+            neural: None,
         }),
         pass_probe: None,
         pass_probe_skipped: None,

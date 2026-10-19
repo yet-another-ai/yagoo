@@ -174,18 +174,36 @@ impl AnalysisQueryBuilder {
         self
     }
 
-    /// Fill stones currently on a [`GameState`] as `initialStones`, empty `moves`.
+    /// Retain setup and move history (including passes and ko) for neural features.
     #[must_use]
     pub fn from_game_state(mut self, game: &GameState) -> Self {
         let size = game.board().size();
-        self = self.board_size(size).initial_player(game.to_play());
+        self = self.board_size(size).initial_player(game.initial_player());
         let mut stones = Vec::new();
-        for color in [Color::Black, Color::White] {
-            for p in game.stones(color) {
-                stones.push((color, p));
+        for y in 0..size {
+            for x in 0..size {
+                let p = Point::new(x, y);
+                if let Some(color) = game
+                    .initial_board()
+                    .get(p)
+                    .ok()
+                    .and_then(yagoo_core::Stone::color)
+                {
+                    stones.push((color, p));
+                }
             }
         }
-        self.initial_stones(stones)
+        self.initial_stones(stones).moves_gtp(
+            game.moves()
+                .iter()
+                .map(|(color, point)| {
+                    (
+                        PlayerToken::from_color(*color),
+                        point.map_or_else(|| "pass".into(), |p| p.to_gtp(size)),
+                    )
+                })
+                .collect(),
+        )
     }
 
     #[must_use]
@@ -228,5 +246,28 @@ mod tests {
         assert_eq!(q.initial_player, Some(PlayerToken::W));
         assert_eq!(q.initial_stones.len(), 1);
         assert_eq!(q.moves.len(), 0);
+    }
+
+    #[test]
+    fn retains_setup_and_history_through_pass_and_undo() {
+        let mut game = GameState::new(9, Ruleset::Chinese).unwrap();
+        game.setup_stone(Point::new(2, 2), Color::Black).unwrap();
+        game.set_to_play(Color::White);
+        game.play_gtp("G3").unwrap();
+        game.play_pass().unwrap();
+        game.play_gtp("D4").unwrap();
+        game.undo().unwrap();
+        let query = AnalysisQueryBuilder::new("history")
+            .from_game_state(&game)
+            .build();
+        assert_eq!(query.initial_player, Some(PlayerToken::W));
+        assert_eq!(query.initial_stones, vec![(PlayerToken::B, "C7".into())]);
+        assert_eq!(
+            query.moves,
+            vec![
+                (PlayerToken::W, "G3".into()),
+                (PlayerToken::B, "pass".into())
+            ]
+        );
     }
 }

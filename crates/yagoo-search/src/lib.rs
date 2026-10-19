@@ -218,6 +218,7 @@ fn replay(query: &AnalysisQuery) -> Result<(GameState, FeatureRules), String> {
         game.play_gtp(coord).map_err(|e| e.to_string())?;
     }
     if game.consecutive_passes() >= 2 && rules == FeatureRules::Japanese {
+        // TODO(#10): Japanese encore legality, features and territory scoring.
         return Err(
             "Japanese encore legality, features and territory scoring are not implemented".into(),
         );
@@ -368,6 +369,7 @@ fn tree_ownership(
         .sum();
     // This search assigns one unit of weight to each NN evaluation. Native
     // KataGo can use uncertainty-dependent NN weights, which are not implemented.
+    // TODO(#11): uncertainty-dependent ownership weights for search parity.
     let mut own_weight = if children_square_weight == 0.0 || weight < minimum {
         weight
     } else {
@@ -454,7 +456,7 @@ fn response(
             (vec![], vec![])
         };
         // A utility confidence bound is not the protocol's winrate LCB.
-        // Leave lcb absent until a justified confidence estimate is implemented.
+        // TODO(#11): emit protocol winrate LCB when a justified estimate exists.
         let mut info = json!({ "move": gtp(&root.game, *mv), "order": order, "visits": node.visits,
             "winrate": node.mean(node.win_sum), "scoreLead": node.mean(node.lead_sum), "prior": root.eval.policy[*mv],
             "utility": node.mean(node.utility_sum), "pv": pv });

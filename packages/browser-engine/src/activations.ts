@@ -10,6 +10,7 @@ export type ActivationLease = RootContext & {
 /** One ephemeral root, owned by this worker. Never serializes tensor values.
  * Consumers run here, on the ORT device, and submit GPU work synchronously inside
  * use(). The next root/release invalidates the handle. This is not a concept head.
+ * TODO(#13): concept-head consumers, activation visualization, persistent storage.
  */
 export class RootActivationStore {
   private serial = 0;

@@ -35,6 +35,7 @@ pub fn validate_history(game: &GameState, rules: FeatureRules) -> Result<History
                     .iter()
                     .any(|(p, b)| *p == player && *b == before)
             {
+                // TODO(#16): score repeated-pass phase endings instead of rejecting.
                 return Err(
                     "Repeated-pass phase ending is not implemented; position not evaluated".into(),
                 );
@@ -45,6 +46,7 @@ pub fn validate_history(game: &GameState, rules: FeatureRules) -> Result<History
             }
             if passes >= 2 {
                 if rules == FeatureRules::Japanese {
+                    // TODO(#10): Japanese encore legality, V7 features, territory scoring.
                     return Err("Japanese encore legality, features and territory scoring are not implemented".into());
                 }
                 ended = true;
@@ -64,6 +66,7 @@ pub fn validate_history(game: &GameState, rules: FeatureRules) -> Result<History
                 1
             };
             if point.is_some() && count >= 3 {
+                // TODO(#16): score simple-ko long-cycle / no-result endings.
                 return Err(
                     "Long-cycle no-result scoring is not implemented; position not evaluated"
                         .into(),

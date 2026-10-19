@@ -138,7 +138,9 @@ responses have the WebAssembly MIME type and that COOP/COEP headers apply to the
 entry document. A remote model host must also allow the page's origin through
 CORS. The page verifies file hashes and nine required heads against the selected
 official model manifest before analysis; a missing model is an explicit load
-error. Public-host deployment has not been performed or verified.
+error. Public-host deployment has not been performed or verified
+([#17](https://github.com/yet-another-ai/yagoo/issues/17)). Small-net / mobile
+profiles are not shipped ([#15](https://github.com/yet-another-ai/yagoo/issues/15)).
 
 ## Root activations
 
@@ -196,9 +198,11 @@ semantics and should not be presented as calibrated teaching conclusions.
   A two-position deep analysis with eight visits per root and pass probe also
   completed with candidates and PVs. A separate two-pass Japanese SGF produced
   a visible terminal-scoring error and no `gameCompleted` event.
-  fp16 is **not validated** on this GPU: its policy warmup differs beyond the
-  existing tolerance (maximum probability error `0.00948977`, allowed `0.005`)
-  and initialization accurately retries fp32 GPU.
+  fp16 is **not validated** on this GPU ([#8](https://github.com/yet-another-ai/yagoo/issues/8)):
+  its policy warmup differs beyond the existing tolerance (maximum probability
+  error `0.00948977`, allowed `0.005`) and initialization accurately retries
+  fp32 GPU. Other GPUs/browsers remain unverified
+  ([#9](https://github.com/yet-another-ai/yagoo/issues/9)).
 - The original fp16 scorebelief failure was traced to ORT WebGPU 1.30's unshifted
   exponential reductions. Both LogSoftmax and the scorebelief mixture's separate
   ReduceLogSumExp now use an explicit maximum shift. This removes the observed
@@ -231,14 +235,16 @@ semantics and should not be presented as calibrated teaching conclusions.
   Root and pass-probe results pass unchanged tolerances (0.002 for probability/
   ownership, 0.05 points for lead). Native analysis defaults to hiding pre-root
   history; the comparison explicitly disables that default to match browser inputs.
-  The release binary is older than the pinned feature oracle/export source.
+  The release binary is older than the pinned feature oracle/export source
+  ([#12](https://github.com/yet-another-ai/yagoo/issues/12)).
 - The same corpus completed two eight-visit roots and their pass probes on both
   engines. Root policies still agree within `4.656e-6`; searched values differ:
   up to `0.007128` winrate, `1.766` points, `0.4380` ownership and `0.2731`
   ownership standard deviation. These are recorded differences, not relaxed
   acceptance tolerances. Native search heuristics/defaults and this batched PUCT
   search are different; a single tiny-budget run does not establish strength or
-  search equivalence. See [the recorded comparison](./evidence/native-katago-comparison.json).
+  search equivalence ([#11](https://github.com/yet-another-ai/yagoo/issues/11)).
+  See [the recorded comparison](./evidence/native-katago-comparison.json).
 - Two independent code reviews covered algorithms/rules and runtime/cancellation/
   provenance. Confirmed defects were fixed, including friendly-pass history,
   komi clipping, no-result output, ownership/PV fields, repeated-click event loss,
@@ -293,18 +299,18 @@ native engine runs or browser GPU experiments are added to shared-runner CI.
 
 See the [acceptance checklist](./issue-5-acceptance.md) and the **Follow-ups**
 section on [PR #7](https://github.com/yet-another-ai/yagoo/pull/7). Each open
-limit is tracked as its own GitHub issue (related to #7 / #5):
+limit is its own issue (related to #7 / #5):
 
-- fp16 WebGPU policy warmup (falls back to fp32)
-- Unverified GPUs / browsers
-- Japanese encore legality, features and territory scoring
-- Simple-ko long-cycle / no-result and repeated-pass scoring
-- Search parity with native (uncertainty weighting, LCB, passing heuristics, strength)
-- Native comparison release aligned with the pinned exporter
-- Concept-head consumers, activation visualization, persistent activation storage
-- Model download resume
-- Small-net / mobile support
-- Deployed public-host verification
+- [#8](https://github.com/yet-another-ai/yagoo/issues/8) fp16 WebGPU policy warmup (falls back to fp32)
+- [#9](https://github.com/yet-another-ai/yagoo/issues/9) Unverified GPUs / browsers
+- [#10](https://github.com/yet-another-ai/yagoo/issues/10) Japanese encore legality, features and territory scoring
+- [#16](https://github.com/yet-another-ai/yagoo/issues/16) Simple-ko long-cycle / no-result and repeated-pass scoring
+- [#11](https://github.com/yet-another-ai/yagoo/issues/11) Search parity with native (uncertainty weighting, LCB, passing heuristics, strength)
+- [#12](https://github.com/yet-another-ai/yagoo/issues/12) Native comparison release aligned with the pinned exporter
+- [#13](https://github.com/yet-another-ai/yagoo/issues/13) Concept-head consumers, activation visualization, persistent activation storage
+- [#14](https://github.com/yet-another-ai/yagoo/issues/14) Model download resume
+- [#15](https://github.com/yet-another-ai/yagoo/issues/15) Small-net / mobile support
+- [#17](https://github.com/yet-another-ai/yagoo/issues/17) Deployed public-host verification
 
 No full-game strength, throughput, or shared-runner performance claim is made.
 Issue #5 remains the research tracking issue; merging this experimental path

@@ -15,6 +15,7 @@ pub(super) fn evaluate(
         return Ok(None);
     }
     if rules == FeatureRules::Japanese {
+        // TODO(#10): Japanese encore territory scoring for terminal leaves.
         return Err("Japanese encore legality, features and territory scoring are not implemented; no final analysis produced".into());
     }
     if !komi.is_finite() {

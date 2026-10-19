@@ -141,6 +141,7 @@ self.onmessage = async ({ data }: MessageEvent) => {
         const adapter = await navigator.gpu?.requestAdapter();
         if (!adapter) throw new Error('No WebGPU adapter is available.');
         ort.env.webgpu.adapter = adapter;
+        // TODO(#8): fp16 WebGPU policy warmup still fails (~0.00949 > 0.005); falls back to fp32.
         if (data.precision !== 'fp32' && adapter.features.has('shader-f16') && manifest.variants.fp16) precision = 'fp16';
       }
       ort.env.wasm.numThreads = data.ortThreads;

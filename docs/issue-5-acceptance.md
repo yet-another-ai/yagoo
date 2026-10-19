@@ -24,15 +24,18 @@ split into focused follow-up issues linked from PR #7.
       72 Python V7, 40 targeted C++ and 30 area-scoring cases. This is not exhaustive.
 - [x] Unsupported encore, long-cycle/no-result and repeated-pass boundaries are
       detected from complete history, at entry and searched leaves, before NN or
-      successful final output. Implementing their actual scoring remains open.
+      successful final output. Actual scoring remains open ([#10](https://github.com/yet-another-ai/yagoo/issues/10),
+      [#16](https://github.com/yet-another-ai/yagoo/issues/16)).
 - [x] Japanese encore legality, features and scoring remain unimplemented; the
       explicit unsupported boundary is accepted for this **experimental** stage
-      (follow-up issue). Zero-filled encore features are forbidden.
+      ([#10](https://github.com/yet-another-ai/yagoo/issues/10)). Zero-filled encore
+      features are forbidden.
 - [x] Search behavior comparison against native KataGo on a small functional corpus,
       with stated tolerances and limits. Seven one-visit root/pass-probe queries
       match official native SWA outputs. Four eight-visit queries completed, with
       differences recorded (up to 1.766 points and 0.4380 ownership); full search
-      equivalence is not established and remains outside the completed scope.
+      equivalence is not established ([#11](https://github.com/yet-another-ai/yagoo/issues/11),
+      [#12](https://github.com/yet-another-ai/yagoo/issues/12)).
 - [x] Independent algorithm and runtime reviews, with regression checks for the
       confirmed output, cancellation, initialization and provenance defects.
 - [x] Root score-belief, seki and future-position heads propagated through final
@@ -49,19 +52,26 @@ TypeScript, 17 browser unit tests and the production bundle. Extra-head and root
 activation checks passed real fp32 WebGPU and four-thread Wasm with eight root
 symmetries and batch four. See [browser setup and evidence](./browser-engine).
 
-## Subsequent enhancements, separately disclosed
+## Subsequent enhancements (follow-up issues)
 
-- fp16 GPU numerical alignment (fp32 GPU already works); other GPUs and browsers.
-- Download resume, smaller/mobile models, deployed public-host verification.
-- Trained concept-head consumers, activation visualization and persistent storage.
-- Additional KataGo search heuristics and strength alignment beyond the first
-  supported search path. A simplified PUCT implementation must retain that label.
+| Limit | Issue |
+| --- | --- |
+| fp16 WebGPU policy warmup (fp32 GPU works; falls back today) | [#8](https://github.com/yet-another-ai/yagoo/issues/8) |
+| Unverified GPUs / browsers | [#9](https://github.com/yet-another-ai/yagoo/issues/9) |
+| Japanese encore legality, features and territory scoring | [#10](https://github.com/yet-another-ai/yagoo/issues/10) |
+| Search parity with native (uncertainty weights, LCB, passing, strength) | [#11](https://github.com/yet-another-ai/yagoo/issues/11) |
+| Native comparison release aligned with pinned exporter | [#12](https://github.com/yet-another-ai/yagoo/issues/12) |
+| Concept-head consumers, activation visualization, persistent storage | [#13](https://github.com/yet-another-ai/yagoo/issues/13) |
+| Model download resume | [#14](https://github.com/yet-another-ai/yagoo/issues/14) |
+| Small-net / mobile support | [#15](https://github.com/yet-another-ai/yagoo/issues/15) |
+| Simple-ko long-cycle / no-result and repeated-pass scoring | [#16](https://github.com/yet-another-ai/yagoo/issues/16) |
+| Deployed public-host verification | [#17](https://github.com/yet-another-ai/yagoo/issues/17) |
 
 This experimental stage ships with explicit rule/search limits. Encore and
 long-cycle/repeated-pass scoring are still absent; they are rejected, not
 approximated. Native eight-visit differences are recorded without relaxed
-tolerances or a strength claim. No individual heuristic has been shown to
-account for a specific measured difference. Follow-up issues track each limit.
+tolerances or a strength claim. A simplified PUCT implementation must retain
+that label until [#11](https://github.com/yet-another-ai/yagoo/issues/11) lands.
 
 Rust search currently runs on one dedicated worker and waits for ORT. Batch
 formation and virtual reservations can execute on that worker without another

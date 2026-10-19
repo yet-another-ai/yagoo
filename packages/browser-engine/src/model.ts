@@ -38,6 +38,7 @@ async function verify(data: Uint8Array, a: Artifact): Promise<void> {
 }
 
 // Content-addressed cache. A partially written file is never accepted as a model.
+// TODO(#14): HTTP range / resumable downloads for large model artifacts.
 export async function loadArtifact(base: string, a: Artifact, progress: (n: number, total: number) => void): Promise<Uint8Array> {
   let directory: FileSystemDirectoryHandle | undefined;
   try { directory = await navigator.storage.getDirectory(); } catch { /* storage optional */ }

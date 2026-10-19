@@ -1,5 +1,6 @@
 {
   "name": "@yagoo/browser-engine",
+  "description": "EXPERIMENTAL in-browser KataGo analysis (WebGPU / Wasm). Not a native replacement.",
   "private": true,
   "type": "module",
   "exports": "./src/client.ts",

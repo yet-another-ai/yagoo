@@ -1,5 +1,5 @@
-//! Experimental, deterministic PUCT analysis over a real V7 neural evaluator.
-//! This is not KataGo's complete search implementation; see docs/browser-engine.md.
+//! EXPERIMENTAL deterministic PUCT analysis over a real V7 neural evaluator.
+//! Not KataGo's complete search; see docs/browser-engine.md and PR #7 follow-ups.
 #![allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
 use futures::future::LocalBoxFuture;
 use serde::{Deserialize, Serialize};

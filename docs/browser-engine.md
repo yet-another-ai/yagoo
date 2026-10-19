@@ -1,10 +1,15 @@
-# Browser engine (issue #5, work in progress)
+# Browser engine (EXPERIMENTAL)
 
-This is an experimental implementation using the actual official
-`kata1-b18c384nbt-s9996604416-d4316597426` SWA checkpoint. It is not yet a
-complete implementation of issue #5 or a search-equivalent replacement for
-native KataGo. The checkpoint reports model version **14**, despite the version
-15 description in the original research report.
+> **EXPERIMENTAL feature.** This is a staged, mergeable browser analysis path —
+> not a complete delivery of research issue #5 and not a search-equivalent
+> replacement for native KataGo. The native CLI / `AnalysisClient` path is
+> unchanged. Treat outputs as experimental; see follow-up issues linked from
+> PR #7 for remaining acceptance work.
+
+This implementation uses the actual official
+`kata1-b18c384nbt-s9996604416-d4316597426` SWA checkpoint. The checkpoint
+reports model version **14**, despite the version 15 description in the
+original research report.
 
 ## Current implementation
 
@@ -284,19 +289,23 @@ Without that environment override the smoke uses eight deep visits; the comparis
 reports their differences without claiming native search parity. No model downloads,
 native engine runs or browser GPU experiments are added to shared-runner CI.
 
-## Remaining acceptance work
+## Remaining acceptance work (follow-ups)
 
-See the [acceptance checklist](./issue-5-acceptance.md). Japanese encore legality,
-features and territory scoring remain open. Two-pass area scoring does not yet
-cover simple-ko long-cycle/no-result or repeated-pass phase endings; these are
-reliably rejected. The PUCT implementation is still simplified: native uncertainty
-weights, confidence bounds, advanced passing strategies and strength alignment
-remain open. In particular, normal BoardHistory two-pass endings do not reproduce
-native Search's friendly-pass continuation heuristics. The implementation also needs
-model download resume, small-net/mobile support, trained concept-head consumers,
-activation visualization, broader browser
-coverage and a deployed-host check. fp16 WebGPU remains unvalidated and falls back
-to fp32. No full-game strength,
-throughput, or shared-runner performance claim is made. The usable supported path
-is demonstrated locally, while acceptance of these staged boundaries remains a
-review decision. The draft must not close issue #5.
+See the [acceptance checklist](./issue-5-acceptance.md) and the **Follow-ups**
+section on [PR #7](https://github.com/yet-another-ai/yagoo/pull/7). Each open
+limit is tracked as its own GitHub issue (related to #7 / #5):
+
+- fp16 WebGPU policy warmup (falls back to fp32)
+- Unverified GPUs / browsers
+- Japanese encore legality, features and territory scoring
+- Simple-ko long-cycle / no-result and repeated-pass scoring
+- Search parity with native (uncertainty weighting, LCB, passing heuristics, strength)
+- Native comparison release aligned with the pinned exporter
+- Concept-head consumers, activation visualization, persistent activation storage
+- Model download resume
+- Small-net / mobile support
+- Deployed public-host verification
+
+No full-game strength, throughput, or shared-runner performance claim is made.
+Issue #5 remains the research tracking issue; merging this experimental path
+must not close #5.

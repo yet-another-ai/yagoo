@@ -1,10 +1,11 @@
 # Issue #5 acceptance checklist
 
-The usable supported browser path has been demonstrated locally with real b18
-SWA inference, scan/deep analysis, NDJSON export and bounded Wasm threading.
-This draft remains open for review of the staged delivery below; it does not
-close issue #5. Search equivalence and unverified optimizations must not be
-inferred from a successful model load or build.
+The usable **EXPERIMENTAL** browser path has been demonstrated locally with real
+b18 SWA inference, scan/deep analysis, NDJSON export and bounded Wasm threading.
+PR #7 merges that staged path as an experimental feature; it does **not** close
+issue #5 (use “Related to #5”). Search equivalence and unverified optimizations
+must not be inferred from a successful model load or build. Open limits are
+split into focused follow-up issues linked from PR #7.
 
 ## Required for a usable supported path
 
@@ -24,8 +25,9 @@ inferred from a successful model load or build.
 - [x] Unsupported encore, long-cycle/no-result and repeated-pass boundaries are
       detected from complete history, at entry and searched leaves, before NN or
       successful final output. Implementing their actual scoring remains open.
-- [ ] Japanese encore legality, features and scoring, or an explicit unsupported
-      boundary accepted as a staged delivery. Zero-filled encore features are forbidden.
+- [x] Japanese encore legality, features and scoring remain unimplemented; the
+      explicit unsupported boundary is accepted for this **experimental** stage
+      (follow-up issue). Zero-filled encore features are forbidden.
 - [x] Search behavior comparison against native KataGo on a small functional corpus,
       with stated tolerances and limits. Seven one-visit root/pass-probe queries
       match official native SWA outputs. Four eight-visit queries completed, with
@@ -55,17 +57,13 @@ symmetries and batch four. See [browser setup and evidence](./browser-engine).
 - Additional KataGo search heuristics and strength alignment beyond the first
   supported search path. A simplified PUCT implementation must retain that label.
 
-The remaining decision is whether to review this supported browser stage with
-explicit rule/search limits, or extend it with the missing native rule/search
-behavior first. Encore and long-cycle/repeated-pass scoring are still absent;
-they are rejected, not approximated. Native eight-visit differences are recorded
-without relaxed tolerances or a strength claim. No individual heuristic has been
-shown to account for a specific measured difference.
+This experimental stage ships with explicit rule/search limits. Encore and
+long-cycle/repeated-pass scoring are still absent; they are rejected, not
+approximated. Native eight-visit differences are recorded without relaxed
+tolerances or a strength claim. No individual heuristic has been shown to
+account for a specific measured difference. Follow-up issues track each limit.
 
 Rust search currently runs on one dedicated worker and waits for ORT. Batch
 formation and virtual reservations can execute on that worker without another
 CPU thread pool. Add a Rust pool only if an identified independent workload
 requires it; ORT thread count and Rust concurrency must share one explicit budget.
-
-GitHub Actions is disabled at repository level. Local implementation and tests
-continue; changing that repository setting is pending the owner's decision.

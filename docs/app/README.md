@@ -12,7 +12,7 @@ VitePress page at `/app/` hosts the real `@yagoo/ui` reviewer (Sabaki chrome + S
 
 Missing SGF `RU` is treated as **Chinese** (same as `yagoo-sgf` / the pipeline).
 
-The bundled sample is an original **19×19** teaching game (~70 legality-checked moves). Analysis covers the main line via `scan_then_deep`; one ownership-swing ply is deepened. The board auto-sizes to the container (`ResizeObserver`). Other board sizes still work when you open an SGF with a different `SZ`.
+The bundled sample is the public-domain **ear-reddening game** (Yasuda Shusaku vs Inoue Gennan Inseki, 1846), truncated to the first 100 moves — see the SGF `C[]` credit (Andries Brouwer archive, game 126). Analysis covers the main line via `scan_then_deep` with scan visits ≈200; swing plies are deepened. The board auto-sizes to the container (`ResizeObserver`). Other board sizes still work when you open an SGF with a different `SZ`.
 
 ### Groups / 块 in the sample
 

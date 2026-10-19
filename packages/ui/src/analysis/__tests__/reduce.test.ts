@@ -9,7 +9,7 @@ import { createInitialAnalysisState, type PipelineEvent } from "../types";
 import { buildReviewSeries } from "../display";
 
 const fixtureEvents = parseNdjson(fixtureText);
-const DEEP_PLY = 52;
+const DEEP_PLY = 48;
 
 describe("parseNdjson / fixture format", () => {
   it("parses real 19×19 pipeline NDJSON from yagoo analyze --scripted-fixture", () => {

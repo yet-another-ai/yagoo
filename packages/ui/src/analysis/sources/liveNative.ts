@@ -18,9 +18,10 @@ export interface LiveNativeSourceOptions {
  * (b) Live connection to a locally running native engine.
  *
  * **Not implemented yet** — `yagoo analyze` currently only writes NDJSON to a
- * file/stdout. Adding `--serve` (WebSocket or SSE) is tracked as a follow-up.
- * This adapter is the seam: when a server exists, replace `start()` with a real
- * stream consumer that parses the same `PipelineEvent` lines.
+ * file/stdout. This adapter is the seam: when a server exists, replace `start()`
+ * with a real stream consumer that parses the same `PipelineEvent` lines.
+ *
+ * TODO(#19): implement against `yagoo analyze --serve` (WebSocket/SSE).
  */
 export function createLiveNativeSource(
   options: LiveNativeSourceOptions = {},
@@ -30,8 +31,9 @@ export function createLiveNativeSource(
     id: options.id ?? "live-native",
     label: options.label ?? "Local native engine (not available yet)",
     start(handlers: AnalysisSourceHandlers): AnalysisSourceHandle {
+      // TODO(#19): connect to `url` and forward PipelineEvent lines.
       const err = new Error(
-        `Live native analysis is not wired yet (planned: yagoo analyze --serve). ` +
+        `Live native analysis is not wired yet (see #19: yagoo analyze --serve). ` +
           `Expected stream endpoint: ${url}. Import an NDJSON file for now.`,
       );
       queueMicrotask(() => handlers.onError?.(err));
@@ -42,5 +44,6 @@ export function createLiveNativeSource(
 
 /** Capability probe for UI chrome — always false until `--serve` ships. */
 export function isLiveNativeAvailable(): boolean {
+  // TODO(#19): return true when a local serve endpoint is reachable / configured.
   return false;
 }

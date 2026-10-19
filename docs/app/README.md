@@ -7,8 +7,8 @@ VitePress page at `/app/` hosts the real `@yagoo/ui` reviewer (Sabaki chrome + S
 | Source | Status |
 | --- | --- |
 | **(a) NDJSON import** | Supported — file picker, drag-and-drop, and bundled `public/app/sample-scan-deep.ndjson` |
-| **(b) Live native engine** | Adapter seam only — needs `yagoo analyze --serve` (WebSocket/SSE). Follow-up issue. |
-| **(c) Browser engine** | Adapter seam only — do not depend on unmerged PR #7. Follow-up after merge. |
+| **(b) Live native engine** | Adapter seam only — [#19](https://github.com/yet-another-ai/yagoo/issues/19) (`yagoo analyze --serve`) |
+| **(c) Browser engine** | Adapter seam only — [#20](https://github.com/yet-another-ai/yagoo/issues/20) (after PR #7 merges) |
 
 Missing SGF `RU` is treated as **Chinese** (same as `yagoo-sgf` / the pipeline).
 

@@ -6,23 +6,15 @@
 //! future Web UI.
 
 use crate::error::{KatagoError, KatagoResult};
-use crate::types::{AnalysisQuery, AnalysisResponse};
+use crate::types::{AnalysisQuery, AnalysisResponse, AnalysisUpdate};
 use std::collections::{HashMap, VecDeque};
 use std::process::Stdio;
-use std::sync::{Arc, Weak};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex as SyncMutex, Weak};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio::time::{sleep, Duration};
-
-/// One update from a streaming analysis query.
-#[derive(Clone, Debug)]
-pub enum AnalysisUpdate {
-    /// `isDuringSearch: true` progress report (only when requested).
-    Partial(AnalysisResponse),
-    /// Final response for the query id.
-    Final(AnalysisResponse),
-}
 
 enum RouteMsg {
     Update(Box<AnalysisUpdate>),
@@ -32,6 +24,18 @@ enum RouteMsg {
 enum StdinTransport {
     Process(ChildStdin),
     Scripted,
+    #[cfg(test)]
+    Test(Box<dyn tokio::io::AsyncWrite + Unpin + Send>),
+}
+
+struct WriteCommand {
+    line: String,
+    written: Option<oneshot::Sender<()>>,
+}
+
+struct Route {
+    logical_id: String,
+    tx: mpsc::UnboundedSender<RouteMsg>,
 }
 
 enum StdoutTransport {
@@ -46,15 +50,47 @@ enum StdoutTransport {
 }
 
 struct Inner {
-    stdin: Mutex<StdinTransport>,
-    scripted_written: Mutex<Vec<String>>,
-    /// Raw stdout lines (process mode only), for fixture recording.
-    recorded_lines: Mutex<Vec<String>>,
+    writer: mpsc::UnboundedSender<WriteCommand>,
+    scripted_written: SyncMutex<Vec<String>>,
+    /// Raw stdout lines (process mode only), for local fixture recording.
+    recorded_lines: SyncMutex<Vec<String>>,
     record: bool,
-    routes: Mutex<HashMap<String, mpsc::UnboundedSender<RouteMsg>>>,
-    /// Responses that arrived before their route was registered.
-    orphans: Mutex<VecDeque<AnalysisResponse>>,
+    routes: SyncMutex<HashMap<String, Route>>,
+    /// Static scripted fixtures may arrive before their logical query is registered.
+    /// Real wire responses always follow registration; unknown wire IDs are discarded.
+    orphans: SyncMutex<VecDeque<AnalysisResponse>>,
+    scripted: bool,
+    next_id: AtomicU64,
     stdout: Mutex<StdoutTransport>,
+}
+
+struct QueryGuard {
+    inner: Arc<Inner>,
+    wire_id: String,
+}
+
+impl Drop for QueryGuard {
+    fn drop(&mut self) {
+        // Synchronous removal makes the caller's logical ID reusable immediately.
+        // The writer owns complete lines, so cancellation never interrupts a JSON write.
+        let removed = self
+            .inner
+            .routes
+            .lock()
+            .expect("routes lock")
+            .remove(&self.wire_id);
+        if removed.is_some() {
+            let line = serde_json::json!({
+                "id": format!("{}-cancel", self.wire_id),
+                "action": "terminate", "terminateId": self.wire_id,
+            })
+            .to_string();
+            let _ = self.inner.writer.send(WriteCommand {
+                line,
+                written: None,
+            });
+        }
+    }
 }
 
 /// Client for **one** `katago analysis` process (or a scripted stand-in).
@@ -96,39 +132,88 @@ impl AnalysisClient {
             .stdout
             .take()
             .ok_or_else(|| KatagoError::Io(std::io::Error::other("katago stdout missing")))?;
-        let inner = Arc::new(Inner {
-            stdin: Mutex::new(StdinTransport::Process(stdin)),
-            scripted_written: Mutex::new(Vec::new()),
-            recorded_lines: Mutex::new(Vec::new()),
-            record,
-            routes: Mutex::new(HashMap::new()),
-            orphans: Mutex::new(VecDeque::new()),
-            stdout: Mutex::new(StdoutTransport::Process {
+        Ok(Self::from_transports(
+            StdinTransport::Process(stdin),
+            StdoutTransport::Process {
                 stdout: BufReader::new(stdout),
                 _child: Box::new(child),
-            }),
-        });
-        Self::start_reader(Arc::downgrade(&inner));
-        Ok(Self { inner })
+            },
+            false,
+            record,
+        ))
     }
 
     /// Scripted client for tests / CI. Demux by `id` like a real process.
     #[must_use]
     pub fn scripted(responses: Vec<String>) -> Self {
-        let inner = Arc::new(Inner {
-            stdin: Mutex::new(StdinTransport::Scripted),
-            scripted_written: Mutex::new(Vec::new()),
-            recorded_lines: Mutex::new(Vec::new()),
-            record: false,
-            routes: Mutex::new(HashMap::new()),
-            orphans: Mutex::new(VecDeque::new()),
-            stdout: Mutex::new(StdoutTransport::Scripted {
+        Self::from_transports(
+            StdinTransport::Scripted,
+            StdoutTransport::Scripted {
                 responses,
                 cursor: 0,
-            }),
+            },
+            true,
+            false,
+        )
+    }
+
+    fn from_transports(
+        stdin: StdinTransport,
+        stdout: StdoutTransport,
+        scripted: bool,
+        record: bool,
+    ) -> Self {
+        let (writer, commands) = mpsc::unbounded_channel();
+        let inner = Arc::new(Inner {
+            writer,
+            scripted_written: SyncMutex::new(Vec::new()),
+            recorded_lines: SyncMutex::new(Vec::new()),
+            record,
+            routes: SyncMutex::new(HashMap::new()),
+            orphans: SyncMutex::new(VecDeque::new()),
+            scripted,
+            next_id: AtomicU64::new(1),
+            stdout: Mutex::new(stdout),
         });
+        Self::start_writer(Arc::downgrade(&inner), stdin, commands);
         Self::start_reader(Arc::downgrade(&inner));
         Self { inner }
+    }
+
+    fn start_writer(
+        weak: Weak<Inner>,
+        mut stdin: StdinTransport,
+        mut commands: mpsc::UnboundedReceiver<WriteCommand>,
+    ) {
+        tokio::spawn(async move {
+            while let Some(command) = commands.recv().await {
+                let Some(inner) = weak.upgrade() else { break };
+                let mut line = command.line;
+                line.push('\n');
+                let result = match &mut stdin {
+                    StdinTransport::Process(stdin) => write_line(stdin, &line).await,
+                    StdinTransport::Scripted => {
+                        inner
+                            .scripted_written
+                            .lock()
+                            .expect("scripted writes lock")
+                            .push(line.trim_end_matches('\n').to_owned());
+                        Ok(())
+                    }
+                    #[cfg(test)]
+                    StdinTransport::Test(stdin) => write_line(stdin, &line).await,
+                };
+                if result.is_err() {
+                    for (_, route) in inner.routes.lock().expect("routes lock").drain() {
+                        let _ = route.tx.send(RouteMsg::Failed(KatagoError::ProcessExited));
+                    }
+                    break;
+                }
+                if let Some(written) = command.written {
+                    let _ = written.send(());
+                }
+            }
+        });
     }
 
     fn start_reader(weak: Weak<Inner>) {
@@ -145,7 +230,7 @@ impl AnalysisClient {
                             drop(stdout);
                             // Scripted fixture exhausted, or process EOF.
                             // If routes remain, wait briefly for registration races.
-                            let pending = !inner.routes.lock().await.is_empty();
+                            let pending = !inner.routes.lock().expect("routes lock").is_empty();
                             if !pending {
                                 // Idle: keep task alive until client drops.
                                 sleep(Duration::from_millis(20)).await;
@@ -155,9 +240,9 @@ impl AnalysisClient {
                             continue;
                         }
                         Err(_) => {
-                            let mut routes = inner.routes.lock().await;
-                            for (_, tx) in routes.drain() {
-                                let _ = tx.send(RouteMsg::Failed(KatagoError::ProcessExited));
+                            let mut routes = inner.routes.lock().expect("routes lock");
+                            for (_, route) in routes.drain() {
+                                let _ = route.tx.send(RouteMsg::Failed(KatagoError::ProcessExited));
                             }
                             break;
                         }
@@ -165,15 +250,19 @@ impl AnalysisClient {
                 };
 
                 if inner.record {
-                    inner.recorded_lines.lock().await.push(line.clone());
+                    inner
+                        .recorded_lines
+                        .lock()
+                        .expect("recorded lines lock")
+                        .push(line.clone());
                 }
 
                 let resp: AnalysisResponse = match serde_json::from_str(&line) {
                     Ok(r) => r,
                     Err(e) => {
-                        let mut routes = inner.routes.lock().await;
-                        for (_, tx) in routes.drain() {
-                            let _ = tx.send(RouteMsg::Failed(KatagoError::Io(
+                        let mut routes = inner.routes.lock().expect("routes lock");
+                        for (_, route) in routes.drain() {
+                            let _ = route.tx.send(RouteMsg::Failed(KatagoError::Io(
                                 std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()),
                             )));
                         }
@@ -181,19 +270,31 @@ impl AnalysisClient {
                     }
                 };
 
-                dispatch_response(&inner, resp).await;
+                dispatch_response(&inner, resp);
             }
         });
     }
 
     /// Lines written by a scripted client (test helper).
-    pub async fn scripted_writes(&self) -> Vec<String> {
-        self.inner.scripted_written.lock().await.clone()
+    pub fn scripted_writes(&self) -> impl std::future::Future<Output = Vec<String>> {
+        std::future::ready(
+            self.inner
+                .scripted_written
+                .lock()
+                .expect("scripted writes lock")
+                .clone(),
+        )
     }
 
     /// Raw engine stdout lines recorded when spawned with `record: true`.
-    pub async fn recorded_lines(&self) -> Vec<String> {
-        self.inner.recorded_lines.lock().await.clone()
+    pub fn recorded_lines(&self) -> impl std::future::Future<Output = Vec<String>> {
+        std::future::ready(
+            self.inner
+                .recorded_lines
+                .lock()
+                .expect("recorded lines lock")
+                .clone(),
+        )
     }
 
     /// Send one query and wait for the finished response (ignores partials).
@@ -212,6 +313,8 @@ impl AnalysisClient {
     /// Stream optional during-search partials then the final response.
     ///
     /// Concurrent calls on the same client are supported via id demux.
+    /// Dropping this future removes its route and queues a best-effort terminate.
+    /// An independent writer finishes any pending JSON line before cancellation.
     pub async fn analyze_streaming<F>(
         &self,
         query: &AnalysisQuery,
@@ -220,68 +323,78 @@ impl AnalysisClient {
     where
         F: FnMut(AnalysisUpdate) -> KatagoResult<()>,
     {
+        let wire_id = format!(
+            "__yagoo_query_{}",
+            self.inner.next_id.fetch_add(1, Ordering::Relaxed)
+        );
+        let mut wire_query = query.clone();
+        wire_query.id.clone_from(&wire_id);
+        let line = serde_json::to_string(&wire_query)?;
         let (tx, mut rx) = mpsc::unbounded_channel();
         {
-            let mut routes = self.inner.routes.lock().await;
-            if routes.contains_key(&query.id) {
+            let mut routes = self.inner.routes.lock().expect("routes lock");
+            if routes.values().any(|route| route.logical_id == query.id) {
                 return Err(KatagoError::Io(std::io::Error::other(format!(
                     "duplicate in-flight query id `{}`",
                     query.id
                 ))));
             }
-            routes.insert(query.id.clone(), tx.clone());
+            routes.insert(
+                wire_id.clone(),
+                Route {
+                    logical_id: query.id.clone(),
+                    tx,
+                },
+            );
         }
+        let _guard = QueryGuard {
+            inner: Arc::clone(&self.inner),
+            wire_id,
+        };
+        let (written, write_done) = oneshot::channel();
+        self.inner
+            .writer
+            .send(WriteCommand {
+                line,
+                written: Some(written),
+            })
+            .map_err(|_| KatagoError::ProcessExited)?;
+        write_done.await.map_err(|_| KatagoError::ProcessExited)?;
 
-        // Deliver any orphaned responses that arrived early for this id.
-        {
-            let mut orphans = self.inner.orphans.lock().await;
+        // Only the scripted fixture transport permits responses before requests.
+        let early = {
+            let mut orphans = self.inner.orphans.lock().expect("orphans lock");
             let mut kept = VecDeque::new();
+            let mut matching = Vec::new();
             while let Some(resp) = orphans.pop_front() {
                 if resp.id == query.id {
-                    deliver_to_route(&tx, resp);
+                    matching.push(resp);
                 } else {
                     kept.push_back(resp);
                 }
             }
             *orphans = kept;
+            matching
+        };
+        for response in early {
+            dispatch_response(&self.inner, response);
         }
 
-        let line = serde_json::to_string(query)?;
-        {
-            let mut stdin = self.inner.stdin.lock().await;
-            match &mut *stdin {
-                StdinTransport::Process(stdin) => {
-                    stdin.write_all(line.as_bytes()).await?;
-                    stdin.write_all(b"\n").await?;
-                    stdin.flush().await?;
-                }
-                StdinTransport::Scripted => {
-                    self.inner.scripted_written.lock().await.push(line);
-                }
+        while let Some(msg) = rx.recv().await {
+            match msg {
+                RouteMsg::Update(update) => match *update {
+                    AnalysisUpdate::Partial(resp) => {
+                        on_update(AnalysisUpdate::Partial(resp))?;
+                    }
+                    AnalysisUpdate::Final(resp) => {
+                        on_update(AnalysisUpdate::Final(resp))?;
+                        return Ok(());
+                    }
+                },
+                RouteMsg::Failed(err) => return Err(err),
             }
         }
-
-        let result = async {
-            while let Some(msg) = rx.recv().await {
-                match msg {
-                    RouteMsg::Update(update) => match *update {
-                        AnalysisUpdate::Partial(resp) => {
-                            on_update(AnalysisUpdate::Partial(resp))?;
-                        }
-                        AnalysisUpdate::Final(resp) => {
-                            on_update(AnalysisUpdate::Final(resp))?;
-                            return Ok(());
-                        }
-                    },
-                    RouteMsg::Failed(err) => return Err(err),
-                }
-            }
-            Err(KatagoError::ProcessExited)
-        }
-        .await;
-
-        self.inner.routes.lock().await.remove(&query.id);
-        result
+        Err(KatagoError::ProcessExited)
     }
 
     /// Parse a response JSON string (fixture helper).
@@ -290,31 +403,52 @@ impl AnalysisClient {
     }
 }
 
-async fn dispatch_response(inner: &Inner, resp: AnalysisResponse) {
-    let tx = {
-        let routes = inner.routes.lock().await;
-        routes.get(&resp.id).cloned()
+fn dispatch_response(inner: &Inner, mut resp: AnalysisResponse) {
+    let destination = {
+        let mut routes = inner.routes.lock().expect("routes lock");
+        let wire_id = if routes.contains_key(&resp.id) {
+            Some(resp.id.clone())
+        } else if inner.scripted && !resp.id.starts_with("__yagoo_query_") {
+            routes
+                .iter()
+                .find(|(_, route)| route.logical_id == resp.id)
+                .map(|(id, _)| id.clone())
+        } else {
+            None
+        };
+        let Some(wire_id) = wire_id else {
+            // Keep fixture lookup and buffering under the route lock so query
+            // registration cannot race an early scripted response into orphans.
+            if inner.scripted && !resp.id.starts_with("__yagoo_query_") {
+                inner.orphans.lock().expect("orphans lock").push_back(resp);
+            }
+            return;
+        };
+        {
+            if resp.error.is_some() || !resp.is_during_search.unwrap_or(false) {
+                routes
+                    .remove(&wire_id)
+                    .map(|route| (route.logical_id, route.tx))
+            } else {
+                routes
+                    .get(&wire_id)
+                    .map(|route| (route.logical_id.clone(), route.tx.clone()))
+            }
+        }
     };
-    let Some(tx) = tx else {
-        inner.orphans.lock().await.push_back(resp);
+    let Some((logical_id, tx)) = destination else {
         return;
     };
+    resp.id = logical_id;
+    deliver_to_route(&tx, resp);
+}
 
-    if let Some(err) = resp.error.clone() {
-        inner.routes.lock().await.remove(&resp.id);
-        let _ = tx.send(RouteMsg::Failed(KatagoError::Engine {
-            id: resp.id,
-            error: err,
-        }));
-        return;
-    }
-
-    if resp.is_during_search.unwrap_or(false) {
-        let _ = tx.send(RouteMsg::Update(Box::new(AnalysisUpdate::Partial(resp))));
-    } else {
-        inner.routes.lock().await.remove(&resp.id);
-        let _ = tx.send(RouteMsg::Update(Box::new(AnalysisUpdate::Final(resp))));
-    }
+async fn write_line<W: tokio::io::AsyncWrite + Unpin>(
+    writer: &mut W,
+    line: &str,
+) -> std::io::Result<()> {
+    writer.write_all(line.as_bytes()).await?;
+    writer.flush().await
 }
 
 fn deliver_to_route(tx: &mpsc::UnboundedSender<RouteMsg>, resp: AnalysisResponse) {
@@ -356,5 +490,100 @@ async fn read_line(stdout: &mut StdoutTransport) -> KatagoResult<Option<String>>
             *cursor += 1;
             Ok(Some(line))
         }
+    }
+}
+
+#[cfg(test)]
+mod cancellation_tests {
+    use super::*;
+    use crate::AnalysisQueryBuilder;
+    use tokio::io::{AsyncReadExt, DuplexStream};
+
+    fn controlled_client(capacity: usize) -> (AnalysisClient, BufReader<DuplexStream>) {
+        let (input, peer) = tokio::io::duplex(capacity);
+        let client = AnalysisClient::from_transports(
+            StdinTransport::Test(Box::new(input)),
+            StdoutTransport::Scripted {
+                responses: Vec::new(),
+                cursor: 0,
+            },
+            false,
+            false,
+        );
+        (client, BufReader::new(peer))
+    }
+
+    async fn next_line(peer: &mut BufReader<DuplexStream>) -> serde_json::Value {
+        let mut line = String::new();
+        peer.read_line(&mut line).await.unwrap();
+        serde_json::from_str(&line).unwrap()
+    }
+
+    fn respond(client: &AnalysisClient, value: serde_json::Value) {
+        dispatch_response(&client.inner, serde_json::from_value(value).unwrap());
+    }
+
+    #[tokio::test]
+    async fn cancel_mid_write_then_reuse_logical_id_ignores_old_final_and_ack() {
+        // A tiny pipe forces write_all to suspend in the middle of the first JSON.
+        // This is a functional liveness timeout, not a performance requirement.
+        tokio::time::timeout(Duration::from_secs(5), async {
+            let (client, mut peer) = controlled_client(8);
+            let old_client = client.clone();
+            let old = tokio::spawn(async move {
+                old_client.analyze(&AnalysisQueryBuilder::new("same").build()).await
+            });
+            let mut first = [0];
+            peer.read_exact(&mut first).await.unwrap();
+            assert_eq!(first, [b'{']);
+            old.abort();
+            assert!(old.await.unwrap_err().is_cancelled());
+            assert!(client.inner.routes.lock().unwrap().is_empty());
+
+            let new_client = client.clone();
+            let new = tokio::spawn(async move {
+                new_client.analyze(&AnalysisQueryBuilder::new("same").build()).await
+            });
+            let mut rest = String::from("{");
+            peer.read_line(&mut rest).await.unwrap();
+            let old_wire: serde_json::Value = serde_json::from_str(&rest).unwrap();
+            let terminate = next_line(&mut peer).await;
+            let new_wire = next_line(&mut peer).await;
+            assert_eq!(terminate["action"], "terminate");
+            assert_eq!(terminate["terminateId"], old_wire["id"]);
+            assert_ne!(old_wire["id"], new_wire["id"]);
+            assert!(new_wire.get("action").is_none());
+
+            respond(&client, serde_json::json!({"id": old_wire["id"], "isDuringSearch": true, "rootInfo": {"visits": 2}}));
+            respond(&client, serde_json::json!({"id": old_wire["id"], "isDuringSearch": false, "rootInfo": {"visits": 3}}));
+            respond(&client, terminate);
+            assert_eq!(client.inner.routes.lock().unwrap().len(), 1);
+            assert!(client.inner.orphans.lock().unwrap().is_empty());
+            respond(&client, serde_json::json!({"id": new_wire["id"], "isDuringSearch": false, "rootInfo": {"visits": 99}}));
+            let result = new.await.unwrap().unwrap();
+            assert_eq!(result.id, "same");
+            assert_eq!(result.root_info.unwrap().visits, Some(99));
+            assert!(client.inner.routes.lock().unwrap().is_empty());
+        }).await.expect("cancelled query must not corrupt or block the next query");
+    }
+
+    #[tokio::test]
+    async fn callback_failure_removes_route_and_terminates_only_its_query() {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            let (client, mut peer) = controlled_client(4096);
+            let running_client = client.clone();
+            let running = tokio::spawn(async move {
+                running_client.analyze_streaming(&AnalysisQueryBuilder::new("reject-update").build(), |_| {
+                    Err(KatagoError::MissingField("callback rejected update"))
+                }).await
+            });
+            let query = next_line(&mut peer).await;
+            respond(&client, serde_json::json!({"id": query["id"], "isDuringSearch": true, "rootInfo": {"visits": 1}}));
+            assert!(matches!(running.await.unwrap(), Err(KatagoError::MissingField("callback rejected update"))));
+            let terminate = next_line(&mut peer).await;
+            assert_eq!(terminate["terminateId"], query["id"]);
+            assert_eq!(terminate["action"], "terminate");
+            assert!(client.inner.routes.lock().unwrap().is_empty());
+        }).await.expect("callback failure must clean up the live query");
     }
 }

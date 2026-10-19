@@ -38,3 +38,6 @@ coverage/
 
 # Local KataGo / model downloads (mise run katago:fetch-dev)
 .yagoo-data/
+packages/browser-engine/wasm/
+packages/browser-engine/public/ort/
+packages/browser-engine/public/models/

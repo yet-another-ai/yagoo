@@ -43,6 +43,7 @@ fn eng(own: Vec<f64>, stdev: Option<Vec<f64>>) -> EngineAnalysis {
         ownership: Some(own),
         ownership_stdev: stdev,
         policy: None,
+        neural: None,
     }
 }
 

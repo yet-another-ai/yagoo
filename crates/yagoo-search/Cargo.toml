@@ -1,0 +1,22 @@
+[package]
+name = "yagoo-search"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+yagoo-core.workspace = true
+yagoo-katago.workspace = true
+yagoo-pipeline.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+futures = { version = "0.3", default-features = false, features = ["std"] }
+
+[dev-dependencies]
+futures = { version = "0.3", default-features = false, features = ["executor"] }
+
+[lints]
+workspace = true

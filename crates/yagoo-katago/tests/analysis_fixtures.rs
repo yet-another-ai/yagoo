@@ -34,7 +34,11 @@ async fn scripted_client_roundtrip() {
     assert_eq!(resp.id, "fixture-1");
     let writes = client.scripted_writes().await;
     assert_eq!(writes.len(), 1);
-    assert!(writes[0].contains("\"id\":\"fixture-1\""));
+    let wire_query: serde_json::Value = serde_json::from_str(&writes[0]).unwrap();
+    assert!(wire_query["id"]
+        .as_str()
+        .unwrap()
+        .starts_with("__yagoo_query_"));
     assert!(writes[0].contains("includeOwnership"));
 }
 

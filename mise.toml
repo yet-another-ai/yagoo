@@ -60,6 +60,19 @@ run = "pnpm --filter @yagoo/ui check"
 description = "Typecheck UI (library is consumed via source exports)"
 depends = ["ui:check"]
 
+[tasks."browser:wasm"]
+description = "Build Rust/Wasm bindings with the matching local wasm-bindgen CLI"
+run = "pnpm --filter @yagoo/browser-engine build:wasm"
+
+[tasks."browser:check"]
+description = "Check browser engine types, functional units, and deployment bundle (no model download)"
+depends = ["install", "browser:wasm"]
+run = [
+  "pnpm --filter @yagoo/browser-engine check",
+  "pnpm --filter @yagoo/browser-engine test",
+  "pnpm --filter @yagoo/browser-engine build",
+]
+
 [tasks.docs]
 description = "Start the documentation site"
 depends = ["install"]
@@ -84,7 +97,7 @@ depends = ["rust:clippy"]
 
 [tasks.check]
 description = "Format check, Clippy, cargo test, UI tests, and docs build"
-depends = ["format-check", "lint", "rust:test", "ui:test", "docs-build"]
+depends = ["format-check", "lint", "rust:test", "ui:test", "browser:check", "docs-build"]
 
 [tasks."python:sync"]
 description = "Sync the uv-managed Python environment"

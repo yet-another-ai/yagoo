@@ -18,7 +18,7 @@ Design documentation for Yagoo: a Go review / teaching tool built on **interpret
    - [Concept heads](./modules/concept-heads.md) *(post-MVP)*
    - [Explanation generation](./modules/explanation-generation.md)
 5. [Architecture & data flow](./architecture.md)
-6. Pipeline: [snapshots](./pipeline/snapshots.md), [streaming](./pipeline/streaming.md)
+6. Pipeline: [snapshots](./pipeline/snapshots.md), [streaming](./pipeline/streaming.md), [browser engine (EXPERIMENTAL)](./browser-engine.md)
 7. [MVP & validation plan](./mvp.md)
 8. [Open questions](./open-questions.md)
 9. Appendix: [parameters](./appendix/parameters.md), [symbol conventions](./appendix/conventions.md)

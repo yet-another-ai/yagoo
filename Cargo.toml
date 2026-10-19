@@ -6,6 +6,8 @@ members = [
     "crates/yagoo-snapshot",
     "crates/yagoo-pipeline",
     "crates/yagoo-cli",
+    "crates/yagoo-search",
+    "crates/yagoo-web",
 ]
 resolver = "2"
 

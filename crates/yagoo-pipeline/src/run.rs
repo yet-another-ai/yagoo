@@ -3,14 +3,15 @@
 use crate::config::{PipelineConfig, PipelineStrategy};
 use crate::error::{PipelineError, PipelineResult};
 use crate::select::{select_deep_plies, DeepPlyReason};
-use async_stream::try_stream;
+use crate::AnalysisEngine;
+use futures::channel::mpsc;
 use futures::stream::Stream;
+use futures::StreamExt;
 use std::collections::{BTreeMap, HashSet};
 use std::pin::Pin;
 use std::sync::Arc;
-use tokio::sync::mpsc;
 use yagoo_core::Color;
-use yagoo_katago::{AnalysisClient, AnalysisQueryBuilder, AnalysisUpdate};
+use yagoo_katago::{AnalysisQueryBuilder, AnalysisUpdate};
 use yagoo_sgf::{
     filter_ply_range, move_to_gtp, parse_sgf, replay_main_line, GameRecord, ReplayedPosition,
 };
@@ -22,47 +23,45 @@ use yagoo_snapshot::{
 };
 
 /// Boxed stream of pipeline events.
-pub type EventStream = Pin<Box<dyn Stream<Item = PipelineResult<PipelineEvent>> + Send>>;
+pub type EventStream = Pin<Box<dyn Stream<Item = PipelineResult<PipelineEvent>>>>;
 
 type Tx = mpsc::UnboundedSender<PipelineEvent>;
 
 /// Analyze an SGF string, yielding [`PipelineEvent`]s progressively.
-pub fn analyze_game(sgf: &str, client: Arc<AnalysisClient>, config: PipelineConfig) -> EventStream {
+pub fn analyze_game<E: AnalysisEngine + 'static>(
+    sgf: &str,
+    client: Arc<E>,
+    config: PipelineConfig,
+) -> EventStream {
     let sgf = sgf.to_owned();
-    Box::pin(try_stream! {
-        let (tx, mut rx) = mpsc::unbounded_channel::<PipelineEvent>();
-        let client_task = Arc::clone(&client);
-        let join = tokio::spawn(async move {
-            match drive(&sgf, client_task, config, tx.clone()).await {
-                Ok(()) => {}
-                Err(e) => {
-                    let _ = tx.send(PipelineEvent::Error {
-                        v: SCHEMA_VERSION,
-                        message: e.to_string(),
-                        ply: None,
-                    });
-                }
-            }
-        });
-
-        while let Some(ev) = rx.recv().await {
-            yield ev;
+    let (tx, rx) = mpsc::unbounded::<PipelineEvent>();
+    // Poll the driver and receiver together, without a detached runtime task.
+    // Dropping the event stream drops the query future as well.
+    let driver = futures::stream::once(async move {
+        if let Err(e) = drive(&sgf, client, config, tx.clone()).await {
+            let _ = tx.unbounded_send(PipelineEvent::Error {
+                v: SCHEMA_VERSION,
+                message: e.to_string(),
+                ply: None,
+            });
         }
-        join.await.map_err(|e| PipelineError::Message(e.to_string()))?;
+        None::<PipelineEvent>
     })
+    .filter_map(futures::future::ready);
+    Box::pin(futures::stream::select(rx, driver).map(Ok))
 }
 
 /// Collect all events (convenience for tests / aggregate CLI).
-pub async fn analyze_game_collected(
+pub async fn analyze_game_collected<E: AnalysisEngine>(
     sgf: &str,
-    client: Arc<AnalysisClient>,
+    client: Arc<E>,
     config: PipelineConfig,
 ) -> PipelineResult<Vec<PipelineEvent>> {
-    let (tx, mut rx) = mpsc::unbounded_channel();
+    let (tx, mut rx) = mpsc::unbounded();
     let sgf = sgf.to_owned();
     let drive_result = drive(&sgf, client, config, tx).await;
     let mut events = Vec::new();
-    while let Some(ev) = rx.recv().await {
+    while let Some(ev) = rx.next().await {
         events.push(ev);
     }
     drive_result?;
@@ -70,9 +69,9 @@ pub async fn analyze_game_collected(
 }
 
 #[allow(clippy::too_many_lines)]
-async fn drive(
+async fn drive<E: AnalysisEngine>(
     sgf: &str,
-    client: Arc<AnalysisClient>,
+    client: Arc<E>,
     config: PipelineConfig,
     tx: Tx,
 ) -> PipelineResult<()> {
@@ -114,7 +113,7 @@ async fn drive(
                 PhaseMode::Scan,
                 &record,
                 &position_refs,
-                &client,
+                client.as_ref(),
                 &config,
                 &tx,
                 &mut snapshots,
@@ -140,7 +139,7 @@ async fn drive(
                     PhaseMode::Deep,
                     &record,
                     &deep_positions,
-                    &client,
+                    client.as_ref(),
                     &config,
                     &tx,
                     &mut snapshots,
@@ -156,7 +155,7 @@ async fn drive(
                 PhaseMode::Deep,
                 &record,
                 &position_refs,
-                &client,
+                client.as_ref(),
                 &config,
                 &tx,
                 &mut snapshots,
@@ -237,7 +236,7 @@ async fn run_phase(
     mode: PhaseMode,
     record: &GameRecord,
     positions: &[&ReplayedPosition],
-    client: &AnalysisClient,
+    client: &dyn AnalysisEngine,
     config: &PipelineConfig,
     tx: &Tx,
     snapshots: &mut BTreeMap<u32, PositionSnapshot>,
@@ -275,7 +274,7 @@ async fn analyze_position(
     mode: PhaseMode,
     record: &GameRecord,
     pos: &ReplayedPosition,
-    client: &AnalysisClient,
+    client: &dyn AnalysisEngine,
     config: &PipelineConfig,
     tx: &Tx,
     snapshots: &mut BTreeMap<u32, PositionSnapshot>,
@@ -335,7 +334,7 @@ async fn analyze_position(
 
     let mut final_root = None;
     client
-        .analyze_streaming(&root_query, |update| {
+        .analyze_streaming(&root_query, &mut |update| {
             match update {
                 AnalysisUpdate::Partial(resp) => {
                     let visits_n = resp.root_info.as_ref().and_then(|r| r.visits);
@@ -431,7 +430,7 @@ async fn run_pass_probe(
     pos: &ReplayedPosition,
     to_play: Color,
     rules: &str,
-    client: &AnalysisClient,
+    client: &dyn AnalysisEngine,
     config: &PipelineConfig,
     tx: &Tx,
     snap: &mut PositionSnapshot,
@@ -470,7 +469,7 @@ async fn run_pass_probe(
 
     let mut final_resp = None;
     client
-        .analyze_streaming(&query, |update| {
+        .analyze_streaming(&query, &mut |update| {
             match update {
                 AnalysisUpdate::Partial(resp) => {
                     let visits_n = resp.root_info.as_ref().and_then(|r| r.visits);
@@ -517,7 +516,7 @@ async fn run_pv_ends(
     record: &GameRecord,
     pos: &ReplayedPosition,
     rules: &str,
-    client: &AnalysisClient,
+    client: &dyn AnalysisEngine,
     config: &PipelineConfig,
     tx: &Tx,
     snap: &mut PositionSnapshot,
@@ -582,6 +581,6 @@ async fn run_pv_ends(
 }
 
 fn send(tx: &Tx, ev: PipelineEvent) -> PipelineResult<()> {
-    tx.send(ev)
+    tx.unbounded_send(ev)
         .map_err(|_| PipelineError::Message("event consumer dropped".into()))
 }

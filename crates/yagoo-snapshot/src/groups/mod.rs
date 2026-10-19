@@ -606,11 +606,7 @@ fn tempo_fields(
 /// intersects the group (Sabaki-style anchor). Fall back to the least stone
 /// among all members. Empties must never become the id — they caused panel
 /// labels like `A13` / `A5` with no stone on that vertex.
-fn representative_stone_id(
-    black: &[String],
-    white: &[String],
-    snap: &PositionSnapshot,
-) -> String {
+fn representative_stone_id(black: &[String], white: &[String], snap: &PositionSnapshot) -> String {
     let member: std::collections::HashSet<&str> = black
         .iter()
         .chain(white.iter())

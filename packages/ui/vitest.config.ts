@@ -13,5 +13,8 @@ export default defineConfig({
   test: {
     environment: "happy-dom",
     include: ["src/**/*.test.ts"],
+    // AnalysisReviewer progressive NDJSON drain can take several seconds under
+    // parallel mise ci load; keep headroom above the default 5s.
+    testTimeout: 15_000,
   },
 });

@@ -62,7 +62,7 @@ symmetries and batch four. See [browser setup and evidence](./browser-engine).
 | Search parity with native (uncertainty weights, LCB, passing, strength) | [#11](https://github.com/yet-another-ai/yagoo/issues/11) |
 | Native comparison release aligned with pinned exporter | [#12](https://github.com/yet-another-ai/yagoo/issues/12) |
 | Concept-head consumers, activation visualization, persistent storage | [#13](https://github.com/yet-another-ai/yagoo/issues/13) |
-| Model download resume | [#14](https://github.com/yet-another-ai/yagoo/issues/14) |
+| Model download resume (jet-style picker/cache/cancel shipped; Range resume open) | [#14](https://github.com/yet-another-ai/yagoo/issues/14) |
 | Small-net / mobile support | [#15](https://github.com/yet-another-ai/yagoo/issues/15) |
 | Simple-ko long-cycle / no-result and repeated-pass scoring | [#16](https://github.com/yet-another-ai/yagoo/issues/16) |
 | Deployed public-host verification | [#17](https://github.com/yet-another-ai/yagoo/issues/17) |

@@ -23,8 +23,13 @@ original research report.
 - `AnalysisEngine` keeps the existing analysis protocol and NDJSON pipeline,
   usable by native `AnalysisClient` and browser Rust/Wasm search. Game history
   is retained when building queries, including setup and pass moves.
-- The browser package has a standalone load/scan/deepen/stop/download page.
-  Model bytes are verified before use and cached in OPFS when available.
+- The browser package has a standalone load/scan/deepen/stop/download page with a
+  **jet-style model island**: choose a catalog entry (b18 SWA default; others
+  listed as unavailable when unsupported), see approximate/exact size, **Load
+  model** only on explicit click (never on page load / never in CI), progress in
+  MB with cancel, OPFS content-addressed cache with clear, and **Load local
+  files** for an exported `manifest.json` + `.onnx` + `warmup.json`. Bytes are
+  SHA-256 verified before use. HTTP Range resume remains open ([#14](https://github.com/yet-another-ai/yagoo/issues/14)).
 - Experimental PUCT/FPU search has a bounded cache, partial events, candidates,
   PVs and tree ownership. Optional eight-way root symmetry averages probabilities
   and ownership after inverse transforms. Async batches of up to four reserve
@@ -104,8 +109,10 @@ pnpm --filter @yagoo/browser-engine preview
 
 Open the preview URL printed by Vite, normally
 `http://localhost:4173/yagoo-engine/`. This is the runnable engine entry point;
-the existing reviewer imports its downloaded NDJSON. The engine is not embedded
-in the reviewer's UI in this stage.
+the existing reviewer at docs `/app/` imports downloaded NDJSON (browser live
+adapter is [#20](https://github.com/yet-another-ai/yagoo/issues/20)). Weights are
+not shipped in git and are not fetched until you click **Load model** (or stage
+local files first).
 
 `build:wasm` installs a matching wasm-bindgen CLI into the repository's ignored
 `.yagoo-data/wasm-tools` directory when needed. `WASM_BINDGEN` can select an
@@ -308,7 +315,7 @@ limit is its own issue (related to #7 / #5):
 - [#11](https://github.com/yet-another-ai/yagoo/issues/11) Search parity with native (uncertainty weighting, LCB, passing heuristics, strength)
 - [#12](https://github.com/yet-another-ai/yagoo/issues/12) Native comparison release aligned with the pinned exporter
 - [#13](https://github.com/yet-another-ai/yagoo/issues/13) Concept-head consumers, activation visualization, persistent activation storage
-- [#14](https://github.com/yet-another-ai/yagoo/issues/14) Model download resume
+- [#14](https://github.com/yet-another-ai/yagoo/issues/14) Model download resume (cancel exists; Range resume does not)
 - [#15](https://github.com/yet-another-ai/yagoo/issues/15) Small-net / mobile support
 - [#17](https://github.com/yet-another-ai/yagoo/issues/17) Deployed public-host verification
 

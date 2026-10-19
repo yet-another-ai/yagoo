@@ -1,13 +1,73 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width"><title>Yagoo browser engine (EXPERIMENTAL)</title></head>
-<body><main><h1>Yagoo browser engine <span style="font-size:0.55em;font-weight:600;letter-spacing:0.04em;vertical-align:middle">(EXPERIMENTAL)</span></h1><p><strong>EXPERIMENTAL.</strong> Not a drop-in replacement for native KataGo. Self-hosted b18 SWA analysis with Chinese/Chinese-OGS two-pass area scoring. Japanese encore stops analysis with an explicit error. Long-cycle/no-result handling and full KataGo search alignment remain unimplemented. The existing reviewer can open downloaded NDJSON events; the native CLI path is unchanged.</p>
-<label>Model manifest <input id="manifest" size="65" value="models/manifest.json"></label>
-<p><label><input type="checkbox" id="wasm"> Force Wasm CPU</label> <label>Wasm threads <input id="threads" type="number" min="1" max="8" value="4"></label></p>
-<p><label><input type="checkbox" id="activations"> Retain the latest root trunk activations on GPU (optional, WebGPU only)</label> <button id="release-activations">Release root activations</button></p>
-<p id="activation-status" role="status">Root activation retention is disabled. Concept-head consumers are not implemented (issue #13).</p>
-<p><button id="isolation">Enable threads on static hosting</button> <button id="load">Load and validate model</button> <button id="stop">Stop / release engine</button></p>
-<p id="status" role="status">Export and serve the official model bundle before loading.</p>
-<label>SGF <textarea id="sgf" rows="5" cols="80">(;SZ[9]KM[7.5]RU[Chinese];B[cc];W[gg])</textarea></label>
-<p><label>Deep visit budget <input id="visits" type="number" min="1" max="10000" value="200"></label> <label><input id="all" type="checkbox"> Deepen every position (otherwise at most 12 selected positions)</label></p>
-<p><label>Neural batch <input id="batch" type="number" min="1" max="4" value="4"></label> <label><input id="symmetries" type="checkbox"> Average 8 root symmetries (8 evaluations per analysis root)</label></p>
-<p><button id="scan" disabled>Scan only</button> <button id="deep" disabled>Scan and deepen</button> <button id="download">Download events</button></p>
-<pre id="events"></pre></main><script type="module" src="/src/demo.ts"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width">
+  <title>Yagoo browser engine (EXPERIMENTAL)</title>
+</head>
+<body>
+<main class="shell">
+  <header class="hero">
+    <h1>Yagoo browser engine <span class="badge">EXPERIMENTAL</span></h1>
+    <p><strong>EXPERIMENTAL.</strong> Not a drop-in replacement for native KataGo.
+      Weights are <em>never</em> downloaded on page load or in CI — you choose a model,
+      see its size, download with progress (cancellable), or load files you already exported.
+      Cached in OPFS (content-addressed), like jet’s playground. Native CLI path is unchanged.</p>
+  </header>
+
+  <section class="island" id="model-island" role="group" aria-label="Model download and load">
+    <div class="island__row">
+      <label class="island__field">Model
+        <select id="model-select"></select>
+      </label>
+      <span id="model-size" class="island__meta" role="status">—</span>
+      <span id="cache-status" class="island__meta" role="status">Cache: checking…</span>
+    </div>
+    <p id="model-notes" class="island__notes"></p>
+    <label class="island__field island__grow">Hosted / same-origin manifest URL
+      <input id="manifest" size="65" value="models/manifest.json" spellcheck="false">
+    </label>
+    <div class="island__status" id="model-status-wrap">
+      <i class="island__dot" id="model-dot" aria-hidden="true"></i>
+      <span id="model-status" class="island__text" role="status">No model loaded</span>
+      <span id="download-bar" class="island__progress" hidden aria-hidden="true"></span>
+    </div>
+    <div class="island__actions">
+      <button type="button" id="load" class="island__button island__button--solid">Load model</button>
+      <button type="button" id="cancel-download" class="island__button" disabled>Cancel download</button>
+      <button type="button" id="clear-cache" class="island__button">Clear model cache</button>
+      <label class="island__button island__file">
+        Load local files…
+        <input id="local-files" type="file" multiple accept=".json,.onnx,application/json,application/octet-stream">
+      </label>
+    </div>
+  </section>
+
+  <section class="controls">
+    <p><label><input type="checkbox" id="wasm"> Force Wasm CPU</label>
+      <label>Wasm threads <input id="threads" type="number" min="1" max="8" value="4"></label></p>
+    <p><label><input type="checkbox" id="activations"> Retain the latest root trunk activations on GPU (optional, WebGPU only)</label>
+      <button type="button" id="release-activations">Release root activations</button></p>
+    <p id="activation-status" role="status">Root activation retention is disabled. Concept-head consumers are not implemented (issue #13).</p>
+    <p>
+      <button type="button" id="isolation">Enable threads on static hosting</button>
+      <button type="button" id="stop">Stop / release engine</button>
+    </p>
+    <p id="status" role="status">Choose a model above, then Load model. Export instructions: docs/browser-engine.md.</p>
+  </section>
+
+  <label>SGF <textarea id="sgf" rows="5" cols="80">(;SZ[9]KM[7.5]RU[Chinese];B[cc];W[gg])</textarea></label>
+  <p><label>Deep visit budget <input id="visits" type="number" min="1" max="10000" value="200"></label>
+    <label><input id="all" type="checkbox"> Deepen every position (otherwise at most 12 selected positions)</label></p>
+  <p><label>Neural batch <input id="batch" type="number" min="1" max="4" value="4"></label>
+    <label><input id="symmetries" type="checkbox"> Average 8 root symmetries (8 evaluations per analysis root)</label></p>
+  <p>
+    <button type="button" id="scan" disabled>Scan only</button>
+    <button type="button" id="deep" disabled>Scan and deepen</button>
+    <button type="button" id="download">Download events</button>
+  </p>
+  <pre id="events"></pre>
+</main>
+<script type="module" src="/src/demo.ts"></script>
+</body>
+</html>

@@ -16,6 +16,26 @@ declare module "*.svg" {
   export default src;
 }
 
+declare module "*.ndjson?raw" {
+  const src: string;
+  export default src;
+}
+
+declare module "*.ndjson" {
+  const src: string;
+  export default src;
+}
+
+declare module "*.sgf?raw" {
+  const src: string;
+  export default src;
+}
+
+declare module "*.sgf" {
+  const src: string;
+  export default src;
+}
+
 declare module "@sabaki/sgf" {
   interface SgfApi {
     parse(

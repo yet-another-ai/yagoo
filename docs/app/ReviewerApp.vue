@@ -34,7 +34,6 @@ onMounted(async () => {
       v-else
       :initial-sgf="sgf"
       :initial-ndjson="ndjson"
-      :vertex-size="28"
     />
   </div>
 </template>

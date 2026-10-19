@@ -13,21 +13,33 @@ import type { BoardMap, GhostStone, HeatVertex, LineMarker, Marker } from "../ty
 import ReviewerLayout from "./ReviewerLayout.vue";
 import "./styles/reviewer.css";
 
-const props = withDefaults(
-  defineProps<{
-    /** Initial / bundled sample SGF. */
-    initialSgf?: string;
-    /** Initial / bundled NDJSON analysis (loaded progressively). */
-    initialNdjson?: string;
-    vertexSize?: number;
-  }>(),
-  {
-    vertexSize: 28,
-  },
-);
+const props = defineProps<{
+  /** Initial / bundled sample SGF. */
+  initialSgf?: string;
+  /** Initial / bundled NDJSON analysis (loaded progressively). */
+  initialNdjson?: string;
+  /** Override stone size; default scales for 19×19 vs smaller boards. */
+  vertexSize?: number;
+}>();
+
+function parseBoardSize(sgf: string): number {
+  const n = Number.parseInt(/SZ\[(\d+)/i.exec(sgf)?.[1] ?? "19", 10);
+  return Number.isFinite(n) && n >= 2 ? n : 19;
+}
+
+/** Fit a full board in the wide docs layout (sidebar-less). */
+function vertexSizeForBoard(size: number): number {
+  if (size <= 9) return 28;
+  if (size <= 13) return 24;
+  return 20;
+}
 
 const sgfText = ref(props.initialSgf ?? "");
 const rulesLabel = computed(() => resolveSgfRules(sgfText.value));
+const boardSizeFromSgf = computed(() => parseBoardSize(sgfText.value));
+const effectiveVertexSize = computed(
+  () => props.vertexSize ?? vertexSizeForBoard(boardSizeFromSgf.value),
+);
 const dragOver = ref(false);
 const statusMessage = ref("");
 const selectedCandidate = ref(0);
@@ -52,9 +64,7 @@ const markerMap = ref<BoardMap<Marker | null>>([]);
 const lines = ref<LineMarker[]>([]);
 
 function refreshOverlays() {
-  const size =
-    state.value.size ??
-    Number.parseInt(/SZ\[(\d+)/i.exec(sgfText.value)?.[1] ?? "19", 10);
+  const size = state.value.size ?? boardSizeFromSgf.value;
   const overlays = overlaysFor(currentPly.value, size, {
     selectedCandidate: selectedCandidate.value,
   });
@@ -262,7 +272,7 @@ const phaseBadge = computed(() => {
         :lines="lines"
         :comment-override="analysisComment"
         comment-title="Analysis"
-        :vertex-size="vertexSize"
+        :vertex-size="effectiveVertexSize"
         :show-coordinates="true"
         :fuzzy-stone-placement="true"
         :animate-stone-placement="true"

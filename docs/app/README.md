@@ -12,14 +12,17 @@ VitePress page at `/app/` hosts the real `@yagoo/ui` reviewer (Sabaki chrome + S
 
 Missing SGF `RU` is treated as **Chinese** (same as `yagoo-sgf` / the pipeline).
 
+The bundled sample is a **19×19** game (~52 moves). Analysis covers the full main line via `scan_then_deep`; one swing ply is deepened. Other board sizes still work when you open an SGF with a different `SZ`.
+
 ## Local regenerate fixture
 
 ```sh
 # Scripted engine responses → real PipelineEvent NDJSON (no KataGo binary / model).
-cargo run -p yagoo-cli -- analyze path/to/sample.sgf \
+# Ownership arrays must be size² long (361 for 19×19).
+cargo run -p yagoo-cli -- analyze docs/public/app/sample.sgf \
   --scripted-fixture path/to/scripted.json \
   -o docs/public/app/sample-scan-deep.ndjson \
-  --strategy scan-then-deep --partials --from 0 --to 2
+  --strategy scan-then-deep --partials --from 0 --to 52
 ```
 
 CI never downloads or runs KataGo models.

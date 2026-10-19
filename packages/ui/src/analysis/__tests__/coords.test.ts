@@ -31,6 +31,28 @@ describe("ownership maps", () => {
     expect(paint[0]![0]).toBe(1);
     expect(paint[0]![1]).toBe(-1);
   });
+
+  it("scales heat/paint maps to 19×19 ownership length", () => {
+    const own = Array.from({ length: 19 * 19 }, (_, i) =>
+      i === 0 ? 1 : i === 18 ? -1 : 0,
+    );
+    const heat = ownershipToHeatMap(own, 19);
+    expect(heat).toHaveLength(19);
+    expect(heat[0]).toHaveLength(19);
+    expect(heat[0]![0]?.strength).toBe(9);
+    expect(heat[0]![18]?.strength).toBe(9);
+    const paint = ownershipToPaintMap(own, 19);
+    expect(paint[0]![0]).toBe(1);
+    expect(paint[0]![18]).toBe(-1);
+  });
+});
+
+describe("parseGtpVertex on 19×19", () => {
+  it("maps star points and edges", () => {
+    expect(parseGtpVertex("D4", 19)).toEqual([3, 15]);
+    expect(parseGtpVertex("Q16", 19)).toEqual([15, 3]);
+    expect(parseGtpVertex("K10", 19)).toEqual([9, 9]);
+  });
 });
 
 describe("resolveSgfRules", () => {

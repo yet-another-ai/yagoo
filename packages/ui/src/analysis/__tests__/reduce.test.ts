@@ -9,11 +9,16 @@ import { createInitialAnalysisState, type PipelineEvent } from "../types";
 import { buildReviewSeries } from "../display";
 
 const fixtureEvents = parseNdjson(fixtureText);
+const DEEP_PLY = 36;
 
 describe("parseNdjson / fixture format", () => {
-  it("parses real pipeline NDJSON from yagoo analyze --scripted-fixture", () => {
+  it("parses real 19×19 pipeline NDJSON from yagoo analyze --scripted-fixture", () => {
     expect(fixtureEvents.length).toBeGreaterThan(10);
     expect(fixtureEvents[0]?.type).toBe("gameStarted");
+    if (fixtureEvents[0]?.type === "gameStarted") {
+      expect(fixtureEvents[0].size).toBe(19);
+      expect(fixtureEvents[0].moveCount).toBeGreaterThanOrEqual(40);
+    }
     expect(fixtureEvents.at(-1)?.type).toBe("gameCompleted");
     expect(fixtureEvents.some((e) => e.type === "deepPliesSelected")).toBe(
       true,
@@ -37,52 +42,52 @@ describe("reducePipelineEvent ordering", () => {
       state = reducePipelineEvent(state, ev);
       if (ev.type === "phaseCompleted" && ev.phase === "scan") {
         expect(state.plies[0]?.complete).toBe(true);
-        expect(state.plies[2]?.root?.winrate).toBeCloseTo(0.7, 5);
+        expect(state.plies[DEEP_PLY]?.root?.winrate).toBeGreaterThan(0.6);
         expect(state.deepPlies).toEqual([]);
       }
       if (ev.type === "deepPliesSelected") {
-        expect(state.deepPlies).toEqual([2]);
+        expect(state.deepPlies).toEqual([DEEP_PLY]);
         expect(state.deepMode).toBe("swing");
-        expect(state.deepReasons[0]?.ply).toBe(2);
+        expect(state.deepReasons[0]?.ply).toBe(DEEP_PLY);
       }
       if (ev.type === "stagePartial") {
-        expect(state.plies[2]?.rootPartial).toBe(true);
-        expect(state.plies[2]?.complete).toBe(false);
-        expect(state.plies[2]?.root?.visits).toBe(20);
+        expect(state.plies[DEEP_PLY]?.rootPartial).toBe(true);
+        expect(state.plies[DEEP_PLY]?.complete).toBe(false);
+        expect(state.plies[DEEP_PLY]?.root?.visits).toBe(40);
       }
       if (
         ev.type === "positionCompleted" &&
         ev.phase === "deep" &&
-        ev.snapshot.ply === 2
+        ev.snapshot.ply === DEEP_PLY
       ) {
-        expect(state.plies[2]?.rootPartial).toBe(false);
-        expect(state.plies[2]?.complete).toBe(true);
-        expect(state.plies[2]?.root?.visits).toBe(200);
-        expect(state.plies[2]?.root?.winrate).toBeCloseTo(0.71, 5);
-        expect(state.plies[2]?.candidates.length).toBe(2);
+        expect(state.plies[DEEP_PLY]?.rootPartial).toBe(false);
+        expect(state.plies[DEEP_PLY]?.complete).toBe(true);
+        expect(state.plies[DEEP_PLY]?.root?.visits).toBe(400);
+        expect(state.plies[DEEP_PLY]?.root?.ownership?.length).toBe(361);
+        expect(state.plies[DEEP_PLY]?.candidates.length).toBe(6);
       }
     }
     expect(state.status).toBe("completed");
+    expect(state.size).toBe(19);
     expect(state.rules).toBe("chinese"); // missing RU on gameStarted
   });
 
   it("lets deepen overwrite scan root while keeping earlier plies", () => {
     const state = reducePipelineEvents(fixtureEvents);
-    expect(state.plies[0]?.root?.winrate).toBeCloseTo(0.5, 5);
-    expect(state.plies[1]?.root?.winrate).toBeCloseTo(0.51, 5);
-    expect(state.plies[2]?.root?.winrate).toBeCloseTo(0.71, 5);
-    expect(state.plies[2]?.phase).toBe("deep");
+    expect(state.plies[0]?.root?.winrate).toBeCloseTo(0.48, 5);
+    expect(state.plies[DEEP_PLY]?.phase).toBe("deep");
     expect(state.plies[0]?.phase).toBe("scan");
+    expect(state.plies[DEEP_PLY]?.root?.visits).toBe(400);
   });
 
-  it("builds winrate series with deepSelected highlights", () => {
+  it("builds winrate series with deepSelected highlights on 19×19 game", () => {
     const state = reducePipelineEvents(fixtureEvents);
     const series = buildReviewSeries(state);
-    expect(series.length).toBeGreaterThanOrEqual(3);
-    expect(series[2]?.deepSelected).toBe(true);
+    expect(series.length).toBeGreaterThanOrEqual(DEEP_PLY + 1);
+    expect(series[DEEP_PLY]?.deepSelected).toBe(true);
     expect(series[0]?.deepSelected).toBe(false);
-    expect(series[2]?.winrate).toBeCloseTo(71, 5);
-    expect(series[2]?.scoreLead).toBeCloseTo(4.8, 5);
+    expect(series[DEEP_PLY]?.winrate).toBeGreaterThan(60);
+    expect(series[DEEP_PLY]?.scoreLead).not.toBeNull();
   });
 });
 

@@ -18,7 +18,10 @@ const props = defineProps<{
   initialSgf?: string;
   /** Initial / bundled NDJSON analysis (loaded progressively). */
   initialNdjson?: string;
-  /** Override stone size; default scales for 19×19 vs smaller boards. */
+  /**
+   * Optional fixed stone size. When omitted, `ReviewerLayout` sizes the board
+   * from its container via ResizeObserver (fills available area).
+   */
   vertexSize?: number;
 }>();
 
@@ -27,19 +30,9 @@ function parseBoardSize(sgf: string): number {
   return Number.isFinite(n) && n >= 2 ? n : 19;
 }
 
-/** Fit a full board in the wide docs layout (sidebar-less). */
-function vertexSizeForBoard(size: number): number {
-  if (size <= 9) return 28;
-  if (size <= 13) return 24;
-  return 20;
-}
-
 const sgfText = ref(props.initialSgf ?? "");
 const rulesLabel = computed(() => resolveSgfRules(sgfText.value));
 const boardSizeFromSgf = computed(() => parseBoardSize(sgfText.value));
-const effectiveVertexSize = computed(
-  () => props.vertexSize ?? vertexSizeForBoard(boardSizeFromSgf.value),
-);
 const dragOver = ref(false);
 const statusMessage = ref("");
 const selectedCandidate = ref(0);
@@ -272,7 +265,7 @@ const phaseBadge = computed(() => {
         :lines="lines"
         :comment-override="analysisComment"
         comment-title="Analysis"
-        :vertex-size="effectiveVertexSize"
+        :vertex-size="vertexSize"
         :show-coordinates="true"
         :fuzzy-stone-placement="true"
         :animate-stone-placement="true"

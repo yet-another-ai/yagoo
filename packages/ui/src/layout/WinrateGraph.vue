@@ -23,7 +23,7 @@ const props = withDefaults(
   {
     data: () => [],
     currentIndex: 0,
-    height: 96,
+    height: 140,
     showScoreLead: true,
   },
 );

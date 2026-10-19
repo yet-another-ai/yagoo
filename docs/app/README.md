@@ -12,7 +12,7 @@ VitePress page at `/app/` hosts the real `@yagoo/ui` reviewer (Sabaki chrome + S
 
 Missing SGF `RU` is treated as **Chinese** (same as `yagoo-sgf` / the pipeline).
 
-The bundled sample is a **19×19** game (~52 moves). Analysis covers the full main line via `scan_then_deep`; one swing ply is deepened. Other board sizes still work when you open an SGF with a different `SZ`.
+The bundled sample is an original **19×19** teaching game (~70 legality-checked moves). Analysis covers the main line via `scan_then_deep`; one ownership-swing ply is deepened. The board auto-sizes to the container (`ResizeObserver`). Other board sizes still work when you open an SGF with a different `SZ`.
 
 ## Local regenerate fixture
 
@@ -22,7 +22,7 @@ The bundled sample is a **19×19** game (~52 moves). Analysis covers the full ma
 cargo run -p yagoo-cli -- analyze docs/public/app/sample.sgf \
   --scripted-fixture path/to/scripted.json \
   -o docs/public/app/sample-scan-deep.ndjson \
-  --strategy scan-then-deep --partials --from 0 --to 52
+  --strategy scan-then-deep --partials --from 0 --to 70
 ```
 
 CI never downloads or runs KataGo models.

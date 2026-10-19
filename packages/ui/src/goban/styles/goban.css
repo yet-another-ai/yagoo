@@ -11,6 +11,10 @@
     --shudan-white-background-color: #eee;
     --shudan-white-foreground-color: #222;
 
+    /* Sabaki default — without this, paint fills render fully opaque. */
+    --shudan-paint-opacity: 0.35;
+    --shudan-paint-box-shadow: none;
+
     position: relative;
     border: var(--shudan-board-border-width) solid var(--shudan-board-border-color);
     color: var(--shudan-board-foreground-color);
@@ -322,7 +326,7 @@
     border-bottom-right-radius: 0;
 }
 
-/* Heat map */
+/* Heat map — soft per-vertex glow (stones/grid stay readable). */
 
 .shudan-vertex .shudan-heat {
     top: 50%;
@@ -335,51 +339,52 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity .5s, box-shadow .5s;
+    z-index: 1;
   }
   .shudan-vertex.shudan-heat_9 .shudan-heat {
     background: #59A80F;
-    box-shadow: 0 0 1em 1em #59A80F;
-    opacity: .8;
+    box-shadow: 0 0 .55em .45em #59A80F;
+    opacity: .42;
   }
   .shudan-vertex.shudan-heat_8 .shudan-heat {
     background: #59A80F;
-    box-shadow: 0 0 1em .9em #59A80F;
-    opacity: .7;
+    box-shadow: 0 0 .5em .4em #59A80F;
+    opacity: .38;
   }
   .shudan-vertex.shudan-heat_7 .shudan-heat {
     background: #4886D5;
-    box-shadow: 0 0 1em .75em #4886D5;
-    opacity: .8;
+    box-shadow: 0 0 .48em .38em #4886D5;
+    opacity: .4;
   }
   .shudan-vertex.shudan-heat_6 .shudan-heat {
     background: #4886D5;
-    box-shadow: 0 0 1em .6em #4886D5;
-    opacity: .8;
+    box-shadow: 0 0 .45em .35em #4886D5;
+    opacity: .36;
   }
   .shudan-vertex.shudan-heat_5 .shudan-heat {
     background: #4886D5;
-    box-shadow: 0 0 .9em .55em #4886D5;
-    opacity: .7;
+    box-shadow: 0 0 .42em .32em #4886D5;
+    opacity: .32;
   }
   .shudan-vertex.shudan-heat_4 .shudan-heat {
     background: #92278F;
-    box-shadow: 0 0 .85em .5em #92278F;
-    opacity: .8;
+    box-shadow: 0 0 .4em .3em #92278F;
+    opacity: .34;
   }
   .shudan-vertex.shudan-heat_3 .shudan-heat {
     background: #92278F;
-    box-shadow: 0 0 .8em .45em #92278F;
-    opacity: .7;
+    box-shadow: 0 0 .38em .28em #92278F;
+    opacity: .3;
   }
   .shudan-vertex.shudan-heat_2 .shudan-heat {
     background: #F02311;
-    box-shadow: 0 0 .75em .4em #F02311;
-    opacity: .8;
+    box-shadow: 0 0 .35em .25em #F02311;
+    opacity: .32;
   }
   .shudan-vertex.shudan-heat_1 .shudan-heat {
     background: #F02311;
-    box-shadow: 0 0 .75em .4em #F02311;
-    opacity: .7;
+    box-shadow: 0 0 .32em .22em #F02311;
+    opacity: .28;
 }
 
 .shudan-vertex .shudan-heatlabel {

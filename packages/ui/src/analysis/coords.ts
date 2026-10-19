@@ -34,8 +34,21 @@ export function emptyBoardMap<T>(size: number, fill: T): BoardMap<T> {
 }
 
 /**
+ * Clamp ownership to the KataGo black-positive range [-1, 1].
+ */
+export function clampOwnership(v: number): number {
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(-1, Math.min(1, v));
+}
+
+/**
  * Ownership (row-major from A19, black-positive ∈ [-1, 1]) → Shudan heat map.
- * Strength 1–9 scales with |ownership|; labels only for strong points.
+ *
+ * Strength 1–9 scales with |ownership|. **No text labels** — candidate winrate /
+ * visits belong on ghost markers, not ownership cells (Sabaki-style).
+ *
+ * Prefer this over paint-map for ownership: heat is a soft per-vertex glow so
+ * stones and grid stay readable (paint fills merge into opaque blocks).
  */
 export function ownershipToHeatMap(
   ownership: number[] | null | undefined,
@@ -44,34 +57,42 @@ export function ownershipToHeatMap(
   const map = emptyBoardMap<HeatVertex | null>(size, null);
   if (ownership == null || ownership.length === 0) return map;
   for (let i = 0; i < ownership.length; i++) {
-    const v = ownership[i];
-    if (v == null || !Number.isFinite(v)) continue;
+    const raw = ownership[i];
+    if (raw == null) continue;
+    const v = clampOwnership(raw);
     const abs = Math.abs(v);
-    if (abs < 0.05) continue;
+    // Skip near-zero / unsettled points to avoid a muddy full-board wash.
+    if (abs < 0.12) continue;
     const y = Math.floor(i / size);
     const x = i % size;
     if (y < 0 || y >= size || x < 0 || x >= size) continue;
-    const strength = Math.max(1, Math.min(9, Math.round(abs * 9)));
-    const label =
-      abs >= 0.35 ? `${v >= 0 ? "+" : ""}${(v * 100).toFixed(0)}` : null;
-    map[y]![x] = { strength, text: label };
+    // Map |own| ∈ [0.12, 1] → strength 1–9. Sign is not encoded in Shudan
+    // heat colors; intensity alone is the ownership heatmap.
+    const strength = Math.max(
+      1,
+      Math.min(9, Math.round(((abs - 0.12) / 0.88) * 8) + 1),
+    );
+    map[y]![x] = { strength, text: null };
   }
   return map;
 }
 
 /**
- * Ownership → Sabaki-style paint map (`1` black / `-1` white territory tint).
+ * Ownership → Sabaki paint map (`1` black / `-1` white).
+ * Kept for callers that want territory tint; the docs reviewer uses heat instead.
  */
 export function ownershipToPaintMap(
   ownership: number[] | null | undefined,
   size: number,
-  threshold = 0.15,
+  threshold = 0.2,
 ): BoardMap<number> {
   const map = emptyBoardMap(size, 0);
   if (ownership == null) return map;
   for (let i = 0; i < ownership.length; i++) {
-    const v = ownership[i];
-    if (v == null || !Number.isFinite(v) || Math.abs(v) < threshold) continue;
+    const raw = ownership[i];
+    if (raw == null) continue;
+    const v = clampOwnership(raw);
+    if (Math.abs(v) < threshold) continue;
     const y = Math.floor(i / size);
     const x = i % size;
     if (y < 0 || y >= size || x < 0 || x >= size) continue;

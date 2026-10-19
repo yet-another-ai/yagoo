@@ -217,11 +217,12 @@ function abs(zIndex?: number) {
 
     <div v-if="selected" class="shudan-selection" :style="abs(4)" />
 
-    <div class="shudan-heat" :style="abs(5)" />
+    <!-- Heat under stones so ownership glow does not obscure them. -->
+    <div class="shudan-heat" :style="abs(0)" />
     <div
       v-if="heat?.text != null"
       class="shudan-heatlabel"
-      :style="abs(6)"
+      :style="abs(5)"
     >
       {{ heat.text.toString() }}
     </div>

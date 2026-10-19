@@ -12,13 +12,14 @@ describe("AnalysisReviewer", () => {
       props: {
         initialSgf: sampleSgf,
         initialNdjson: fixtureText,
+        // Fixed size in jsdom (no real layout); production uses ResizeObserver.
         vertexSize: 16,
       },
       attachTo: document.body,
     });
 
-    // Progressive rAF batches — fixture has ~200 events @ batchSize 3.
-    for (let i = 0; i < 120; i++) {
+    // Progressive rAF batches — 19×19 fixture has ~290 events @ batchSize 3.
+    for (let i = 0; i < 160; i++) {
       await new Promise<void>((resolve) => {
         requestAnimationFrame(() => resolve());
       });

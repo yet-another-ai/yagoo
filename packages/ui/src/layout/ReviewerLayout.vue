@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import { useGame } from "../composables/useGame";
 import Goban from "../goban/Goban.vue";
 import OverlayLayer from "../overlays/OverlayLayer.vue";
@@ -22,6 +29,10 @@ const props = withDefaults(
   defineProps<{
     sgf?: string;
     winrateData?: WinratePoint[];
+    /**
+     * Fixed vertex size in px. When omitted, size is computed from the board
+     * container via ResizeObserver (Sabaki-style fill).
+     */
     vertexSize?: number;
     showCoordinates?: boolean;
     fuzzyStonePlacement?: boolean;
@@ -39,7 +50,6 @@ const props = withDefaults(
     commentTitle?: string;
   }>(),
   {
-    vertexSize: 22,
     showCoordinates: true,
     fuzzyStonePlacement: true,
     animateStonePlacement: true,
@@ -75,16 +85,53 @@ const {
 } = useGame();
 
 const loaded = ref(false);
+const mainEl = ref<HTMLElement | null>(null);
+const autoVertexSize = ref(22);
+let resizeObserver: ResizeObserver | null = null;
 
 function load(contents: string | undefined) {
   if (!contents) return;
   loadSgf(contents);
   loaded.value = true;
   emit("ply-change", moveNumber.value);
+  void nextTick(() => updateAutoVertexSize());
 }
+
+/**
+ * Fit the goban into the main pane (width × height), leaving a small margin
+ * and room for coordinate labels — same idea as Sabaki's board sizing.
+ */
+function updateAutoVertexSize() {
+  if (props.vertexSize != null) return;
+  const el = mainEl.value;
+  if (el == null) return;
+  const size = Math.max(2, boardSize.value);
+  const coordExtra = props.showCoordinates ? 1.35 : 0.4;
+  const marginPx = 24;
+  const availW = Math.max(0, el.clientWidth - marginPx);
+  const availH = Math.max(0, el.clientHeight - marginPx);
+  const avail = Math.min(availW, availH);
+  if (avail <= 0) return;
+  const vs = Math.floor(avail / (size + coordExtra));
+  autoVertexSize.value = Math.max(12, Math.min(40, vs));
+}
+
+const effectiveVertexSize = computed(
+  () => props.vertexSize ?? autoVertexSize.value,
+);
 
 onMounted(() => {
   load(props.sgf);
+  if (typeof ResizeObserver !== "undefined" && mainEl.value) {
+    resizeObserver = new ResizeObserver(() => updateAutoVertexSize());
+    resizeObserver.observe(mainEl.value);
+  }
+  updateAutoVertexSize();
+});
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+  resizeObserver = null;
 });
 
 watch(
@@ -94,6 +141,7 @@ watch(
   },
 );
 
+watch(boardSize, () => updateAutoVertexSize());
 watch(moveNumber, (n) => emit("ply-change", n));
 
 const overlayData = computed<OverlayData>(() => ({
@@ -138,12 +186,13 @@ defineExpose({
   goForward,
   goBack,
   loadSgf: load,
+  effectiveVertexSize,
 });
 </script>
 
 <template>
   <div class="yagoo-reviewer">
-    <main class="yagoo-reviewer__main">
+    <main ref="mainEl" class="yagoo-reviewer__main">
       <div class="yagoo-reviewer__board-wrap">
         <Goban
           :sign-map="displaySignMap"
@@ -152,14 +201,14 @@ defineExpose({
           :ghost-stone-map="ghostStoneMap"
           :marker-map="markerMap"
           :lines="lines"
-          :vertex-size="vertexSize"
+          :vertex-size="effectiveVertexSize"
           :show-coordinates="showCoordinates"
           :fuzzy-stone-placement="fuzzyStonePlacement"
           :animate-stone-placement="animateStonePlacement"
           :fuzzy-seed="fuzzySeed"
         >
           <OverlayLayer
-            :vertex-size="vertexSize"
+            :vertex-size="effectiveVertexSize"
             :width="boardSize"
             :height="boardSize"
             :data="overlayData"
@@ -172,6 +221,7 @@ defineExpose({
       <WinrateGraph
         :data="winrateData"
         :current-index="moveNumber"
+        :height="140"
         :show-score-lead="true"
         @select="onSelectPly"
       />

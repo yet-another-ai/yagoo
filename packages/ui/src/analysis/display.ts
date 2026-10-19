@@ -8,12 +8,7 @@ import type {
   Sign,
   Vertex,
 } from "../types";
-import {
-  emptyBoardMap,
-  ownershipToHeatMap,
-  ownershipToPaintMap,
-  parseGtpVertex,
-} from "./coords";
+import { emptyBoardMap, ownershipToHeatMap, parseGtpVertex } from "./coords";
 import type {
   AnalysisState,
   CandidateSnapshot,
@@ -183,12 +178,11 @@ export function buildBoardOverlays(
   const showCandidates = options.showCandidates !== false;
   const selected = options.selectedCandidate ?? 0;
 
+  // Ownership: soft heat glow only (no paint fill, no numeric labels).
   const heatMap = showOwnership
     ? ownershipToHeatMap(root?.ownership, size)
     : emptyBoardMap<HeatVertex | null>(size, null);
-  const paintMap = showOwnership
-    ? ownershipToPaintMap(root?.ownership, size)
-    : emptyBoardMap(size, 0);
+  const paintMap = emptyBoardMap(size, 0);
 
   const ghostStoneMap = emptyBoardMap<GhostStone | null>(size, null);
   const markerMap = emptyBoardMap<Marker | null>(size, null);
@@ -208,6 +202,9 @@ export function buildBoardOverlays(
   return { heatMap, paintMap, ghostStoneMap, markerMap, lines };
 }
 
+/** Sabaki-style: only the top few candidates get winrate/visits labels. */
+const MAX_CANDIDATE_LABELS = 5;
+
 function applyCandidates(
   candidates: CandidateSnapshot[],
   size: number,
@@ -217,8 +214,9 @@ function applyCandidates(
   lines: LineMarker[],
 ): void {
   const toPlaySign: Sign = 1; // overlays are decorative; ghost sign follows order coloring
+  const labeled = candidates.slice(0, MAX_CANDIDATE_LABELS);
 
-  candidates.forEach((c, idx) => {
+  labeled.forEach((c, idx) => {
     const v = parseGtpVertex(c.move, size);
     if (v == null) return;
     const [x, y] = v;
@@ -244,7 +242,7 @@ function applyCandidates(
     };
   });
 
-  const focus = candidates[selected] ?? candidates[0];
+  const focus = labeled[selected] ?? labeled[0];
   if (focus?.pv && focus.pv.length >= 2) {
     for (let i = 0; i < focus.pv.length - 1; i++) {
       const a = parseGtpVertex(focus.pv[i]!, size);

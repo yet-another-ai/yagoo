@@ -32,7 +32,7 @@ describe("ownership maps", () => {
     expect(paint[0]![1]).toBe(-1);
   });
 
-  it("scales heat/paint maps to 19×19 ownership length", () => {
+  it("scales heat maps to 19×19 without ownership numeric labels", () => {
     const own = Array.from({ length: 19 * 19 }, (_, i) =>
       i === 0 ? 1 : i === 18 ? -1 : 0,
     );
@@ -40,10 +40,18 @@ describe("ownership maps", () => {
     expect(heat).toHaveLength(19);
     expect(heat[0]).toHaveLength(19);
     expect(heat[0]![0]?.strength).toBe(9);
+    expect(heat[0]![0]?.text).toBeNull();
     expect(heat[0]![18]?.strength).toBe(9);
+    expect(heat[0]![18]?.text).toBeNull();
     const paint = ownershipToPaintMap(own, 19);
     expect(paint[0]![0]).toBe(1);
     expect(paint[0]![18]).toBe(-1);
+  });
+
+  it("skips near-zero ownership cells", () => {
+    const own = Array.from({ length: 9 }, (_, i) => (i === 0 ? 0.05 : 0));
+    const heat = ownershipToHeatMap(own, 3);
+    expect(heat[0]![0]).toBeNull();
   });
 });
 

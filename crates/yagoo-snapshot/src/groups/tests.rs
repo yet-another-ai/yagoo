@@ -170,7 +170,7 @@ fn group_id_is_member_stone_not_empty() {
     snap.candidates = vec![cand("D5", c1), cand("E5", c2)];
 
     let groups = compute_groups(&snap);
-    assert!(!groups.is_empty());
+    assert_ne!(groups.len(), 0, "expected at least one teaching group");
     for g in &groups {
         let stones: Vec<&String> = g
             .members

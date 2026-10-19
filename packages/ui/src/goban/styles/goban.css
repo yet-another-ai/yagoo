@@ -269,16 +269,20 @@
   /* PV preview: larger translucent B/W stones (no candidate type class). */
   .shudan-vertex.shudan-sign_0.shudan-ghost_1:not(.shudan-ghost_good):not(.shudan-ghost_interesting):not(.shudan-ghost_doubtful):not(.shudan-ghost_bad) .shudan-ghost,
   .shudan-vertex.shudan-sign_0.shudan-ghost_-1:not(.shudan-ghost_good):not(.shudan-ghost_interesting):not(.shudan-ghost_doubtful):not(.shudan-ghost_bad) .shudan-ghost {
-    width: .9em;
-    height: .9em;
-    opacity: .62;
+    width: .92em;
+    height: .92em;
+    opacity: .78;
   }
   .shudan-vertex.shudan-sign_0.shudan-ghost_1:not(.shudan-ghost_good):not(.shudan-ghost_interesting):not(.shudan-ghost_doubtful):not(.shudan-ghost_bad) .shudan-ghost::before,
   .shudan-vertex.shudan-sign_0.shudan-ghost_-1:not(.shudan-ghost_good):not(.shudan-ghost_interesting):not(.shudan-ghost_doubtful):not(.shudan-ghost_bad) .shudan-ghost::before {
-    width: .9em;
-    height: .9em;
-    border: none;
-    box-shadow: none;
+    width: .92em;
+    height: .92em;
+    border: .04em solid rgba(0, 0, 0, .35);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .25);
+  }
+  .shudan-vertex.shudan-sign_0.shudan-ghost_-1:not(.shudan-ghost_good):not(.shudan-ghost_interesting):not(.shudan-ghost_doubtful):not(.shudan-ghost_bad) .shudan-ghost::before {
+    border-color: rgba(0, 0, 0, .45);
+    background: #f7f7f7;
   }
   .shudan-vertex.shudan-ghost_1 .shudan-ghost::before {
     background: rgba(0, 0, 0, .82);

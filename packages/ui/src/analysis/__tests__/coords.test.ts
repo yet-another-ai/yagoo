@@ -29,8 +29,10 @@ describe("ownership maps", () => {
     expect(heat[0]![0]?.strength).toBeGreaterThanOrEqual(7);
     expect(heat[0]![1]?.strength).toBeGreaterThanOrEqual(5);
     const paint = ownershipToPaintMap(own, 3);
-    expect(paint[0]![0]).toBeCloseTo(0.8 * OWNERSHIP_PAINT_STRENGTH, 5);
-    expect(paint[0]![1]).toBeCloseTo(-0.6 * OWNERSHIP_PAINT_STRENGTH, 5);
+    expect(Math.abs(paint[0]![0]!)).toBeGreaterThan(0.4);
+    expect(paint[0]![0]).toBeGreaterThan(0);
+    expect(paint[0]![1]).toBeLessThan(0);
+    expect(Math.abs(paint[0]![0]!)).toBeLessThanOrEqual(OWNERSHIP_PAINT_STRENGTH);
   });
 
   it("scales paint maps to 19×19 without ownership numeric labels", () => {

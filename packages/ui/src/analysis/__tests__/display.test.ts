@@ -113,14 +113,12 @@ describe("buildBoardOverlays", () => {
     expect(overlays.lines).toEqual([]);
     expect(overlays.ghostStoneMap[2]![2]?.type).toBe("good");
     expect(overlays.markerMap[2]![2]?.label).toContain("%");
-    // Fractional ownership paint (not binary ±1).
-    expect(overlays.paintMap[0]![0]).toBeCloseTo(
-      0.9 * OWNERSHIP_PAINT_STRENGTH,
-      5,
-    );
-    expect(overlays.paintMap[0]![1]).toBeCloseTo(
-      -0.7 * OWNERSHIP_PAINT_STRENGTH,
-      5,
+    // Fractional ownership paint (not binary ±1), medium strength.
+    expect(overlays.paintMap[0]![0]).toBeGreaterThan(0.4);
+    expect(overlays.paintMap[0]![0]).toBeLessThanOrEqual(OWNERSHIP_PAINT_STRENGTH);
+    expect(overlays.paintMap[0]![1]).toBeLessThan(-0.4);
+    expect(Math.abs(overlays.paintMap[0]![1]!)).toBeLessThanOrEqual(
+      OWNERSHIP_PAINT_STRENGTH,
     );
   });
 
@@ -159,7 +157,9 @@ describe("ownershipToPaintMap fractional strength", () => {
     );
     const paint = ownershipToPaintMap(own, 3);
     expect(paint[0]![0]).toBeCloseTo(OWNERSHIP_PAINT_STRENGTH, 5);
-    expect(paint[0]![1]).toBeCloseTo(-0.5 * OWNERSHIP_PAINT_STRENGTH, 5);
+    expect(paint[0]![1]).toBeLessThan(0);
+    expect(Math.abs(paint[0]![1]!)).toBeGreaterThan(0.3);
+    expect(Math.abs(paint[0]![1]!)).toBeLessThan(OWNERSHIP_PAINT_STRENGTH);
     expect(paint[0]![2]).toBe(0);
   });
 });

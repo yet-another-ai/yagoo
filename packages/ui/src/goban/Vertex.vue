@@ -101,8 +101,10 @@ const classList = computed(() => {
 
 const paintStyle = computed(() => {
   const paint = props.paint ?? 0;
+  // Opacity must be non-negative — signed paint encodes color via
+  // shudan-paint_±1; |paint| is the Sabaki territory strength.
   const sources = paint
-    ? [paint]
+    ? [Math.abs(paint)]
     : [props.paintLeft, props.paintRight, props.paintTop, props.paintBottom]
         .filter((x) => x !== 0 && x != null && !Number.isNaN(x))
         .map((x) => Math.abs(x!) * 0.5);

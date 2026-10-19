@@ -112,6 +112,30 @@ describe("Goban", () => {
     expect(wrapper.find(".shudan-marker_circle").exists()).toBe(true);
   });
 
+  it("uses absolute opacity for signed ownership paint (black and white)", () => {
+    const signMap = emptyBoard(3);
+    const paintMap: BoardMap<number> = emptyBoard(3).map((row) =>
+      row.map(() => 0),
+    );
+    paintMap[0]![0] = 0.55;
+    paintMap[0]![1] = -0.4;
+
+    const wrapper = mount(Goban, {
+      props: { signMap, paintMap, vertexSize: 20 },
+    });
+
+    const black = wrapper.find(".shudan-paint_1 .shudan-paint");
+    const white = wrapper.find(".shudan-paint_-1 .shudan-paint");
+    expect(black.exists()).toBe(true);
+    expect(white.exists()).toBe(true);
+    expect(black.attributes("style")).toMatch(/--shudan-paint-opacity:\s*0\.55/);
+    // Negative paint must not produce negative CSS opacity (invisible white).
+    expect(white.attributes("style")).toMatch(/--shudan-paint-opacity:\s*0\.4/);
+    expect(white.attributes("style")).not.toMatch(
+      /--shudan-paint-opacity:\s*-/,
+    );
+  });
+
   it("animates placement by assigning a non-zero shift", async () => {
     const before = emptyBoard(3);
     const wrapper = mount(Goban, {

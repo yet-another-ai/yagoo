@@ -79,18 +79,21 @@ export function ownershipToHeatMap(
 /**
  * Medium Sabaki-like paint strength: max |paint| ≈ this value so Vertex opacity
  * stays translucent (stones/grid remain visible; no opaque blocks).
+ *
+ * Combined with a modest floor boost below so mid-range |own| stays readable
+ * (raw `|own| * 0.55` alone looked too faint on wood).
  */
-export const OWNERSHIP_PAINT_STRENGTH = 0.55;
+export const OWNERSHIP_PAINT_STRENGTH = 0.72;
 
 /**
- * Ownership → Sabaki paint map. Values are **signed fractions**
- * `sign(own) * |own| * strength` so `Vertex` sets `--shudan-paint-opacity` to
- * `|paint|` (black / white territory shading scaled by confidence).
+ * Ownership → Sabaki paint map. Values are **signed fractions** so `Vertex`
+ * sets `--shudan-paint-opacity` to `|paint|` (black / white territory shading
+ * scaled by confidence). Near-zero / unsettled points are left unpainted.
  */
 export function ownershipToPaintMap(
   ownership: number[] | null | undefined,
   size: number,
-  threshold = 0.08,
+  threshold = 0.15,
   strength = OWNERSHIP_PAINT_STRENGTH,
 ): BoardMap<number> {
   const map = emptyBoardMap(size, 0);
@@ -104,7 +107,10 @@ export function ownershipToPaintMap(
     const y = Math.floor(i / size);
     const x = i % size;
     if (y < 0 || y >= size || x < 0 || x >= size) continue;
-    map[y]![x] = Math.sign(v) * abs * strength;
+    // Boost mid-range slightly: map |own|∈[threshold,1] → [~0.35, strength].
+    const t = (abs - threshold) / (1 - threshold);
+    const opacity = 0.35 + t * (strength - 0.35);
+    map[y]![x] = Math.sign(v) * opacity;
   }
   return map;
 }

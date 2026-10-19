@@ -2,6 +2,8 @@
 
 VitePress page at `/app/` hosts the real `@yagoo/ui` reviewer (Sabaki chrome + Shudan goban) driven by the same NDJSON event stream that `yagoo analyze` emits.
 
+Layout, panel map, and the typed slots for issues #19 and #23–#29 are described in [Reviewer UI](../design/reviewer-ui.md). Unimplemented modules render an empty state named with their issue. They are not filled with client-side guesses.
+
 ## Data sources
 
 | Source | Status |

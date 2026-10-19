@@ -1,4 +1,21 @@
 export {
+  REVIEW_MODULE_ISSUES,
+} from "./modules";
+export type {
+  GainLossLedger,
+  GainLossLine,
+  LedgerBaseline,
+  LedgerLineKind,
+  LlmCommentary,
+  MoveComparison,
+  OpeningMatch,
+  ReviewReportDocument,
+  ReviewReportMove,
+  SacrificeAnnotation,
+  TempoChange,
+} from "./modules";
+
+export {
   PIPELINE_SCHEMA_VERSION,
   createInitialAnalysisState,
 } from "./types";
@@ -45,6 +62,7 @@ export {
 
 export {
   emptyBoardMap,
+  formatGtpVertex,
   OWNERSHIP_PAINT_STRENGTH,
   ownershipToHeatMap,
   ownershipToPaintMap,

@@ -14,6 +14,10 @@ import {
   resolveSgfRules,
   useAnalysisStream,
 } from "../analysis";
+import EngineSourcePanel from "../reviewer/EngineSourcePanel.vue";
+import { keyMovesFromState } from "../reviewer/keyMoves";
+import type { InspectorPerspective } from "../reviewer/MoveInspector.vue";
+import OpeningBadge from "../reviewer/OpeningBadge.vue";
 import type {
   BoardMap,
   GhostStone,
@@ -35,6 +39,9 @@ const props = defineProps<{
    * from its container via ResizeObserver (fills available area).
    */
   vertexSize?: number;
+  /** Force a theme. `auto` follows VitePress (`html.dark`) and these tokens. */
+  theme?: "auto" | "light" | "dark";
+  initialPerspective?: InspectorPerspective;
 }>();
 
 function parseBoardSize(sgf: string): number {
@@ -46,6 +53,7 @@ const sgfText = ref(props.initialSgf ?? "");
 const rulesLabel = computed(() => resolveSgfRules(sgfText.value));
 const boardSizeFromSgf = computed(() => parseBoardSize(sgfText.value));
 const dragOver = ref(false);
+const sourceOpen = ref(false);
 const statusMessage = ref("");
 const selectedCandidate = ref(0);
 const currentPly = ref(0);
@@ -178,6 +186,18 @@ watch(
 
 const analysisComment = computed(() =>
   commentFor(currentPly.value, /* sgf comment merged inside */ ""),
+);
+
+const keyMoves = computed(() => keyMovesFromState(state.value));
+const currentPlyAnalysis = computed(
+  () => state.value.plies[currentPly.value] ?? null,
+);
+const themeClass = computed(() =>
+  props.theme === "dark"
+    ? "yagoo-theme-dark"
+    : props.theme === "light"
+      ? "yagoo-theme-light"
+      : "",
 );
 
 const liveAvailable = isLiveNativeAvailable();
@@ -360,14 +380,20 @@ const phaseBadge = computed(() => {
 <template>
   <div
     class="yagoo-analysis-app"
-    :class="{ 'yagoo-analysis-app--drag': dragOver }"
+    :class="[themeClass, { 'yagoo-analysis-app--drag': dragOver }]"
     @dragenter.prevent="dragOver = true"
     @dragover.prevent="dragOver = true"
     @dragleave.prevent="dragOver = false"
     @drop="onDrop"
   >
     <header class="yagoo-analysis-app__toolbar">
-      <div class="yagoo-analysis-app__brand">Yagoo Reviewer</div>
+      <div class="yagoo-analysis-app__brand">Yagoo</div>
+      <OpeningBadge :match="state.opening" />
+      <div class="yagoo-analysis-app__meta">
+        <span>RU {{ rulesLabel }}</span>
+        <span v-if="sourceLabel">· {{ sourceLabel }}</span>
+        <span>· {{ phaseBadge }}</span>
+      </div>
       <div class="yagoo-analysis-app__controls">
         <label class="yagoo-analysis-app__btn">
           Open SGF
@@ -378,44 +404,30 @@ const phaseBadge = computed(() => {
             @change="onFileInput('sgf', $event)"
           />
         </label>
-        <label class="yagoo-analysis-app__btn">
-          Import NDJSON
-          <input
-            type="file"
-            accept=".ndjson,.jsonl,.json,text/plain"
-            hidden
-            @change="onFileInput('ndjson', $event)"
-          />
-        </label>
         <button
           type="button"
           class="yagoo-analysis-app__btn"
-          :disabled="!liveAvailable"
-          :title="
-            liveAvailable
-              ? 'Connect to yagoo analyze --serve'
-              : 'Follow-up: yagoo analyze --serve (WebSocket/SSE)'
-          "
-          @click="tryLiveNative"
+          data-testid="engine-source-button"
+          :aria-expanded="sourceOpen"
+          @click="sourceOpen = !sourceOpen"
         >
-          Live native
+          Engine
         </button>
-        <button
-          type="button"
-          class="yagoo-analysis-app__btn"
-          :disabled="!browserAvailable"
-          title="Follow-up: browser engine after PR #7 merges"
-          @click="tryBrowserEngine"
-        >
-          Browser engine
-        </button>
-      </div>
-      <div class="yagoo-analysis-app__meta">
-        <span>RU {{ rulesLabel }}</span>
-        <span v-if="sourceLabel">· {{ sourceLabel }}</span>
-        <span>· {{ phaseBadge }}</span>
       </div>
     </header>
+
+    <EngineSourcePanel
+      v-if="sourceOpen"
+      class="yagoo-analysis-app__source"
+      :native-available="liveAvailable"
+      :browser-available="browserAvailable"
+      :source-label="sourceLabel"
+      @close="sourceOpen = false"
+      @sgf-file="onSgfFile"
+      @ndjson-file="onNdjsonFile"
+      @connect-native="tryLiveNative"
+      @connect-browser="tryBrowserEngine"
+    />
 
     <p v-if="statusMessage" class="yagoo-analysis-app__status">
       {{ statusMessage }}
@@ -445,6 +457,14 @@ const phaseBadge = computed(() => {
         :selected-vertices="selectedVertices"
         :comment-override="analysisComment"
         comment-title="Analysis"
+        :root-analysis="currentPlyAnalysis?.root ?? null"
+        :key-moves="keyMoves"
+        :ledger="currentPlyAnalysis?.ledger ?? null"
+        :comparison="currentPlyAnalysis?.comparison ?? null"
+        :sacrifices="currentPlyAnalysis?.sacrifices ?? null"
+        :commentary="currentPlyAnalysis?.commentary ?? null"
+        :report-document="state.report"
+        :initial-perspective="initialPerspective"
         :vertex-size="vertexSize"
         :show-coordinates="true"
         :fuzzy-stone-placement="true"
@@ -468,14 +488,14 @@ const phaseBadge = computed(() => {
 
 <style scoped>
 .yagoo-analysis-app {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: #0d0d0d;
-  color: #eee;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
-    sans-serif;
+  background: var(--yagoo-bg, #f6f6f7);
+  color: var(--yagoo-text, #1b1b1f);
+  font-family: var(--yagoo-font, system-ui, sans-serif);
 }
 
 .yagoo-analysis-app--drag {
@@ -488,16 +508,17 @@ const phaseBadge = computed(() => {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem 1rem;
-  padding: 0.55rem 0.85rem;
-  background: #181818;
-  border-bottom: 1px solid #333;
+  padding: 0.45rem 0.75rem;
+  background: var(--yagoo-panel, #fff);
+  border-bottom: 1px solid var(--yagoo-border, #e2e2e6);
+  color: var(--yagoo-text, #1b1b1f);
   flex: 0 0 auto;
 }
 
 .yagoo-analysis-app__brand {
   font-weight: 650;
   letter-spacing: 0.02em;
-  color: #f2f2f2;
+  color: var(--yagoo-text, #1b1b1f);
 }
 
 .yagoo-analysis-app__controls {
@@ -510,10 +531,10 @@ const phaseBadge = computed(() => {
   display: inline-flex;
   align-items: center;
   padding: 0.28rem 0.65rem;
-  border: 1px solid #444;
-  border-radius: 3px;
-  background: #222;
-  color: #eee;
+  border: 1px solid var(--yagoo-border, #c8c8d0);
+  border-radius: 4px;
+  background: var(--yagoo-panel-2, #f3f3f6);
+  color: var(--yagoo-text, #1b1b1f);
   font-size: 0.82rem;
   cursor: pointer;
 }
@@ -530,7 +551,7 @@ const phaseBadge = computed(() => {
 .yagoo-analysis-app__meta {
   margin-left: auto;
   font-size: 0.78rem;
-  color: #9a9a9a;
+  color: var(--yagoo-muted, #5c5c66);
 }
 
 .yagoo-analysis-app__status,
@@ -538,9 +559,16 @@ const phaseBadge = computed(() => {
   margin: 0;
   padding: 0.35rem 0.85rem;
   font-size: 0.8rem;
-  color: #bbb;
-  background: #141414;
-  border-bottom: 1px solid #2a2a2a;
+  color: var(--yagoo-muted, #5c5c66);
+  background: var(--yagoo-panel, #fff);
+  border-bottom: 1px solid var(--yagoo-border, #e2e2e6);
+}
+
+.yagoo-analysis-app__source {
+  position: absolute;
+  top: 3.1rem;
+  right: 0.75rem;
+  z-index: 30;
 }
 
 .yagoo-analysis-app__drop {

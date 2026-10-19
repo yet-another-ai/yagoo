@@ -65,4 +65,20 @@ describe("useGame", () => {
     expect(g.comment.value).toBe("Main line");
     expect(g.signMap.value[3]![5]).toBe(-1); // W[fd]
   });
+
+  it("labels child variations in GTP and knows the main line", () => {
+    const g = useGame();
+    g.loadSgf(SAMPLE);
+    expect(g.onMainLine.value).toBe(true);
+    expect(g.children.value[0]?.label).toBe("B D6");
+    g.goForward();
+    g.goForward();
+    g.goForward();
+    expect(g.children.value.map((child) => child.label)).toEqual([
+      "W F6",
+      "W C4",
+    ]);
+    g.goToVariation(1);
+    expect(g.onMainLine.value).toBe(false);
+  });
 });

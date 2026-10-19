@@ -8,12 +8,20 @@ export { default as CommentBox } from "./layout/CommentBox.vue";
 export { default as GroupsPanel } from "./layout/GroupsPanel.vue";
 export { default as WinrateGraph } from "./layout/WinrateGraph.vue";
 export type { WinratePoint } from "./layout/WinrateGraph.vue";
+export type { InspectorPerspective } from "./reviewer/MoveInspector.vue";
+export type { KeyMoveRow } from "./reviewer/keyMoves";
+export { keyMovesFromState } from "./reviewer/keyMoves";
 
 export { useGame } from "./composables/useGame";
-export type { GamePlayerInfo, UseGameResult } from "./composables/useGame";
+export type {
+  GameChildInfo,
+  GamePlayerInfo,
+  UseGameResult,
+} from "./composables/useGame";
 
 export {
   PIPELINE_SCHEMA_VERSION,
+  REVIEW_MODULE_ISSUES,
   OWNERSHIP_PAINT_STRENGTH,
   buildBoardOverlays,
   buildGroupOutlines,
@@ -29,6 +37,7 @@ export {
   createNdjsonTextSource,
   dimVerticesOutsideGroup,
   formatAnalysisComment,
+  formatGtpVertex,
   groupMemberVertices,
   groupOutlineColor,
   groupPrimaryColor,
@@ -51,6 +60,14 @@ export {
 export type {
   AnalysisEventSource,
   AnalysisPhase,
+  GainLossLedger,
+  GainLossLine,
+  LlmCommentary,
+  MoveComparison,
+  OpeningMatch,
+  ReviewReportDocument,
+  ReviewReportMove,
+  SacrificeAnnotation,
   AnalysisState,
   AnalysisStage,
   BrowserEngineAdapter,

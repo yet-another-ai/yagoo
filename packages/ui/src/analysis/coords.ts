@@ -27,6 +27,17 @@ export function parseGtpVertex(
   return [x, y];
 }
 
+const GTP_COLUMNS = "ABCDEFGHJKLMNOPQRSTUVWXYZ";
+
+/** Inverse of `parseGtpVertex`. Off-board vertices format as `pass`. */
+export function formatGtpVertex(vertex: Vertex, size: number): string {
+  const [x, y] = vertex;
+  if (x < 0 || y < 0 || x >= size || y >= size) return "pass";
+  const col = GTP_COLUMNS[x];
+  if (col == null) return "pass";
+  return `${col}${size - y}`;
+}
+
 export function emptyBoardMap<T>(size: number, fill: T): BoardMap<T> {
   return Array.from({ length: size }, () =>
     Array.from({ length: size }, () => fill),

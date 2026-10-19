@@ -32,6 +32,10 @@ function stateWithCandidates(
     phase: "deep",
     candidates,
     groups: [],
+    ledger: null,
+    comparison: null,
+    sacrifices: null,
+    commentary: null,
     root: {
       visits: 200,
       winrate: 0.55,

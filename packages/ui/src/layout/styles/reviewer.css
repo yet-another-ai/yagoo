@@ -1,24 +1,69 @@
-/* Sabaki-inspired reviewer chrome (colors from Sabaki style/index.css). */
+/* Sabaki-inspired reviewer chrome, themed with VitePress tokens. */
 
-.yagoo-reviewer {
-  --yagoo-bg: #111;
-  --yagoo-panel: #181818;
-  --yagoo-panel-2: #222;
-  --yagoo-text: #eee;
-  --yagoo-muted: #d0d0d0;
-  --yagoo-accent: #0082f0;
-  --yagoo-danger: #ff3b30;
-  --yagoo-success: #4cd964;
+.yagoo-reviewer,
+.yagoo-analysis-app {
+  --yagoo-bg: var(--vp-c-bg, #f6f6f7);
+  --yagoo-panel: var(--vp-c-bg-soft, #ffffff);
+  --yagoo-panel-2: var(--vp-c-bg-elv, #f1f1f4);
+  --yagoo-text: var(--vp-c-text-1, #1b1b1f);
+  --yagoo-muted: var(--vp-c-text-2, #5c5f6b);
+  --yagoo-border: var(--vp-c-divider, #e2e2e8);
+  --yagoo-accent: var(--vp-c-brand-1, #0082f0);
+  --yagoo-accent-soft: var(--vp-c-brand-soft, rgba(0, 130, 240, 0.12));
+  --yagoo-danger: var(--vp-c-danger-1, #d32f2f);
+  --yagoo-success: var(--vp-c-green-1, #1b7a32);
+  --yagoo-success-soft: rgba(27, 122, 50, 0.12);
+  --yagoo-hover: rgba(0, 0, 0, 0.05);
+  --yagoo-key: #c47d00;
   --yagoo-tatami: #c2cb9c;
-  --yagoo-bar-height: 40px;
-  --yagoo-sidebar-width: 280px;
+  --yagoo-bar-height: 44px;
+  --yagoo-sidebar-width: 340px;
   --yagoo-font: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
     sans-serif;
+  color-scheme: light;
+}
 
+.yagoo-theme-dark,
+.yagoo-theme-dark .yagoo-reviewer,
+html.dark .yagoo-reviewer,
+html.dark .yagoo-analysis-app,
+html.dark .yagoo-analysis-app .yagoo-reviewer {
+  --yagoo-bg: var(--vp-c-bg, #16171d);
+  --yagoo-panel: var(--vp-c-bg-soft, #1e2028);
+  --yagoo-panel-2: var(--vp-c-bg-elv, #262833);
+  --yagoo-text: var(--vp-c-text-1, #eceae4);
+  --yagoo-muted: var(--vp-c-text-2, #b4b6c2);
+  --yagoo-border: var(--vp-c-divider, rgba(255, 255, 255, 0.12));
+  --yagoo-accent: var(--vp-c-brand-1, #3c9eff);
+  --yagoo-accent-soft: rgba(60, 158, 255, 0.16);
+  --yagoo-danger: var(--vp-c-danger-1, #f07178);
+  --yagoo-success: var(--vp-c-green-1, #7fd99a);
+  --yagoo-success-soft: rgba(127, 217, 154, 0.14);
+  --yagoo-hover: rgba(255, 255, 255, 0.06);
+  --yagoo-key: #f0a000;
+  color-scheme: dark;
+}
+
+.yagoo-theme-dark {
+  --vp-c-bg: #16171d;
+  --vp-c-bg-soft: #1e2028;
+  --vp-c-bg-elv: #262833;
+  --vp-c-text-1: #eceae4;
+  --vp-c-text-2: #b4b6c2;
+  --vp-c-divider: rgba(255, 255, 255, 0.12);
+  --vp-c-brand-1: #3c9eff;
+  --vp-c-danger-1: #f07178;
+  --vp-c-green-1: #7fd99a;
+}
+
+.yagoo-reviewer {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr var(--yagoo-sidebar-width);
-  grid-template-rows: 1fr var(--yagoo-bar-height);
+  grid-template-columns: minmax(0, 1fr) 6px var(--yagoo-sidebar-width);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "main split side"
+    "bar bar bar";
   width: 100%;
   height: 100%;
   min-height: 480px;
@@ -28,9 +73,14 @@
   overflow: hidden;
 }
 
+.yagoo-reviewer :focus-visible,
+.yagoo-analysis-app :focus-visible {
+  outline: 2px solid var(--yagoo-accent);
+  outline-offset: 2px;
+}
+
 .yagoo-reviewer__main {
-  grid-column: 1;
-  grid-row: 1;
+  grid-area: main;
   position: relative;
   display: flex;
   align-items: center;
@@ -51,26 +101,112 @@
 }
 
 .yagoo-reviewer__sidebar {
-  grid-column: 2;
-  grid-row: 1;
+  grid-area: side;
   display: flex;
   flex-direction: column;
   background: var(--yagoo-bg);
+  border-left: 1px solid var(--yagoo-border);
   min-width: 0;
   min-height: 0;
-  z-index: 10;
+  overflow: hidden;
+  z-index: 2;
 }
 
 .yagoo-reviewer__bar {
-  grid-column: 1 / -1;
-  grid-row: 2;
+  grid-area: bar;
+  z-index: 3;
+}
+
+.yagoo-reviewer__report {
+  grid-area: report;
+  min-height: 0;
+}
+
+.yagoo-reviewer__inspector {
+  flex: 1 1 auto;
+  min-height: 8rem;
+  overflow: hidden;
+  border-top: 1px solid var(--yagoo-border);
+}
+
+.yagoo-reviewer__lower {
+  flex: 0 1 34%;
+  min-height: 7.5rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-top: 1px solid var(--yagoo-border);
+  background: var(--yagoo-panel);
+}
+
+.yagoo-splitter {
+  grid-area: split;
+  cursor: col-resize;
+  background: var(--yagoo-border);
+}
+
+.yagoo-splitter:hover,
+.yagoo-splitter:focus-visible {
+  background: var(--yagoo-accent);
+}
+
+.yagoo-section-tabs,
+.yagoo-subtabs {
+  display: flex;
+  gap: 0.15rem;
+  padding: 0.25rem 0.35rem;
+  border-bottom: 1px solid var(--yagoo-border);
+  overflow-x: auto;
+  flex: 0 0 auto;
+}
+
+.yagoo-section-tabs button,
+.yagoo-subtabs button {
+  border: none;
+  background: transparent;
+  color: var(--yagoo-muted);
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 0.28rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.yagoo-section-tabs button[aria-selected="true"],
+.yagoo-subtabs button[aria-selected="true"] {
+  color: var(--yagoo-text);
+  font-weight: 700;
+  background: var(--yagoo-hover);
+}
+
+.yagoo-try-banner {
+  position: absolute;
+  z-index: 5;
+  top: 0.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  max-width: calc(100% - 2rem);
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: var(--yagoo-panel);
+  color: var(--yagoo-text);
+  border: 1px solid var(--yagoo-border);
+  font-size: 0.78rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.yagoo-reviewer--report {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "report"
+    "bar";
 }
 
 .yagoo-winrate {
   flex: 0 0 auto;
   min-height: 140px;
   background: var(--yagoo-panel);
-  box-shadow: 10px 0 10px #111;
   color: var(--yagoo-muted);
   overflow: hidden;
 }
@@ -97,7 +233,7 @@
 }
 
 .yagoo-winrate__deep {
-  stroke: #f0a000;
+  stroke: var(--yagoo-key, #f0a000);
   stroke-width: 2;
   opacity: 0.55;
 }
@@ -108,7 +244,7 @@
 }
 
 .yagoo-winrate__grid {
-  stroke: #333;
+  stroke: var(--yagoo-border, #333);
   stroke-dasharray: 2 3;
   stroke-width: 1;
 }
@@ -130,8 +266,13 @@
   display: flex;
   flex-direction: column;
   background: var(--yagoo-panel);
-  box-shadow: 10px 0 10px #111;
-  border-top: 1px solid #333;
+  border-top: 1px solid var(--yagoo-border);
+}
+
+.yagoo-comment--dock {
+  flex: 0 0 auto;
+  min-height: 5.5rem;
+  max-height: 8.5rem;
 }
 
 .yagoo-comment__header {
@@ -139,9 +280,9 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.4rem 0.75rem;
-  color: #bbb;
+  color: var(--yagoo-muted);
   font-size: 0.85rem;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--yagoo-border);
 }
 
 .yagoo-comment__body {
@@ -159,11 +300,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: var(--yagoo-bar-height);
-  background: #292a2d;
+  min-height: var(--yagoo-bar-height);
+  background: var(--yagoo-panel-2);
   color: var(--yagoo-text);
-  line-height: var(--yagoo-bar-height);
-  box-shadow: 0 0 10px #111;
+  line-height: 1.2;
+  border-top: 1px solid var(--yagoo-border);
+  flex-wrap: wrap;
   gap: 0.5rem;
   padding: 0 0.75rem;
   font-size: 0.9rem;
@@ -262,22 +404,23 @@
   cursor: default;
 }
 
-.yagoo-bottom-bar__nav button:not(:disabled):hover {
+.yagoo-bottom-bar__nav button:not(:disabled):hover,
+.yagoo-bottom-bar__nav button[aria-pressed="true"] {
   background: var(--yagoo-accent);
+  color: #fff;
 }
 
-@media (max-width: 720px) {
-  .yagoo-reviewer {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(280px, 1fr) minmax(200px, 40%) var(--yagoo-bar-height);
+@media (max-width: 960px) {
+  .yagoo-reviewer:not(.yagoo-reviewer--report) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(220px, 46vh) minmax(220px, 1fr) auto;
+    grid-template-areas:
+      "main"
+      "side"
+      "bar";
   }
 
-  .yagoo-reviewer__sidebar {
-    grid-column: 1;
-    grid-row: 2;
-  }
-
-  .yagoo-reviewer__bar {
-    grid-row: 3;
+  .yagoo-splitter {
+    display: none;
   }
 }

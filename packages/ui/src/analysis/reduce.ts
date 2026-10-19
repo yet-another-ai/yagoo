@@ -14,6 +14,10 @@ function ensurePly(state: AnalysisState, ply: number): PlyAnalysis {
     candidates: [],
     groups: [],
     complete: false,
+    ledger: null,
+    comparison: null,
+    sacrifices: null,
+    commentary: null,
   };
   state.plies[ply] = created;
   return created;
@@ -32,6 +36,10 @@ function cloneState(state: AnalysisState): AnalysisState {
           ...v,
           candidates: [...v.candidates],
           groups: [...(v.groups ?? [])],
+          ledger: v.ledger ?? null,
+          comparison: v.comparison ?? null,
+          sacrifices: v.sacrifices ? [...v.sacrifices] : null,
+          commentary: v.commentary ?? null,
           root: v.root ? { ...v.root } : v.root,
           passProbe: v.passProbe ? { ...v.passProbe } : v.passProbe,
           snapshot: v.snapshot,

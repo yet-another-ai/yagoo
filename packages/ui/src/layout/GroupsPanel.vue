@@ -7,11 +7,19 @@ import {
 } from "../analysis/groups";
 import type { GroupSnapshot } from "../analysis/types";
 
-const props = defineProps<{
-  groups: GroupSnapshot[];
-  previewId?: string | null;
-  selectedId?: string | null;
-}>();
+const props = withDefaults(
+  defineProps<{
+    groups: GroupSnapshot[];
+    previewId?: string | null;
+    selectedId?: string | null;
+    embedded?: boolean;
+  }>(),
+  {
+    previewId: null,
+    selectedId: null,
+    embedded: false,
+  },
+);
 
 const emit = defineEmits<{
   (e: "preview", groupId: string): void;
@@ -32,7 +40,11 @@ function statusClass(g: GroupSnapshot): string {
 </script>
 
 <template>
-  <div class="yagoo-groups" data-testid="groups-panel">
+  <div
+    class="yagoo-groups"
+    :class="{ 'yagoo-groups--embedded': embedded }"
+    data-testid="groups-panel"
+  >
     <div class="yagoo-groups__title">Groups / 块</div>
     <ul v-if="groups.length" class="yagoo-groups__list">
       <li
@@ -44,6 +56,10 @@ function statusClass(g: GroupSnapshot): string {
           'yagoo-groups__row--selected': selectedId === g.groupId,
         }"
         :data-group-id="g.groupId"
+        tabindex="0"
+        @keydown.enter.prevent="emit('select', g.groupId)"
+        @keydown.space.prevent="emit('select', g.groupId)"
+        @focus="emit('preview', g.groupId)"
         @mouseenter="emit('preview', g.groupId)"
         @mouseleave="emit('clear-preview')"
         @click="emit('select', g.groupId)"
@@ -73,9 +89,17 @@ function statusClass(g: GroupSnapshot): string {
   max-height: 32%;
   overflow: auto;
   background: var(--yagoo-panel, #181818);
-  border-top: 1px solid #2a2a2a;
-  border-bottom: 1px solid #2a2a2a;
+  border-top: 1px solid var(--yagoo-border, #2a2a2a);
+  border-bottom: 1px solid var(--yagoo-border, #2a2a2a);
   font-size: 0.78rem;
+  color: var(--yagoo-text, #eee);
+}
+
+.yagoo-groups--embedded {
+  max-height: none;
+  height: 100%;
+  border: none;
+  background: transparent;
 }
 
 .yagoo-groups__title {
@@ -87,7 +111,7 @@ function statusClass(g: GroupSnapshot): string {
   font-weight: 650;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #9a9a9a;
+  color: var(--yagoo-muted, #9a9a9a);
 }
 
 .yagoo-groups__list {
@@ -104,16 +128,16 @@ function statusClass(g: GroupSnapshot): string {
   align-items: center;
   padding: 0.3rem 0.65rem;
   cursor: pointer;
-  color: #ddd;
+  color: var(--yagoo-text, #ddd);
 }
 
 .yagoo-groups__row:hover,
 .yagoo-groups__row--preview {
-  background: #222;
+  background: var(--yagoo-hover, #222);
 }
 
 .yagoo-groups__row--selected {
-  outline: 1px solid #0082f0;
+  outline: 1px solid var(--yagoo-accent, #0082f0);
   outline-offset: -1px;
 }
 
@@ -143,14 +167,14 @@ function statusClass(g: GroupSnapshot): string {
 .yagoo-groups__meta {
   display: flex;
   gap: 0.4rem;
-  color: #9a9a9a;
+  color: var(--yagoo-muted, #9a9a9a);
   font-size: 0.72rem;
 }
 
 .yagoo-groups__status {
   grid-column: 3;
   font-size: 0.72rem;
-  color: #bbb;
+  color: var(--yagoo-muted, #bbb);
 }
 
 .yagoo-groups__status--dead {
@@ -173,7 +197,7 @@ function statusClass(g: GroupSnapshot): string {
   grid-column: 4;
   grid-row: 1 / 3;
   font-variant-numeric: tabular-nums;
-  color: #ccc;
+  color: var(--yagoo-text, #ccc);
   font-size: 0.72rem;
   text-align: right;
 }
@@ -181,7 +205,7 @@ function statusClass(g: GroupSnapshot): string {
 .yagoo-groups__empty {
   margin: 0;
   padding: 0.5rem 0.65rem 0.75rem;
-  color: #777;
+  color: var(--yagoo-muted, #777);
   font-size: 0.75rem;
   line-height: 1.35;
 }

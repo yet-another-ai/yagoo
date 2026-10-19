@@ -107,6 +107,12 @@ Open the preview URL printed by Vite, normally
 the existing reviewer imports its downloaded NDJSON. The engine is not embedded
 in the reviewer's UI in this stage.
 
+The page groups the manifest field and **Load and validate model** in
+`#model-island`. Loading is opt-in: opening the page does not fetch weights.
+The reviewer engine menu exposes the same `data-slot="model-island"` so a
+catalog / cancel / OPFS / local-file island can mount there
+([reviewer UI](./design/reviewer-ui.md), follow-up #20 / #22).
+
 `build:wasm` installs a matching wasm-bindgen CLI into the repository's ignored
 `.yagoo-data/wasm-tools` directory when needed. `WASM_BINDGEN` can select an
 already installed matching executable. `mise run browser:check` combines the

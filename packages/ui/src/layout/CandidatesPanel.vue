@@ -4,15 +4,25 @@ import {
 } from "../analysis/display";
 import type { CandidateSnapshot } from "../analysis/types";
 
-const props = defineProps<{
-  candidates: CandidateSnapshot[];
-  /** Root visits at this ply — used to dim sub-threshold rows. */
-  rootVisits?: number | null;
-  /** Index currently previewing PV (hover / tap). */
-  previewIndex?: number | null;
-  /** Persistently selected / best highlight. */
-  selectedIndex?: number;
-}>();
+const props = withDefaults(
+  defineProps<{
+    candidates: CandidateSnapshot[];
+    /** Root visits at this ply — used to dim sub-threshold rows. */
+    rootVisits?: number | null;
+    /** Index currently previewing PV (hover / tap). */
+    previewIndex?: number | null;
+    /** Persistently selected / best highlight. */
+    selectedIndex?: number;
+    /** Fill the parent scroller instead of capping height. */
+    embedded?: boolean;
+  }>(),
+  {
+    rootVisits: null,
+    previewIndex: null,
+    selectedIndex: 0,
+    embedded: false,
+  },
+);
 
 const emit = defineEmits<{
   (e: "preview", index: number): void;
@@ -43,16 +53,50 @@ function orderClass(idx: number): string {
 function isDimmed(c: CandidateSnapshot): boolean {
   return !candidateVisibleOnBoard(c, props.rootVisits);
 }
+
+const visibleCount = () => Math.min(8, props.candidates.length);
+
+function onRowKey(event: KeyboardEvent, idx: number) {
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    event.stopPropagation();
+    const next = event.key === "ArrowDown" ? idx + 1 : idx - 1;
+    if (next < 0 || next >= visibleCount()) return;
+    emit("preview", next);
+    emit("select", next);
+    const row = (event.currentTarget as HTMLElement).parentElement?.querySelector<HTMLElement>(
+      `[data-candidate-index="${next}"]`,
+    );
+    row?.focus();
+  } else if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    emit("toggle", idx);
+    emit("select", idx);
+  }
+}
 </script>
 
 <template>
-  <div class="yagoo-candidates" data-testid="candidates-panel">
+  <div
+    class="yagoo-candidates"
+    :class="{ 'yagoo-candidates--embedded': embedded }"
+    data-testid="candidates-panel"
+  >
     <div class="yagoo-candidates__title">Candidates</div>
-    <ul v-if="candidates.length" class="yagoo-candidates__list">
+    <ul
+      v-if="candidates.length"
+      class="yagoo-candidates__list"
+      role="listbox"
+      aria-label="Candidate moves"
+    >
       <li
         v-for="(c, idx) in candidates.slice(0, 8)"
         :key="`${c.move}-${idx}`"
         class="yagoo-candidates__row"
+        role="option"
+        :aria-selected="selectedIndex === idx"
+        :tabindex="selectedIndex === idx ? 0 : -1"
+        @keydown="onRowKey($event, idx)"
         :class="[
           orderClass(idx),
           {
@@ -84,9 +128,16 @@ function isDimmed(c: CandidateSnapshot): boolean {
   max-height: 40%;
   overflow: auto;
   background: var(--yagoo-panel, #181818);
-  border-top: 1px solid #2a2a2a;
-  border-bottom: 1px solid #2a2a2a;
+  border-top: 1px solid var(--yagoo-border, #2a2a2a);
+  border-bottom: 1px solid var(--yagoo-border, #2a2a2a);
   font-size: 0.8rem;
+  color: var(--yagoo-text, #eee);
+}
+
+.yagoo-candidates--embedded {
+  max-height: none;
+  border: none;
+  background: transparent;
 }
 
 .yagoo-candidates__title {
@@ -95,7 +146,7 @@ function isDimmed(c: CandidateSnapshot): boolean {
   font-weight: 650;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #9a9a9a;
+  color: var(--yagoo-muted, #9a9a9a);
 }
 
 .yagoo-candidates__list {
@@ -111,16 +162,16 @@ function isDimmed(c: CandidateSnapshot): boolean {
   align-items: center;
   padding: 0.28rem 0.65rem;
   cursor: pointer;
-  color: #ddd;
+  color: var(--yagoo-text, #ddd);
 }
 
 .yagoo-candidates__row:hover,
 .yagoo-candidates__row--preview {
-  background: #222;
+  background: var(--yagoo-hover, #222);
 }
 
 .yagoo-candidates__row--selected {
-  outline: 1px solid #0082f0;
+  outline: 1px solid var(--yagoo-accent, #0082f0);
   outline-offset: -1px;
 }
 
@@ -156,19 +207,19 @@ function isDimmed(c: CandidateSnapshot): boolean {
 
 .yagoo-candidates__wr {
   font-variant-numeric: tabular-nums;
-  color: #eee;
+  color: var(--yagoo-text, #eee);
 }
 
 .yagoo-candidates__visits {
   font-variant-numeric: tabular-nums;
-  color: #9a9a9a;
+  color: var(--yagoo-muted, #9a9a9a);
   font-size: 0.75rem;
 }
 
 .yagoo-candidates__empty {
   margin: 0;
   padding: 0.5rem 0.65rem 0.75rem;
-  color: #777;
+  color: var(--yagoo-muted, #777);
   font-size: 0.78rem;
 }
 </style>

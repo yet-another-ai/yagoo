@@ -22,6 +22,7 @@ export interface UseGameResult {
   loadSgf: (contents: string) => void;
   goForward: (childIndex?: number) => boolean;
   goBack: () => boolean;
+  goToPly: (ply: number) => boolean;
   goToVariation: (childIndex: number) => boolean;
   canGoForward: Ref<boolean>;
   canGoBack: Ref<boolean>;
@@ -196,6 +197,24 @@ export function useGame(): UseGameResult {
     return goForward(childIndex);
   }
 
+  /** Jump to a main-line ply (0 = root / setup). */
+  function goToPly(ply: number): boolean {
+    const t = tree.value;
+    if (t == null) return false;
+    const target = Math.max(0, Math.floor(ply));
+    let id: number | string = t.root.id;
+    let depth = 0;
+    while (depth < target) {
+      const node = t.get(id);
+      const child = node?.children[0];
+      if (child == null) break;
+      id = child.id;
+      depth += 1;
+    }
+    syncFromNode(id);
+    return depth === target;
+  }
+
   const canGoBack = computed(() => {
     const t = tree.value;
     const id = currentId.value;
@@ -229,6 +248,7 @@ export function useGame(): UseGameResult {
     loadSgf,
     goForward,
     goBack,
+    goToPly,
     goToVariation,
     canGoForward,
     canGoBack,

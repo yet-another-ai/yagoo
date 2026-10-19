@@ -1,6 +1,7 @@
 export { default as Goban } from "./goban/Goban.vue";
 export { default as OverlayLayer } from "./overlays/OverlayLayer.vue";
 export { default as ReviewerLayout } from "./layout/ReviewerLayout.vue";
+export { default as AnalysisReviewer } from "./layout/AnalysisReviewer.vue";
 export { default as BottomBar } from "./layout/BottomBar.vue";
 export { default as CommentBox } from "./layout/CommentBox.vue";
 export { default as WinrateGraph } from "./layout/WinrateGraph.vue";
@@ -8,6 +9,45 @@ export type { WinratePoint } from "./layout/WinrateGraph.vue";
 
 export { useGame } from "./composables/useGame";
 export type { GamePlayerInfo, UseGameResult } from "./composables/useGame";
+
+export {
+  PIPELINE_SCHEMA_VERSION,
+  buildBoardOverlays,
+  buildReviewSeries,
+  createBrowserEngineSource,
+  createInitialAnalysisState,
+  createLiveNativeSource,
+  createNdjsonEventsSource,
+  createNdjsonFileSource,
+  createNdjsonTextSource,
+  formatAnalysisComment,
+  isBrowserEngineAvailable,
+  isLiveNativeAvailable,
+  ownershipToHeatMap,
+  ownershipToPaintMap,
+  parseGtpVertex,
+  parseNdjson,
+  parsePipelineEventLine,
+  reducePipelineEvent,
+  reducePipelineEvents,
+  resolveSgfRules,
+  useAnalysisStream,
+} from "./analysis";
+export type {
+  AnalysisEventSource,
+  AnalysisPhase,
+  AnalysisState,
+  AnalysisStage,
+  BrowserEngineAdapter,
+  CandidateSnapshot,
+  DeepPlySelection,
+  EngineAnalysis,
+  PipelineEvent,
+  PlyAnalysis,
+  PositionSnapshot,
+  ReviewSeriesPoint,
+  StreamStatus,
+} from "./analysis";
 
 export {
   createBoardGeometry,

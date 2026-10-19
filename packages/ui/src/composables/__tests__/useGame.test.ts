@@ -37,6 +37,16 @@ describe("useGame", () => {
     expect(g.signMap.value[5]![5]).toBe(0);
   });
 
+  it("jumps to a main-line ply", () => {
+    const g = useGame();
+    g.loadSgf(SAMPLE);
+    expect(g.goToPly(2)).toBe(true);
+    expect(g.moveNumber.value).toBe(2);
+    expect(g.signMap.value[5]![5]).toBe(-1); // W[ff]
+    expect(g.goToPly(0)).toBe(true);
+    expect(g.moveNumber.value).toBe(0);
+  });
+
   it("switches between variations", () => {
     const g = useGame();
     g.loadSgf(SAMPLE);

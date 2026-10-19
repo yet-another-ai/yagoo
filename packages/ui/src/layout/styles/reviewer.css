@@ -78,13 +78,28 @@
 .yagoo-winrate__svg {
   display: block;
   width: 100%;
-  height: 80px;
+  height: 96px;
+  cursor: pointer;
 }
 
 .yagoo-winrate__line {
   fill: none;
   stroke: var(--yagoo-accent);
   stroke-width: 1.5;
+}
+
+.yagoo-winrate__score {
+  fill: none;
+  stroke: var(--yagoo-success);
+  stroke-width: 1.25;
+  stroke-dasharray: 3 2;
+  opacity: 0.85;
+}
+
+.yagoo-winrate__deep {
+  stroke: #f0a000;
+  stroke-width: 2;
+  opacity: 0.55;
 }
 
 .yagoo-winrate__change {

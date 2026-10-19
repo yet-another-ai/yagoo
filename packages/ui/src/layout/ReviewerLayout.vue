@@ -1,10 +1,18 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useGame } from "../composables/useGame";
 import Goban from "../goban/Goban.vue";
 import OverlayLayer from "../overlays/OverlayLayer.vue";
 import type { OverlayData } from "../overlays/OverlayRenderer";
-import type { BoardMap, HeatVertex, Sign, Vertex } from "../types";
+import type {
+  BoardMap,
+  GhostStone,
+  HeatVertex,
+  LineMarker,
+  Marker,
+  Sign,
+  Vertex,
+} from "../types";
 import BottomBar from "./BottomBar.vue";
 import CommentBox from "./CommentBox.vue";
 import WinrateGraph, { type WinratePoint } from "./WinrateGraph.vue";
@@ -22,6 +30,13 @@ const props = withDefaults(
     /** Demo group outline vertices (proves OverlayLayer alignment). */
     demoGroupOutline?: Vertex[];
     heatMap?: BoardMap<HeatVertex | null>;
+    paintMap?: BoardMap<number>;
+    ghostStoneMap?: BoardMap<GhostStone | null>;
+    markerMap?: BoardMap<Marker | null>;
+    lines?: LineMarker[];
+    /** Override the SGF node comment (e.g. live analysis text). */
+    commentOverride?: string | null;
+    commentTitle?: string;
   }>(),
   {
     vertexSize: 22,
@@ -31,8 +46,16 @@ const props = withDefaults(
     fuzzySeed: 42,
     demoGroupOutline: () => [],
     winrateData: () => [],
+    lines: () => [],
+    commentOverride: null,
+    commentTitle: "Comment",
   },
 );
+
+const emit = defineEmits<{
+  (e: "ply-change", ply: number): void;
+  (e: "select-ply", ply: number): void;
+}>();
 
 const {
   signMap,
@@ -44,6 +67,7 @@ const {
   loadSgf,
   goForward,
   goBack,
+  goToPly,
   goToVariation,
   canGoForward,
   canGoBack,
@@ -52,12 +76,25 @@ const {
 
 const loaded = ref(false);
 
+function load(contents: string | undefined) {
+  if (!contents) return;
+  loadSgf(contents);
+  loaded.value = true;
+  emit("ply-change", moveNumber.value);
+}
+
 onMounted(() => {
-  if (props.sgf) {
-    loadSgf(props.sgf);
-    loaded.value = true;
-  }
+  load(props.sgf);
 });
+
+watch(
+  () => props.sgf,
+  (next) => {
+    if (next) load(next);
+  },
+);
+
+watch(moveNumber, (n) => emit("ply-change", n));
 
 const overlayData = computed<OverlayData>(() => ({
   groupOutlines:
@@ -76,6 +113,32 @@ const emptySignMap = computed<BoardMap<Sign>>(() => {
 const displaySignMap = computed(() =>
   loaded.value ? signMap.value : emptySignMap.value,
 );
+
+const displayComment = computed(
+  () => props.commentOverride ?? comment.value,
+);
+
+function onBack() {
+  goBack();
+}
+
+function onForward() {
+  goForward();
+}
+
+function onSelectPly(ply: number) {
+  goToPly(ply);
+  emit("select-ply", ply);
+}
+
+defineExpose({
+  boardSize,
+  moveNumber,
+  goToPly,
+  goForward,
+  goBack,
+  loadSgf: load,
+});
 </script>
 
 <template>
@@ -85,6 +148,10 @@ const displaySignMap = computed(() =>
         <Goban
           :sign-map="displaySignMap"
           :heat-map="heatMap"
+          :paint-map="paintMap"
+          :ghost-stone-map="ghostStoneMap"
+          :marker-map="markerMap"
+          :lines="lines"
           :vertex-size="vertexSize"
           :show-coordinates="showCoordinates"
           :fuzzy-stone-placement="fuzzyStonePlacement"
@@ -102,7 +169,12 @@ const displaySignMap = computed(() =>
     </main>
 
     <aside class="yagoo-reviewer__sidebar">
-      <WinrateGraph :data="winrateData" :current-index="moveNumber" />
+      <WinrateGraph
+        :data="winrateData"
+        :current-index="moveNumber"
+        :show-score-lead="true"
+        @select="onSelectPly"
+      />
       <div class="yagoo-gametree-placeholder">
         Game tree panel — placeholder (out of scope for MVP).
         <div v-if="variationCount > 1">
@@ -117,7 +189,7 @@ const displaySignMap = computed(() =>
           </button>
         </div>
       </div>
-      <CommentBox :comment="comment" />
+      <CommentBox :title="commentTitle" :comment="displayComment" />
     </aside>
 
     <BottomBar
@@ -127,8 +199,8 @@ const displaySignMap = computed(() =>
       :can-go-back="canGoBack"
       :can-go-forward="canGoForward"
       :move-number="moveNumber"
-      @back="goBack()"
-      @forward="goForward()"
+      @back="onBack"
+      @forward="onForward"
     />
   </div>
 </template>

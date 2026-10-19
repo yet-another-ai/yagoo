@@ -1,0 +1,20 @@
+/* Full-bleed reviewer page (mirrors jet playground: no sidebar / aside). */
+.yagoo-reviewer-page .VPContent,
+.yagoo-reviewer-page .VPPage {
+  padding: 0 !important;
+}
+
+.yagoo-reviewer-page .container {
+  max-width: none !important;
+  padding: 0 !important;
+}
+
+.yagoo-reviewer-page .VPDoc,
+.yagoo-reviewer-page .vp-doc {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.yagoo-reviewer-page .vp-doc > div {
+  margin: 0;
+}

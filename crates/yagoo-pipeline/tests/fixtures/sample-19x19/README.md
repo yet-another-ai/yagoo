@@ -19,7 +19,8 @@ Recorded locally for deterministic CI replay. **Do not** regenerate in CI.
 ## Files
 
 - `responses.json.gz` — JSON array of trimmed KataGo stdout lines (query order).
-- Replay via `yagoo analyze --scripted-fixture …` or pipeline tests.
+- `groups-snapshot.json` — compact deep-ply group summaries for the replay test.
+- Replay via `yagoo analyze --scripted-fixture …` or `cargo test -p yagoo-pipeline --test fixture_replay`.
 
 ## Regenerate
 
@@ -30,6 +31,5 @@ mise run fixtures:regen
 
 ## Notes from real-data review
 
-- \(r^st = 0.7\) kept — cluster shapes on this sample looked coherent.
+- `r* = 0.7` kept — cluster shapes on this sample looked coherent.
 - `likely_seki` requires ≥3 stones (`min_stones_for_seki`): a 2-stone H16/J17 flat clash was wrongly labelled seki; it is now `weak`.
-

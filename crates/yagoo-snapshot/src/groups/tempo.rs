@@ -96,7 +96,10 @@ mod unit_tests {
     #[test]
     fn settled_when_g_minus_high() {
         let p = GroupParams::default();
-        assert_eq!(classify_status(0.95, 0.85, 0.9, 5, &p), GroupStatus::Settled);
+        assert_eq!(
+            classify_status(0.95, 0.85, 0.9, 5, &p),
+            GroupStatus::Settled
+        );
     }
 
     #[test]

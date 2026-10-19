@@ -227,10 +227,7 @@ fn load_scripted_fixture(path: &Path) -> Result<Vec<String>, Box<dyn std::error:
     Ok(serde_json::from_str(&raw)?)
 }
 
-fn write_scripted_fixture(
-    path: &Path,
-    lines: &[String],
-) -> Result<(), Box<dyn std::error::Error>> {
+fn write_scripted_fixture(path: &Path, lines: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     let json = serde_json::to_vec(lines)?;
     if path.extension().is_some_and(|e| e == "gz")
         || path

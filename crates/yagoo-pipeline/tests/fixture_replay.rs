@@ -9,9 +9,7 @@ use std::sync::Arc;
 
 use yagoo_katago::AnalysisClient;
 use yagoo_pipeline::{analyze_game_collected, DeepSelectConfig, PipelineConfig, PipelineStrategy};
-use yagoo_snapshot::{
-    AnalysisPhase, GroupSnapshot, GroupStatus, PipelineEvent,
-};
+use yagoo_snapshot::{AnalysisPhase, GroupSnapshot, GroupStatus, PipelineEvent};
 
 fn fixture_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/sample-19x19")
@@ -46,12 +44,16 @@ fn load_responses() -> Vec<String> {
 
 fn load_sample_sgf() -> String {
     // Prefer the docs sample (canonical); fall back to a copy under fixtures if needed.
-    let docs = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../docs/public/app/sample.sgf");
+    let docs = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs/public/app/sample.sgf");
     std::fs::read_to_string(&docs).unwrap_or_else(|_| {
         let local = fixture_dir().join("sample.sgf");
-        std::fs::read_to_string(&local)
-            .unwrap_or_else(|e| panic!("sample.sgf not found at {} or {}: {e}", docs.display(), local.display()))
+        std::fs::read_to_string(&local).unwrap_or_else(|e| {
+            panic!(
+                "sample.sgf not found at {} or {}: {e}",
+                docs.display(),
+                local.display()
+            )
+        })
     })
 }
 
@@ -239,14 +241,13 @@ fn assert_groups_summary_eq(ply: &str, got: &serde_json::Value, exp: &serde_json
     );
     for (i, (g, e)) in got_arr.iter().zip(exp_arr.iter()).enumerate() {
         for key in ["groupId", "kind", "status", "blackStones", "whiteStones"] {
-            assert_eq!(
-                g.get(key),
-                e.get(key),
-                "ply {ply} group[{i}].{key}"
-            );
+            assert_eq!(g.get(key), e.get(key), "ply {ply} group[{i}].{key}");
         }
         for key in ["gPlus", "gMinus", "certainty"] {
-            match (g.get(key).and_then(|v| v.as_f64()), e.get(key).and_then(|v| v.as_f64())) {
+            match (
+                g.get(key).and_then(|v| v.as_f64()),
+                e.get(key).and_then(|v| v.as_f64()),
+            ) {
                 (None, None) => {}
                 (Some(a), Some(b)) => {
                     assert!(

@@ -33,16 +33,7 @@ function statusClass(g: GroupSnapshot): string {
 
 <template>
   <div class="yagoo-groups" data-testid="groups-panel">
-    <div class="yagoo-groups__title">
-      Groups / 块
-      <span
-        v-if="groups.some((g) => g.source === 'fixture_proposal')"
-        class="yagoo-groups__badge"
-        title="Hand-authored fixture — pipeline does not emit 块 yet"
-      >
-        fixture
-      </span>
-    </div>
+    <div class="yagoo-groups__title">Groups / 块</div>
     <ul v-if="groups.length" class="yagoo-groups__list">
       <li
         v-for="g in groups"
@@ -70,7 +61,7 @@ function statusClass(g: GroupSnapshot): string {
       </li>
     </ul>
     <p v-else class="yagoo-groups__empty">
-      No groups (块) at this ply — pipeline does not emit them yet.
+      No groups (块) at this ply — deepen a swing position for fate clustering.
     </p>
   </div>
 </template>
@@ -97,17 +88,6 @@ function statusClass(g: GroupSnapshot): string {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: #9a9a9a;
-}
-
-.yagoo-groups__badge {
-  text-transform: none;
-  letter-spacing: 0;
-  font-weight: 600;
-  font-size: 0.65rem;
-  padding: 0.05rem 0.35rem;
-  border-radius: 2px;
-  background: #3a2a10;
-  color: #f0a000;
 }
 
 .yagoo-groups__list {

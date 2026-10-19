@@ -56,8 +56,8 @@ export interface PvEndSnapshot {
 
 /**
  * Teaching group (块) — fate-correlated unit, **not** a rules chain (串).
- * Additive proposal: see `docs/pipeline/groups-proposal.md`. Pipeline does not
- * emit this yet; fixtures may set `source: "fixture_proposal"`.
+ * Emitted by `yagoo-pipeline` on deep `positionCompleted` snapshots.
+ * See `docs/modules/groups.md` and `docs/pipeline/snapshots.md`.
  */
 export type GroupKind = "simple" | "contested" | "bound";
 export type GroupStatus =
@@ -98,8 +98,8 @@ export interface GroupSnapshot {
   gPlus?: number | null;
   gMinus?: number | null;
   delta?: number | null;
-  /** `"fixture_proposal"` = hand-authored demo until pipeline groups land. */
-  source?: "pipeline" | "fixture_proposal";
+  /** `"pipeline"` when emitted by `compute_groups`. */
+  source?: "pipeline";
 }
 
 export interface PositionSnapshot {
@@ -112,8 +112,8 @@ export interface PositionSnapshot {
   /** Rules chains (串) — not teaching groups. */
   chains: ChainSnapshot[];
   /**
-   * Teaching groups (块). Optional / additive — see groups-proposal.md.
-   * Absent until the pipeline groups module exists.
+   * Teaching groups (块). Present on deep `positionCompleted` snapshots when
+   * scenario ownership is available; usually absent/empty after scan.
    */
   groups?: GroupSnapshot[];
   root?: EngineAnalysis | null;

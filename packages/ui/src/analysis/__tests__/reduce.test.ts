@@ -24,7 +24,7 @@ describe("parseNdjson / fixture format", () => {
       true,
     );
     expect(fixtureEvents.some((e) => e.type === "stagePartial")).toBe(true);
-    // Additive groups (块) proposal — fixture_proposal until pipeline emits them.
+    // Teaching groups (块) from pipeline compute_groups on the deep ply.
     const deep = fixtureEvents.find(
       (e) =>
         e.type === "positionCompleted" &&
@@ -34,8 +34,8 @@ describe("parseNdjson / fixture format", () => {
     expect(deep?.type).toBe("positionCompleted");
     if (deep?.type === "positionCompleted") {
       expect(deep.snapshot.groups?.length).toBeGreaterThan(0);
-      expect(deep.snapshot.groups?.[0]?.source).toBe("fixture_proposal");
-      // Chains (串) remain present and distinct.
+      expect(deep.snapshot.groups?.[0]?.source).toBe("pipeline");
+      // Chains (串) remain present and distinct from groups.
       expect(deep.snapshot.chains.length).toBeGreaterThan(0);
     }
   });

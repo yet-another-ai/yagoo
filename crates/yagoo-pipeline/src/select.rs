@@ -157,6 +157,7 @@ mod tests {
                 white: vec![],
             },
             chains: vec![],
+            groups: vec![],
             root: Some(EngineAnalysis {
                 visits: Some(100),
                 winrate: Some(wr),

@@ -2,11 +2,15 @@
 //!
 //! Ownership and winrates in snapshots are **black-positive**
 //! (`reportAnalysisWinratesAs = BLACK`). See `docs/pipeline/snapshots.md`.
+//!
+//! Teaching **groups** (块) are computed from deep ownership scenarios via
+//! [`compute_groups`] — see `docs/modules/groups.md`.
 
 #![forbid(unsafe_code)]
 
 mod convert;
 mod events;
+mod groups;
 mod schema;
 
 pub use convert::{
@@ -14,8 +18,10 @@ pub use convert::{
     engine_from_response,
 };
 pub use events::{AnalysisPhase, AnalysisStage, DeepPlySelection, PipelineEvent};
+pub use groups::{compute_groups, compute_groups_with_params, GroupParams};
 pub use schema::{
     BoardSnapshot, CandidateSnapshot, ChainSnapshot, ColorToken, EngineAnalysis, GameSnapshot,
+    GroupKind, GroupMembers, GroupPart, GroupSnapshot, GroupSource, GroupStatus, GroupStrength,
     OwnershipConvention, PassProbeSkipReason, PositionSnapshot, PvEndSnapshot, SCHEMA_VERSION,
 };
 

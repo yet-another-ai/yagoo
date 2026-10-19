@@ -117,7 +117,7 @@ describe("AnalysisReviewer", () => {
     const panel = wrapper.find('[data-testid="groups-panel"]');
     expect(panel.exists()).toBe(true);
     expect(panel.text()).toMatch(/Groups|块/);
-    expect(panel.text()).toMatch(/fixture/i);
+    expect(panel.text()).not.toMatch(/fixture/i);
     const rows = panel.findAll("[data-group-id]");
     expect(rows.length).toBeGreaterThanOrEqual(3);
 

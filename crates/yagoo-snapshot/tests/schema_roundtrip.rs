@@ -17,6 +17,7 @@ fn position_snapshot_json_roundtrip_and_convention() {
             white: vec![],
         },
         chains: vec![],
+        groups: vec![],
         root: Some(EngineAnalysis {
             visits: Some(800),
             winrate: Some(0.51),

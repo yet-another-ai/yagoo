@@ -8,7 +8,7 @@ Groups deliberately forbid geometric liaison rules. Moyo / thickness heuristics 
 
 ## 2. Weak remote bindings — hide or show?
 
-Low-confidence “weak binding” parts: hide from teaching text, or surface as “possibly related”?
+Low-confidence “weak binding” parts: hide from teaching text, or surface as “possibly related”? (Pipeline still emits the cluster with `boundConfidence` below \(r^\ast\) and `kind: "simple"` when the confidence gate fails.)
 
 ## 3. Score MC mean shift?
 

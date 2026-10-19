@@ -60,7 +60,7 @@ mise run check
 mise run docs          # VitePress docs site
 ```
 
-Foundation crates (`yagoo-core`, `yagoo-sgf`, `yagoo-katago`) are in place. The Vue UI package (`packages/ui` / `@yagoo/ui`) provides a Shudan-compatible goban and Sabaki-inspired reviewer chrome embeddable in the docs (`mise run docs`, then open **Frontend demo**). Teaching algorithms (groups, tempo, …) are not implemented yet.
+Foundation crates (`yagoo-core`, `yagoo-sgf`, `yagoo-katago`, `yagoo-snapshot`, `yagoo-pipeline`) are in place. The Vue UI package (`packages/ui` / `@yagoo/ui`) provides a Shudan-compatible goban and Sabaki-inspired reviewer chrome embeddable in the docs (`mise run docs`, then open **Reviewer** / `/app`). Teaching **groups** (块) and tempo status are computed in the deep pipeline phase.
 
 ```sh
 mise run ui:test       # Vitest (incl. fuzzy-shift / collision)
@@ -69,7 +69,7 @@ mise run docs          # VitePress, with interactive /demo
 
 
 Optional local KataGo assets (not CI):
-Foundation: board/SGF/KataGo client, **streaming snapshot pipeline**, and `yagoo analyze` CLI. Teaching algorithms (groups, tempo, …) come next.
+Foundation: board/SGF/KataGo client, **streaming snapshot pipeline**, `yagoo analyze` CLI, and deep-phase **groups** (块) / tempo judgments.
 
 ```sh
 # Local KataGo assets (not CI) — downloads b18 .bin.gz + sample analysis.cfg;

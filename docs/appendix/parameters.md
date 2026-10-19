@@ -15,8 +15,9 @@ All values are **initial** and expect retuning on real games.
 | Max deep plies (after ranking) | **24** | Pipeline deep select |
 | Stable threshold \(\varepsilon\) | 0.1 | Groups |
 | Keep-if-stdev \(s_i\) | 0.3 | Groups |
-| Affinity exponent \(\gamma\) | 2 | Groups |
+| Affinity exponent \(\gamma\) | 2 | Groups (documented; MVP cut uses raw \(r\)) |
 | Hierarchical cut \(r^\ast\) | 0.7 | Groups |
+| Scenario weights | equal | Groups (MVP — pass probe not drowned by visits) |
 | Min group size \(n_{\min}\) | 3 | Groups |
 | Contested color share | 20% | Groups |
 | Status thresholds | 0.8 / 0.4 / 0.3 | Tempo |

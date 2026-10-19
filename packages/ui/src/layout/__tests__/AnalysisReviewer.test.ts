@@ -4,7 +4,7 @@ import fixtureText from "../../analysis/__fixtures__/sample-scan-deep.ndjson?raw
 import sampleSgf from "../../analysis/__fixtures__/sample.sgf?raw";
 import AnalysisReviewer from "../AnalysisReviewer.vue";
 
-async function drainProgressiveBatches(rounds = 200) {
+async function drainProgressiveBatches(rounds = 350) {
   for (let i = 0; i < rounds; i++) {
     await new Promise<void>((resolve) => {
       requestAnimationFrame(() => resolve());
@@ -14,8 +14,8 @@ async function drainProgressiveBatches(rounds = 200) {
 }
 
 describe("AnalysisReviewer", () => {
-  // Progressive NDJSON (~270 events @ 4/frame) needs headroom under CI load.
-  const timeout = 20_000;
+  // Progressive NDJSON (~400+ events @ 4/frame) needs headroom under CI load.
+  const timeout = 45_000;
 
   it(
     "loads 19×19 SGF and streams fixture NDJSON into the reviewer chrome",

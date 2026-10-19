@@ -245,8 +245,8 @@ fn assert_groups_summary_eq(ply: &str, got: &serde_json::Value, exp: &serde_json
         }
         for key in ["gPlus", "gMinus", "certainty"] {
             match (
-                g.get(key).and_then(|v| v.as_f64()),
-                e.get(key).and_then(|v| v.as_f64()),
+                g.get(key).and_then(serde_json::Value::as_f64),
+                e.get(key).and_then(serde_json::Value::as_f64),
             ) {
                 (None, None) => {}
                 (Some(a), Some(b)) => {

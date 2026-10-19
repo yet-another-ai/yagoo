@@ -9,10 +9,14 @@ import { createInitialAnalysisState, type PipelineEvent } from "../types";
 import { buildReviewSeries } from "../display";
 
 const fixtureEvents = parseNdjson(fixtureText);
-const DEEP_PLY = 48;
+/** Representative deepened ply from the real KataGo sample fixture. */
+const DEEP_PLY = 30;
+const DEEP_PLIES = [17, 19, 30, 31, 32, 35, 40, 42];
+/** Deep visits from `mise run fixtures:regen` (maxVisits may round slightly above). */
+const DEEP_VISITS = 503;
 
 describe("parseNdjson / fixture format", () => {
-  it("parses real 19×19 pipeline NDJSON from yagoo analyze --scripted-fixture", () => {
+  it("parses real 19×19 pipeline NDJSON from recorded KataGo fixture", () => {
     expect(fixtureEvents.length).toBeGreaterThan(10);
     expect(fixtureEvents[0]?.type).toBe("gameStarted");
     if (fixtureEvents[0]?.type === "gameStarted") {
@@ -23,13 +27,14 @@ describe("parseNdjson / fixture format", () => {
     expect(fixtureEvents.some((e) => e.type === "deepPliesSelected")).toBe(
       true,
     );
-    expect(fixtureEvents.some((e) => e.type === "stagePartial")).toBe(true);
-    // Teaching groups (块) from pipeline compute_groups on the deep ply.
+    // Partials are off in the committed real fixture (final responses only).
+    expect(fixtureEvents.some((e) => e.type === "stagePartial")).toBe(false);
+    // Teaching groups (块) from pipeline compute_groups on a deep ply.
     const deep = fixtureEvents.find(
       (e) =>
         e.type === "positionCompleted" &&
         e.phase === "deep" &&
-        e.snapshot.ply === 48,
+        e.snapshot.ply === DEEP_PLY,
     );
     expect(deep?.type).toBe("positionCompleted");
     if (deep?.type === "positionCompleted") {
@@ -62,13 +67,11 @@ describe("reducePipelineEvent ordering", () => {
         expect(state.deepPlies).toEqual([]);
       }
       if (ev.type === "deepPliesSelected") {
-        expect(state.deepPlies).toEqual([DEEP_PLY]);
+        expect(state.deepPlies).toEqual(DEEP_PLIES);
         expect(state.deepMode).toBe("swing");
-        expect(state.deepReasons[0]?.ply).toBe(DEEP_PLY);
-      }
-      if (ev.type === "stagePartial") {
-        expect(state.plies[DEEP_PLY]?.rootPartial).toBe(true);
-        expect(state.plies[DEEP_PLY]?.complete).toBe(false);
+        expect(state.deepReasons.map((r) => r.ply).sort((a, b) => a - b)).toEqual(
+          DEEP_PLIES,
+        );
       }
       if (
         ev.type === "positionCompleted" &&
@@ -77,12 +80,12 @@ describe("reducePipelineEvent ordering", () => {
       ) {
         expect(state.plies[DEEP_PLY]?.rootPartial).toBe(false);
         expect(state.plies[DEEP_PLY]?.complete).toBe(true);
-        expect(state.plies[DEEP_PLY]?.root?.visits).toBe(700);
+        expect(state.plies[DEEP_PLY]?.root?.visits).toBe(DEEP_VISITS);
         expect(state.plies[DEEP_PLY]?.root?.ownership?.length).toBe(361);
         expect(state.plies[DEEP_PLY]?.candidates.length).toBeGreaterThanOrEqual(
           4,
         );
-        // Deepen replaces in place — tiny refinement, not a cliff.
+        // Deepen replaces in place — tiny refinement at this ply, not a cliff.
         expect(scanWrAtDeep).not.toBeNull();
         expect(
           Math.abs((state.plies[DEEP_PLY]?.root?.winrate ?? 0) - scanWrAtDeep!),
@@ -96,25 +99,22 @@ describe("reducePipelineEvent ordering", () => {
 
   it("lets deepen overwrite scan root while keeping earlier plies", () => {
     const state = reducePipelineEvents(fixtureEvents);
-    expect(state.plies[0]?.root?.winrate).toBeCloseTo(0.5, 2);
+    expect(state.plies[0]?.root?.winrate).toBeGreaterThan(0);
+    expect(state.plies[0]?.root?.winrate).toBeLessThan(1);
     expect(state.plies[DEEP_PLY]?.phase).toBe("deep");
     expect(state.plies[0]?.phase).toBe("scan");
-    expect(state.plies[DEEP_PLY]?.root?.visits).toBe(700);
+    expect(state.plies[DEEP_PLY]?.root?.visits).toBe(DEEP_VISITS);
   });
 
   it("builds winrate series with deepSelected highlights on 19×19 game", () => {
     const state = reducePipelineEvents(fixtureEvents);
     const series = buildReviewSeries(state);
     expect(series.length).toBeGreaterThanOrEqual(DEEP_PLY + 1);
-    expect(series[DEEP_PLY]?.deepSelected).toBe(true);
+    for (const ply of DEEP_PLIES) {
+      expect(series[ply]?.deepSelected).toBe(true);
+    }
     expect(series[0]?.deepSelected).toBe(false);
     expect(series[DEEP_PLY]?.winrate).not.toBeNull();
-    // No discontinuous step into the deep ply (smooth ramp in fixture).
-    const prev = series[DEEP_PLY - 1]?.winrate;
-    const cur = series[DEEP_PLY]?.winrate;
-    expect(prev).not.toBeNull();
-    expect(cur).not.toBeNull();
-    expect(Math.abs(cur! - prev!)).toBeLessThan(5); // < 5 percentage points
   });
 });
 

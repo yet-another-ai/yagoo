@@ -65,10 +65,10 @@ describe("AnalysisReviewer", () => {
 
       await drainProgressiveBatches();
 
-      // Navigate to a deep ply that has candidates (ply 48 in the fixture).
+      // Navigate to a deep ply that has candidates (ply 30 in the real fixture).
       const layout = wrapper.findComponent({ name: "ReviewerLayout" });
       expect(layout.exists()).toBe(true);
-      layout.vm.goToPly(48);
+      layout.vm.goToPly(30);
       await flushPromises();
       await drainProgressiveBatches(8);
 
@@ -123,7 +123,7 @@ describe("AnalysisReviewer", () => {
 
       await drainProgressiveBatches();
       const layout = wrapper.findComponent({ name: "ReviewerLayout" });
-      layout.vm.goToPly(48);
+      layout.vm.goToPly(30);
       await flushPromises();
       await drainProgressiveBatches(8);
 
@@ -167,7 +167,7 @@ describe("AnalysisReviewer", () => {
 
       await drainProgressiveBatches();
       const layout = wrapper.findComponent({ name: "ReviewerLayout" });
-      layout.vm.goToPly(48);
+      layout.vm.goToPly(30);
       await flushPromises();
       await drainProgressiveBatches(8);
 

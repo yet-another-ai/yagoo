@@ -115,11 +115,11 @@
 
 .yagoo-gametree-placeholder {
   flex: 1 1 auto;
-  min-height: 80px;
+  min-height: 48px;
   background: var(--yagoo-bg);
   color: #888;
-  padding: 0.75rem 1rem;
-  font-size: 0.85rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
   border-top: 1px solid #333;
   overflow: auto;
 }

@@ -29,7 +29,10 @@ export interface UseAnalysisStreamResult {
   overlaysFor: (
     ply: number,
     size: number,
-    opts?: { selectedCandidate?: number },
+    opts?: {
+      selectedCandidate?: number;
+      previewCandidate?: number | null;
+    },
   ) => ReturnType<typeof buildBoardOverlays>;
   commentFor: (ply: number, sgfComment: string) => string;
 }
@@ -84,11 +87,15 @@ export function useAnalysisStream(): UseAnalysisStreamResult {
   function overlaysFor(
     ply: number,
     size: number,
-    opts?: { selectedCandidate?: number },
+    opts?: {
+      selectedCandidate?: number;
+      previewCandidate?: number | null;
+    },
   ) {
     return buildBoardOverlays(state.value, ply, {
       size,
       selectedCandidate: opts?.selectedCandidate ?? 0,
+      previewCandidate: opts?.previewCandidate ?? null,
     });
   }
 

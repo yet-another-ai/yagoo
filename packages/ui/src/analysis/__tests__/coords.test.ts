@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  OWNERSHIP_PAINT_STRENGTH,
   ownershipToHeatMap,
   ownershipToPaintMap,
   parseGtpVertex,
@@ -20,7 +21,7 @@ describe("parseGtpVertex", () => {
 });
 
 describe("ownership maps", () => {
-  it("builds heat and paint maps from black-positive ownership", () => {
+  it("builds heat and fractional paint maps from black-positive ownership", () => {
     const own = Array.from({ length: 9 }, (_, i) =>
       i === 0 ? 0.8 : i === 1 ? -0.6 : 0,
     );
@@ -28,11 +29,11 @@ describe("ownership maps", () => {
     expect(heat[0]![0]?.strength).toBeGreaterThanOrEqual(7);
     expect(heat[0]![1]?.strength).toBeGreaterThanOrEqual(5);
     const paint = ownershipToPaintMap(own, 3);
-    expect(paint[0]![0]).toBe(1);
-    expect(paint[0]![1]).toBe(-1);
+    expect(paint[0]![0]).toBeCloseTo(0.8 * OWNERSHIP_PAINT_STRENGTH, 5);
+    expect(paint[0]![1]).toBeCloseTo(-0.6 * OWNERSHIP_PAINT_STRENGTH, 5);
   });
 
-  it("scales heat maps to 19×19 without ownership numeric labels", () => {
+  it("scales paint maps to 19×19 without ownership numeric labels", () => {
     const own = Array.from({ length: 19 * 19 }, (_, i) =>
       i === 0 ? 1 : i === 18 ? -1 : 0,
     );
@@ -44,14 +45,16 @@ describe("ownership maps", () => {
     expect(heat[0]![18]?.strength).toBe(9);
     expect(heat[0]![18]?.text).toBeNull();
     const paint = ownershipToPaintMap(own, 19);
-    expect(paint[0]![0]).toBe(1);
-    expect(paint[0]![18]).toBe(-1);
+    expect(paint[0]![0]).toBeCloseTo(OWNERSHIP_PAINT_STRENGTH, 5);
+    expect(paint[0]![18]).toBeCloseTo(-OWNERSHIP_PAINT_STRENGTH, 5);
   });
 
   it("skips near-zero ownership cells", () => {
     const own = Array.from({ length: 9 }, (_, i) => (i === 0 ? 0.05 : 0));
     const heat = ownershipToHeatMap(own, 3);
     expect(heat[0]![0]).toBeNull();
+    const paint = ownershipToPaintMap(own, 3);
+    expect(paint[0]![0]).toBe(0);
   });
 });
 

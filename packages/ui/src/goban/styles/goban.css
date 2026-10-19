@@ -230,17 +230,19 @@
   .shudan-vertex.shudan-smalllabel .shudan-marker {
     max-height: 2.7em;
     max-width: 2.7em;
-    font-size: .36em;
+    font-size: .42em;
+    font-weight: 650;
+    line-height: 1.15;
 }
 
-/* Ghost stones */
+/* Ghost stones — Sabaki-visible candidate rings + PV stone previews */
 
 .shudan-vertex .shudan-ghost {
     left: 50%;
     top: 50%;
-    width: .4em;
-    height: .4em;
-    opacity: .5;
+    width: .72em;
+    height: .72em;
+    opacity: .88;
     transform: translate(calc(-50% + .5px), calc(-50% + .5px));
   }
   .shudan-vertex .shudan-ghost::before {
@@ -250,36 +252,81 @@
     position: absolute;
     left: 50%;
     top: 50%;
-    width: .4em;
-    height: .4em;
+    width: .72em;
+    height: .72em;
     border-radius: 50%;
     transform: translate(-50%, -50%);
+    border: .06em solid rgba(255, 255, 255, .55);
+    box-shadow: 0 0 0 .04em rgba(0, 0, 0, .25);
   }
   .shudan-vertex.shudan-ghost_faint .shudan-ghost {
-    opacity: .3;
+    opacity: .55;
   }
   .shudan-vertex.shudan-sign_0.shudan-ghost_1 .shudan-ghost::before,
   .shudan-vertex.shudan-sign_0.shudan-ghost_-1 .shudan-ghost::before {
     display: block;
   }
+  /* PV preview: larger translucent B/W stones (no candidate type class). */
+  .shudan-vertex.shudan-sign_0.shudan-ghost_1:not(.shudan-ghost_good):not(.shudan-ghost_interesting):not(.shudan-ghost_doubtful):not(.shudan-ghost_bad) .shudan-ghost,
+  .shudan-vertex.shudan-sign_0.shudan-ghost_-1:not(.shudan-ghost_good):not(.shudan-ghost_interesting):not(.shudan-ghost_doubtful):not(.shudan-ghost_bad) .shudan-ghost {
+    width: .9em;
+    height: .9em;
+    opacity: .62;
+  }
+  .shudan-vertex.shudan-sign_0.shudan-ghost_1:not(.shudan-ghost_good):not(.shudan-ghost_interesting):not(.shudan-ghost_doubtful):not(.shudan-ghost_bad) .shudan-ghost::before,
+  .shudan-vertex.shudan-sign_0.shudan-ghost_-1:not(.shudan-ghost_good):not(.shudan-ghost_interesting):not(.shudan-ghost_doubtful):not(.shudan-ghost_bad) .shudan-ghost::before {
+    width: .9em;
+    height: .9em;
+    border: none;
+    box-shadow: none;
+  }
   .shudan-vertex.shudan-ghost_1 .shudan-ghost::before {
-    background: rgba(0, 0, 0, .8);
+    background: rgba(0, 0, 0, .82);
   }
   .shudan-vertex.shudan-ghost_-1 .shudan-ghost::before {
-    background: white;
+    background: rgba(255, 255, 255, .92);
   }
   .shudan-vertex.shudan-ghost_good .shudan-ghost::before {
     background: #59A80F;
+    border-color: #d8f5a8;
+    box-shadow: 0 0 0 .07em rgba(89, 168, 15, .85);
   }
   .shudan-vertex.shudan-ghost_interesting .shudan-ghost::before {
     background: #4886D5;
+    border-color: #b7d4f7;
   }
   .shudan-vertex.shudan-ghost_doubtful .shudan-ghost::before {
     background: #92278F;
+    border-color: #e0a8de;
   }
   .shudan-vertex.shudan-ghost_bad .shudan-ghost::before {
     background: #F02311;
-}
+    border-color: #ffb3ab;
+  }
+  /* Number labels on PV ghosts: contrast against the stone fill. */
+  .shudan-vertex.shudan-sign_0.shudan-ghost_1.shudan-marker_label:not(.shudan-ghost_good):not(.shudan-ghost_interesting):not(.shudan-ghost_doubtful):not(.shudan-ghost_bad) .shudan-marker {
+    background: transparent;
+    color: #f4f4f4;
+    font-weight: 700;
+    font-size: .55em;
+    text-shadow: 0 0 2px rgba(0, 0, 0, .8);
+  }
+  .shudan-vertex.shudan-sign_0.shudan-ghost_-1.shudan-marker_label:not(.shudan-ghost_good):not(.shudan-ghost_interesting):not(.shudan-ghost_doubtful):not(.shudan-ghost_bad) .shudan-marker {
+    background: transparent;
+    color: #1a1a1a;
+    font-weight: 700;
+    font-size: .55em;
+    text-shadow: 0 0 2px rgba(255, 255, 255, .7);
+  }
+  /* Candidate winrate/visits stay legible on the board. */
+  .shudan-vertex.shudan-ghost_good.shudan-marker_label .shudan-marker,
+  .shudan-vertex.shudan-ghost_interesting.shudan-marker_label .shudan-marker,
+  .shudan-vertex.shudan-ghost_doubtful.shudan-marker_label .shudan-marker,
+  .shudan-vertex.shudan-ghost_bad.shudan-marker_label .shudan-marker {
+    background: rgba(241, 180, 88, .92);
+    color: #3a1a08;
+    font-weight: 650;
+  }
 
 /* Paint map */
 

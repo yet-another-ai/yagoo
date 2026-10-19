@@ -6,10 +6,18 @@ import {
   createNdjsonTextSource,
   isBrowserEngineAvailable,
   isLiveNativeAvailable,
+  parseGtpVertex,
   resolveSgfRules,
   useAnalysisStream,
 } from "../analysis";
-import type { BoardMap, GhostStone, HeatVertex, LineMarker, Marker } from "../types";
+import type {
+  BoardMap,
+  GhostStone,
+  HeatVertex,
+  LineMarker,
+  Marker,
+  Vertex,
+} from "../types";
 import ReviewerLayout from "./ReviewerLayout.vue";
 import "./styles/reviewer.css";
 
@@ -37,6 +45,10 @@ const dragOver = ref(false);
 const statusMessage = ref("");
 const selectedCandidate = ref(0);
 const currentPly = ref(0);
+/** Hover / panel preview index (cleared on leave unless touch-pinned). */
+const previewCandidate = ref<number | null>(null);
+/** Touch tap-to-toggle pin; survives mouseleave until toggled off or ply change. */
+const pinnedPreview = ref<number | null>(null);
 
 const {
   state,
@@ -56,10 +68,32 @@ const ghostStoneMap = ref<BoardMap<GhostStone | null>>([]);
 const markerMap = ref<BoardMap<Marker | null>>([]);
 const lines = ref<LineMarker[]>([]);
 
+const activePreview = computed(() => {
+  if (pinnedPreview.value != null) return pinnedPreview.value;
+  return previewCandidate.value;
+});
+
+const currentCandidates = computed(
+  () => state.value.plies[currentPly.value]?.candidates ?? [],
+);
+
+/** Map board vertex → candidate index for the current ply. */
+const candidateVertexIndex = computed(() => {
+  const size = state.value.size ?? boardSizeFromSgf.value;
+  const map = new Map<string, number>();
+  currentCandidates.value.forEach((c, idx) => {
+    const v = parseGtpVertex(c.move, size);
+    if (v == null) return;
+    map.set(`${v[0]},${v[1]}`, idx);
+  });
+  return map;
+});
+
 function refreshOverlays() {
   const size = state.value.size ?? boardSizeFromSgf.value;
   const overlays = overlaysFor(currentPly.value, size, {
     selectedCandidate: selectedCandidate.value,
+    previewCandidate: activePreview.value,
   });
   heatMap.value = overlays.heatMap;
   paintMap.value = overlays.paintMap;
@@ -68,8 +102,16 @@ function refreshOverlays() {
   lines.value = overlays.lines;
 }
 
-watch([() => state.value, currentPly, selectedCandidate], refreshOverlays, {
-  deep: true,
+watch(
+  [() => state.value, currentPly, selectedCandidate, activePreview],
+  refreshOverlays,
+  { deep: true },
+);
+
+watch(currentPly, () => {
+  previewCandidate.value = null;
+  pinnedPreview.value = null;
+  selectedCandidate.value = 0;
 });
 
 watch(
@@ -173,6 +215,52 @@ function onPlyChange(ply: number) {
   currentPly.value = ply;
 }
 
+function setPreview(index: number) {
+  previewCandidate.value = index;
+}
+
+function clearPreview() {
+  // Keep board preview while touch-pinned.
+  if (pinnedPreview.value != null) return;
+  previewCandidate.value = null;
+}
+
+function togglePreview(index: number) {
+  if (pinnedPreview.value === index) {
+    pinnedPreview.value = null;
+    previewCandidate.value = null;
+  } else {
+    pinnedPreview.value = index;
+    previewCandidate.value = index;
+    selectedCandidate.value = index;
+  }
+}
+
+function onVertexMouseEnter(_evt: MouseEvent, vertex: Vertex) {
+  const idx = candidateVertexIndex.value.get(`${vertex[0]},${vertex[1]}`);
+  if (idx == null) return;
+  setPreview(idx);
+}
+
+function onVertexMouseLeave(_evt: MouseEvent, _vertex: Vertex) {
+  clearPreview();
+}
+
+function onVertexClick(evt: MouseEvent, vertex: Vertex) {
+  const idx = candidateVertexIndex.value.get(`${vertex[0]},${vertex[1]}`);
+  if (idx == null) return;
+  // Tap-to-toggle for touch / pen; mouse click also pins so users can inspect.
+  const isTouch =
+    evt.detail === 0 ||
+    ("pointerType" in evt &&
+      (evt as PointerEvent).pointerType === "touch") ||
+    (typeof window !== "undefined" &&
+      window.matchMedia?.("(pointer: coarse)")?.matches);
+  if (isTouch || evt.detail >= 1) {
+    togglePreview(idx);
+  }
+}
+
 const phaseBadge = computed(() => {
   const s = state.value;
   if (s.status === "error") return `error: ${s.lastError ?? "?"}`;
@@ -263,6 +351,9 @@ const phaseBadge = computed(() => {
         :ghost-stone-map="ghostStoneMap"
         :marker-map="markerMap"
         :lines="lines"
+        :candidates="currentCandidates"
+        :preview-candidate-index="activePreview"
+        :selected-candidate-index="selectedCandidate"
         :comment-override="analysisComment"
         comment-title="Analysis"
         :vertex-size="vertexSize"
@@ -271,6 +362,13 @@ const phaseBadge = computed(() => {
         :animate-stone-placement="true"
         :fuzzy-seed="42"
         @ply-change="onPlyChange"
+        @vertex-mouseenter="onVertexMouseEnter"
+        @vertex-mouseleave="onVertexMouseLeave"
+        @vertex-click="onVertexClick"
+        @preview-candidate="setPreview"
+        @clear-preview="clearPreview"
+        @toggle-candidate="togglePreview"
+        @select-candidate="(i) => (selectedCandidate = i)"
       />
     </div>
   </div>

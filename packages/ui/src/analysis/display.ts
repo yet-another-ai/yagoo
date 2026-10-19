@@ -6,9 +6,12 @@ import type {
   LineMarker,
   Marker,
   Sign,
-  Vertex,
 } from "../types";
-import { emptyBoardMap, ownershipToHeatMap, parseGtpVertex } from "./coords";
+import {
+  emptyBoardMap,
+  ownershipToPaintMap,
+  parseGtpVertex,
+} from "./coords";
 import type {
   AnalysisState,
   CandidateSnapshot,
@@ -44,6 +47,11 @@ const GHOST_TYPES: Array<NonNullable<GhostStone["type"]>> = [
 function ghostTypeForOrder(order: number | null | undefined): GhostStone["type"] {
   if (order == null || order < 0) return "interesting";
   return GHOST_TYPES[Math.min(order, GHOST_TYPES.length - 1)] ?? "interesting";
+}
+
+/** `B` → black (1), `W` → white (−1). Defaults to black. */
+export function colorToSign(toPlay: string | undefined | null): Sign {
+  return toPlay === "W" || toPlay === "w" ? -1 : 1;
 }
 
 export function plyAt(state: AnalysisState, ply: number): PlyAnalysis | null {
@@ -159,7 +167,46 @@ export function formatAnalysisComment(
 }
 
 /**
- * Ghost stones + PV arrows + ownership heat/paint for the current ply.
+ * Sabaki-style PV preview: numbered translucent stones in alternating colors,
+ * starting from `startSign` at the first PV vertex (the candidate itself).
+ * Passes are skipped for placement but still advance the color.
+ */
+export function buildPvPreview(
+  pv: string[],
+  size: number,
+  startSign: Sign,
+): {
+  ghostStoneMap: BoardMap<GhostStone | null>;
+  markerMap: BoardMap<Marker | null>;
+} {
+  const ghostStoneMap = emptyBoardMap<GhostStone | null>(size, null);
+  const markerMap = emptyBoardMap<Marker | null>(size, null);
+  let sign: Sign = startSign === -1 ? -1 : 1;
+  let n = 0;
+
+  for (const move of pv) {
+    const v = parseGtpVertex(move, size);
+    if (v == null) {
+      sign = sign === 1 ? -1 : 1;
+      continue;
+    }
+    n += 1;
+    const [x, y] = v;
+    ghostStoneMap[y]![x] = { sign, faint: false };
+    markerMap[y]![x] = {
+      type: "label",
+      label: String(n),
+      tooltip: `PV ${n}: ${move}`,
+    };
+    sign = sign === 1 ? -1 : 1;
+  }
+
+  return { ghostStoneMap, markerMap };
+}
+
+/**
+ * Ghost stones + ownership paint for the current ply.
+ * PV is shown only while `previewCandidate` is set (hover / tap) — no arrows.
  */
 export function buildBoardOverlays(
   state: AnalysisState,
@@ -168,7 +215,13 @@ export function buildBoardOverlays(
     size: number;
     showOwnership?: boolean;
     showCandidates?: boolean;
+    /** Highlighted candidate when not previewing (best = 0). */
     selectedCandidate?: number;
+    /**
+     * When set, replace candidate ghosts with a Sabaki-style numbered PV
+     * preview for that candidate index. `null` / omitted → normal candidates.
+     */
+    previewCandidate?: number | null;
   },
 ): PlyBoardOverlays {
   const size = options.size;
@@ -177,16 +230,37 @@ export function buildBoardOverlays(
   const showOwnership = options.showOwnership !== false;
   const showCandidates = options.showCandidates !== false;
   const selected = options.selectedCandidate ?? 0;
+  const previewIdx = options.previewCandidate;
 
-  // Ownership: soft heat glow only (no paint fill, no numeric labels).
-  const heatMap = showOwnership
-    ? ownershipToHeatMap(root?.ownership, size)
-    : emptyBoardMap<HeatVertex | null>(size, null);
-  const paintMap = emptyBoardMap(size, 0);
+  // Sabaki-like medium B/W territory paint (fractional opacity via |paint|).
+  const heatMap = emptyBoardMap<HeatVertex | null>(size, null);
+  const paintMap = showOwnership
+    ? ownershipToPaintMap(root?.ownership, size)
+    : emptyBoardMap(size, 0);
+
+  const lines: LineMarker[] = [];
+
+  if (
+    previewIdx != null &&
+    previewIdx >= 0 &&
+    info?.candidates?.[previewIdx] != null
+  ) {
+    const focus = info.candidates[previewIdx]!;
+    const pv =
+      focus.pv && focus.pv.length > 0 ? focus.pv : [focus.move];
+    const startSign = colorToSign(info.toPlay);
+    const preview = buildPvPreview(pv, size, startSign);
+    return {
+      heatMap,
+      paintMap,
+      ghostStoneMap: preview.ghostStoneMap,
+      markerMap: preview.markerMap,
+      lines,
+    };
+  }
 
   const ghostStoneMap = emptyBoardMap<GhostStone | null>(size, null);
   const markerMap = emptyBoardMap<Marker | null>(size, null);
-  const lines: LineMarker[] = [];
 
   if (showCandidates && info?.candidates?.length) {
     applyCandidates(
@@ -195,7 +269,6 @@ export function buildBoardOverlays(
       selected,
       ghostStoneMap,
       markerMap,
-      lines,
     );
   }
 
@@ -211,9 +284,7 @@ function applyCandidates(
   selected: number,
   ghostStoneMap: BoardMap<GhostStone | null>,
   markerMap: BoardMap<Marker | null>,
-  lines: LineMarker[],
 ): void {
-  const toPlaySign: Sign = 1; // overlays are decorative; ghost sign follows order coloring
   const labeled = candidates.slice(0, MAX_CANDIDATE_LABELS);
 
   labeled.forEach((c, idx) => {
@@ -229,11 +300,14 @@ function applyCandidates(
     const wrLabel =
       c.winrate != null ? `${(c.winrate * 100).toFixed(0)}%` : "";
     const text = [wrLabel, visitsLabel].filter(Boolean).join("\n") || null;
+    const isBest = idx === 0 || (c.order ?? idx) === 0;
+    const isSelected = idx === selected;
 
     ghostStoneMap[y]![x] = {
-      sign: toPlaySign,
+      // Black ring fill; type carries Sabaki candidate coloring.
+      sign: 1,
       type: ghostTypeForOrder(c.order ?? idx),
-      faint: idx !== selected,
+      faint: !isBest && !isSelected,
     };
     markerMap[y]![x] = {
       type: "label",
@@ -241,16 +315,6 @@ function applyCandidates(
       tooltip: `${c.move} · order ${c.order ?? idx}`,
     };
   });
-
-  const focus = labeled[selected] ?? labeled[0];
-  if (focus?.pv && focus.pv.length >= 2) {
-    for (let i = 0; i < focus.pv.length - 1; i++) {
-      const a = parseGtpVertex(focus.pv[i]!, size);
-      const b = parseGtpVertex(focus.pv[i + 1]!, size);
-      if (a == null || b == null) continue;
-      lines.push({ v1: a, v2: b, type: "arrow" });
-    }
-  }
 }
 
 /** Default Chinese rules when SGF has no RU (matches `yagoo-sgf` / pipeline). */

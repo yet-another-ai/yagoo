@@ -47,8 +47,7 @@ export function clampOwnership(v: number): number {
  * Strength 1–9 scales with |ownership|. **No text labels** — candidate winrate /
  * visits belong on ghost markers, not ownership cells (Sabaki-style).
  *
- * Prefer this over paint-map for ownership: heat is a soft per-vertex glow so
- * stones and grid stay readable (paint fills merge into opaque blocks).
+ * Prefer paint-map for Sabaki-like black/white territory shading (docs reviewer).
  */
 export function ownershipToHeatMap(
   ownership: number[] | null | undefined,
@@ -78,13 +77,21 @@ export function ownershipToHeatMap(
 }
 
 /**
- * Ownership → Sabaki paint map (`1` black / `-1` white).
- * Kept for callers that want territory tint; the docs reviewer uses heat instead.
+ * Medium Sabaki-like paint strength: max |paint| ≈ this value so Vertex opacity
+ * stays translucent (stones/grid remain visible; no opaque blocks).
+ */
+export const OWNERSHIP_PAINT_STRENGTH = 0.55;
+
+/**
+ * Ownership → Sabaki paint map. Values are **signed fractions**
+ * `sign(own) * |own| * strength` so `Vertex` sets `--shudan-paint-opacity` to
+ * `|paint|` (black / white territory shading scaled by confidence).
  */
 export function ownershipToPaintMap(
   ownership: number[] | null | undefined,
   size: number,
-  threshold = 0.2,
+  threshold = 0.08,
+  strength = OWNERSHIP_PAINT_STRENGTH,
 ): BoardMap<number> {
   const map = emptyBoardMap(size, 0);
   if (ownership == null) return map;
@@ -92,11 +99,12 @@ export function ownershipToPaintMap(
     const raw = ownership[i];
     if (raw == null) continue;
     const v = clampOwnership(raw);
-    if (Math.abs(v) < threshold) continue;
+    const abs = Math.abs(v);
+    if (abs < threshold) continue;
     const y = Math.floor(i / size);
     const x = i % size;
     if (y < 0 || y >= size || x < 0 || x >= size) continue;
-    map[y]![x] = v > 0 ? 1 : -1;
+    map[y]![x] = Math.sign(v) * abs * strength;
   }
   return map;
 }

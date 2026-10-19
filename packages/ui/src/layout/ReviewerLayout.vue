@@ -7,6 +7,7 @@ import {
   ref,
   watch,
 } from "vue";
+import type { CandidateSnapshot } from "../analysis/types";
 import { useGame } from "../composables/useGame";
 import Goban from "../goban/Goban.vue";
 import OverlayLayer from "../overlays/OverlayLayer.vue";
@@ -21,6 +22,7 @@ import type {
   Vertex,
 } from "../types";
 import BottomBar from "./BottomBar.vue";
+import CandidatesPanel from "./CandidatesPanel.vue";
 import CommentBox from "./CommentBox.vue";
 import WinrateGraph, { type WinratePoint } from "./WinrateGraph.vue";
 import "./styles/reviewer.css";
@@ -48,6 +50,10 @@ const props = withDefaults(
     /** Override the SGF node comment (e.g. live analysis text). */
     commentOverride?: string | null;
     commentTitle?: string;
+    /** Analysis candidates for the current ply (sidebar panel). */
+    candidates?: CandidateSnapshot[];
+    previewCandidateIndex?: number | null;
+    selectedCandidateIndex?: number;
   }>(),
   {
     showCoordinates: true,
@@ -59,12 +65,22 @@ const props = withDefaults(
     lines: () => [],
     commentOverride: null,
     commentTitle: "Comment",
+    candidates: () => [],
+    previewCandidateIndex: null,
+    selectedCandidateIndex: 0,
   },
 );
 
 const emit = defineEmits<{
   (e: "ply-change", ply: number): void;
   (e: "select-ply", ply: number): void;
+  (e: "vertex-mouseenter", evt: MouseEvent, vertex: Vertex): void;
+  (e: "vertex-mouseleave", evt: MouseEvent, vertex: Vertex): void;
+  (e: "vertex-click", evt: MouseEvent, vertex: Vertex): void;
+  (e: "preview-candidate", index: number): void;
+  (e: "clear-preview"): void;
+  (e: "toggle-candidate", index: number): void;
+  (e: "select-candidate", index: number): void;
 }>();
 
 const {
@@ -206,6 +222,9 @@ defineExpose({
           :fuzzy-stone-placement="fuzzyStonePlacement"
           :animate-stone-placement="animateStonePlacement"
           :fuzzy-seed="fuzzySeed"
+          @vertex-mouseenter="(evt, v) => emit('vertex-mouseenter', evt, v)"
+          @vertex-mouseleave="(evt, v) => emit('vertex-mouseleave', evt, v)"
+          @vertex-click="(evt, v) => emit('vertex-click', evt, v)"
         >
           <OverlayLayer
             :vertex-size="effectiveVertexSize"
@@ -224,6 +243,15 @@ defineExpose({
         :height="140"
         :show-score-lead="true"
         @select="onSelectPly"
+      />
+      <CandidatesPanel
+        :candidates="candidates"
+        :preview-index="previewCandidateIndex"
+        :selected-index="selectedCandidateIndex"
+        @preview="(i) => emit('preview-candidate', i)"
+        @clear-preview="emit('clear-preview')"
+        @toggle="(i) => emit('toggle-candidate', i)"
+        @select="(i) => emit('select-candidate', i)"
       />
       <div class="yagoo-gametree-placeholder">
         Game tree panel — placeholder (out of scope for MVP).

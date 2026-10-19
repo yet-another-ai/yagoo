@@ -25,6 +25,7 @@ export {
 
 export {
   emptyBoardMap,
+  OWNERSHIP_PAINT_STRENGTH,
   ownershipToHeatMap,
   ownershipToPaintMap,
   parseGtpVertex,
@@ -32,7 +33,9 @@ export {
 
 export {
   buildBoardOverlays,
+  buildPvPreview,
   buildReviewSeries,
+  colorToSign,
   formatAnalysisComment,
   plyAt,
   resolveSgfRules,

@@ -3,6 +3,7 @@ export { default as OverlayLayer } from "./overlays/OverlayLayer.vue";
 export { default as ReviewerLayout } from "./layout/ReviewerLayout.vue";
 export { default as AnalysisReviewer } from "./layout/AnalysisReviewer.vue";
 export { default as BottomBar } from "./layout/BottomBar.vue";
+export { default as CandidatesPanel } from "./layout/CandidatesPanel.vue";
 export { default as CommentBox } from "./layout/CommentBox.vue";
 export { default as WinrateGraph } from "./layout/WinrateGraph.vue";
 export type { WinratePoint } from "./layout/WinrateGraph.vue";
@@ -12,8 +13,11 @@ export type { GamePlayerInfo, UseGameResult } from "./composables/useGame";
 
 export {
   PIPELINE_SCHEMA_VERSION,
+  OWNERSHIP_PAINT_STRENGTH,
   buildBoardOverlays,
+  buildPvPreview,
   buildReviewSeries,
+  colorToSign,
   createBrowserEngineSource,
   createInitialAnalysisState,
   createLiveNativeSource,

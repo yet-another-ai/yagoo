@@ -26,10 +26,16 @@ export interface OverlayData {
   fields?: OverlayField[];
   polygons?: OverlayPolygon[];
   lines?: OverlayLine[];
-  /** Group outline demo: list of board vertices to outline. */
+  /** Group (块) outlines — vertices to outline (not chains/串). */
   groupOutlines?: Array<{
     vertices: Array<[number, number]>;
     color?: string;
+    /** Stroke width in px (default 2). */
+    strokeWidth?: number;
+    /** e.g. `"4 3"` for dead/weak dashed outlines. */
+    dasharray?: string;
+    /** Optional data attribute for tests / hover. */
+    groupId?: string;
   }>;
 }
 

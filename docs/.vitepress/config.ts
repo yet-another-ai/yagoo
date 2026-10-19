@@ -15,6 +15,7 @@ export default defineConfig({
     nav: [
       { text: "Overview", link: "/" },
       { text: "Architecture", link: "/architecture" },
+      { text: "Reviewer", link: "/app/" },
       { text: "Demo", link: "/demo/" },
       { text: "MVP", link: "/mvp" },
       {
@@ -59,6 +60,7 @@ export default defineConfig({
         text: "Plan",
         items: [
           { text: "Architecture & data flow", link: "/architecture" },
+          { text: "Reviewer app", link: "/app/" },
           { text: "Frontend demo", link: "/demo/" },
           { text: "MVP & validation", link: "/mvp" },
           { text: "Open questions", link: "/open-questions" },

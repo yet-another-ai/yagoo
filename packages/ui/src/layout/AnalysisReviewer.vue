@@ -1,0 +1,549 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from "vue";
+import {
+  buildGroupOutlines,
+  buildGroupVertexIndex,
+  createBrowserEngineSource,
+  createLiveNativeSource,
+  createNdjsonTextSource,
+  dimVerticesOutsideGroup,
+  groupMemberVertices,
+  isBrowserEngineAvailable,
+  isLiveNativeAvailable,
+  parseGtpVertex,
+  resolveSgfRules,
+  useAnalysisStream,
+} from "../analysis";
+import type {
+  BoardMap,
+  GhostStone,
+  HeatVertex,
+  LineMarker,
+  Marker,
+  Vertex,
+} from "../types";
+import ReviewerLayout from "./ReviewerLayout.vue";
+import "./styles/reviewer.css";
+
+const props = defineProps<{
+  /** Initial / bundled sample SGF. */
+  initialSgf?: string;
+  /** Initial / bundled NDJSON analysis (loaded progressively). */
+  initialNdjson?: string;
+  /**
+   * Optional fixed stone size. When omitted, `ReviewerLayout` sizes the board
+   * from its container via ResizeObserver (fills available area).
+   */
+  vertexSize?: number;
+}>();
+
+function parseBoardSize(sgf: string): number {
+  const n = Number.parseInt(/SZ\[(\d+)/i.exec(sgf)?.[1] ?? "19", 10);
+  return Number.isFinite(n) && n >= 2 ? n : 19;
+}
+
+const sgfText = ref(props.initialSgf ?? "");
+const rulesLabel = computed(() => resolveSgfRules(sgfText.value));
+const boardSizeFromSgf = computed(() => parseBoardSize(sgfText.value));
+const dragOver = ref(false);
+const statusMessage = ref("");
+const selectedCandidate = ref(0);
+const currentPly = ref(0);
+/** Hover / panel preview index (cleared on leave unless touch-pinned). */
+const previewCandidate = ref<number | null>(null);
+/** Touch tap-to-toggle pin; survives mouseleave until toggled off or ply change. */
+const pinnedPreview = ref<number | null>(null);
+/** Hovered / selected teaching group (块). */
+const previewGroupId = ref<string | null>(null);
+const pinnedGroupId = ref<string | null>(null);
+const selectedGroupId = ref<string | null>(null);
+
+const {
+  state,
+  series,
+  sourceLabel,
+  isStreaming,
+  reset,
+  attachSource,
+  overlaysFor,
+  commentFor,
+} = useAnalysisStream();
+
+const emptyHeat = computed<BoardMap<HeatVertex | null>>(() => []);
+const heatMap = ref<BoardMap<HeatVertex | null>>([]);
+const paintMap = ref<BoardMap<number>>([]);
+const ghostStoneMap = ref<BoardMap<GhostStone | null>>([]);
+const markerMap = ref<BoardMap<Marker | null>>([]);
+const lines = ref<LineMarker[]>([]);
+
+const activePreview = computed(() => {
+  if (pinnedPreview.value != null) return pinnedPreview.value;
+  return previewCandidate.value;
+});
+
+const activeGroupId = computed(() => {
+  if (pinnedGroupId.value != null) return pinnedGroupId.value;
+  return previewGroupId.value ?? selectedGroupId.value;
+});
+
+const currentCandidates = computed(
+  () => state.value.plies[currentPly.value]?.candidates ?? [],
+);
+
+const currentGroups = computed(
+  () => state.value.plies[currentPly.value]?.groups ?? [],
+);
+
+/** Map board vertex → candidate index for the current ply. */
+const candidateVertexIndex = computed(() => {
+  const size = state.value.size ?? boardSizeFromSgf.value;
+  const map = new Map<string, number>();
+  currentCandidates.value.forEach((c, idx) => {
+    const v = parseGtpVertex(c.move, size);
+    if (v == null) return;
+    map.set(`${v[0]},${v[1]}`, idx);
+  });
+  return map;
+});
+
+const groupVertexIndex = computed(() => {
+  const size = state.value.size ?? boardSizeFromSgf.value;
+  return buildGroupVertexIndex(currentGroups.value, size);
+});
+
+const groupOutlines = computed(() => {
+  const size = state.value.size ?? boardSizeFromSgf.value;
+  return buildGroupOutlines(currentGroups.value, size, activeGroupId.value);
+});
+
+const dimmedVertices = computed(() => {
+  const size = state.value.size ?? boardSizeFromSgf.value;
+  const focus = currentGroups.value.find(
+    (g) => g.groupId === activeGroupId.value,
+  );
+  return dimVerticesOutsideGroup(focus, size);
+});
+
+const selectedVertices = computed(() => {
+  const size = state.value.size ?? boardSizeFromSgf.value;
+  const focus = currentGroups.value.find(
+    (g) => g.groupId === activeGroupId.value,
+  );
+  if (focus == null) return [] as Vertex[];
+  return groupMemberVertices(focus, size);
+});
+
+function refreshOverlays() {
+  const size = state.value.size ?? boardSizeFromSgf.value;
+  const overlays = overlaysFor(currentPly.value, size, {
+    selectedCandidate: selectedCandidate.value,
+    previewCandidate: activePreview.value,
+  });
+  heatMap.value = overlays.heatMap;
+  paintMap.value = overlays.paintMap;
+  ghostStoneMap.value = overlays.ghostStoneMap;
+  markerMap.value = overlays.markerMap;
+  lines.value = overlays.lines;
+}
+
+watch(
+  [() => state.value, currentPly, selectedCandidate, activePreview],
+  refreshOverlays,
+  { deep: true },
+);
+
+watch(currentPly, () => {
+  previewCandidate.value = null;
+  pinnedPreview.value = null;
+  selectedCandidate.value = 0;
+  previewGroupId.value = null;
+  pinnedGroupId.value = null;
+  selectedGroupId.value = null;
+});
+
+watch(
+  () => state.value.status,
+  (status) => {
+    if (status === "completed" && sourceLabel.value) {
+      statusMessage.value = `Loaded ${sourceLabel.value}`;
+    } else if (status === "error" && state.value.lastError) {
+      statusMessage.value = state.value.lastError;
+    }
+  },
+);
+
+const analysisComment = computed(() =>
+  commentFor(currentPly.value, /* sgf comment merged inside */ ""),
+);
+
+const liveAvailable = isLiveNativeAvailable();
+const browserAvailable = isBrowserEngineAvailable(null);
+
+onMounted(() => {
+  if (props.initialNdjson) {
+    loadNdjsonText(props.initialNdjson, "bundled sample analysis");
+  } else {
+    refreshOverlays();
+  }
+});
+
+watch(
+  () => props.initialSgf,
+  (v) => {
+    if (v) sgfText.value = v;
+  },
+);
+
+function loadNdjsonText(text: string, label: string) {
+  reset();
+  statusMessage.value = `Loading ${label}…`;
+  attachSource(
+    createNdjsonTextSource(text, {
+      progressive: true,
+      batchSize: 3,
+      label,
+    }),
+  );
+  statusMessage.value = `Streaming from ${label}`;
+}
+
+async function onSgfFile(file: File) {
+  const text = await file.text();
+  sgfText.value = text;
+  statusMessage.value = `Loaded SGF ${file.name} (rules: ${resolveSgfRules(text)})`;
+}
+
+async function onNdjsonFile(file: File) {
+  const text = await file.text();
+  loadNdjsonText(text, file.name);
+}
+
+function onFileInput(kind: "sgf" | "ndjson", ev: Event) {
+  const input = ev.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  if (kind === "sgf") void onSgfFile(file);
+  else void onNdjsonFile(file);
+  input.value = "";
+}
+
+function onDrop(ev: DragEvent) {
+  ev.preventDefault();
+  dragOver.value = false;
+  const files = ev.dataTransfer?.files;
+  if (!files?.length) return;
+  for (const file of Array.from(files)) {
+    const name = file.name.toLowerCase();
+    if (name.endsWith(".sgf") || name.endsWith(".sgf.txt")) {
+      void onSgfFile(file);
+    } else if (
+      name.endsWith(".ndjson") ||
+      name.endsWith(".jsonl") ||
+      name.endsWith(".json")
+    ) {
+      void onNdjsonFile(file);
+    }
+  }
+}
+
+function tryLiveNative() {
+  reset();
+  statusMessage.value = "Connecting to local native engine…";
+  attachSource(createLiveNativeSource());
+}
+
+function tryBrowserEngine() {
+  reset();
+  statusMessage.value = "Starting browser engine…";
+  attachSource(createBrowserEngineSource());
+}
+
+function onPlyChange(ply: number) {
+  currentPly.value = ply;
+}
+
+function setPreview(index: number) {
+  previewCandidate.value = index;
+}
+
+function clearPreview() {
+  // Keep board preview while touch-pinned.
+  if (pinnedPreview.value != null) return;
+  previewCandidate.value = null;
+}
+
+function togglePreview(index: number) {
+  if (pinnedPreview.value === index) {
+    pinnedPreview.value = null;
+    previewCandidate.value = null;
+  } else {
+    pinnedPreview.value = index;
+    previewCandidate.value = index;
+    selectedCandidate.value = index;
+  }
+}
+
+function setGroupPreview(groupId: string) {
+  previewGroupId.value = groupId;
+}
+
+function clearGroupPreview() {
+  if (pinnedGroupId.value != null) return;
+  previewGroupId.value = null;
+}
+
+function selectGroup(groupId: string) {
+  if (selectedGroupId.value === groupId && pinnedGroupId.value === groupId) {
+    selectedGroupId.value = null;
+    pinnedGroupId.value = null;
+    previewGroupId.value = null;
+    return;
+  }
+  selectedGroupId.value = groupId;
+  pinnedGroupId.value = groupId;
+  previewGroupId.value = groupId;
+}
+
+function onVertexMouseEnter(_evt: MouseEvent, vertex: Vertex) {
+  const key = `${vertex[0]},${vertex[1]}`;
+  const idx = candidateVertexIndex.value.get(key);
+  if (idx != null) {
+    setPreview(idx);
+    return;
+  }
+  const gid = groupVertexIndex.value.get(key);
+  if (gid != null) setGroupPreview(gid);
+}
+
+function onVertexMouseLeave(_evt: MouseEvent, _vertex: Vertex) {
+  clearPreview();
+  clearGroupPreview();
+}
+
+function onVertexClick(evt: MouseEvent, vertex: Vertex) {
+  const key = `${vertex[0]},${vertex[1]}`;
+  const idx = candidateVertexIndex.value.get(key);
+  if (idx != null) {
+    const isTouch =
+      evt.detail === 0 ||
+      ("pointerType" in evt &&
+        (evt as PointerEvent).pointerType === "touch") ||
+      (typeof window !== "undefined" &&
+        window.matchMedia?.("(pointer: coarse)")?.matches);
+    if (isTouch || evt.detail >= 1) {
+      togglePreview(idx);
+    }
+    return;
+  }
+  const gid = groupVertexIndex.value.get(key);
+  if (gid != null) selectGroup(gid);
+}
+
+const phaseBadge = computed(() => {
+  const s = state.value;
+  if (s.status === "error") return `error: ${s.lastError ?? "?"}`;
+  if (s.currentPhase) {
+    return `${s.currentPhase} @ ply ${s.activePly ?? "—"} (${s.eventCount} events)`;
+  }
+  if (s.status === "completed") {
+    return `complete · ${s.eventCount} events · deep [${s.deepPlies.join(",") || "—"}]`;
+  }
+  if (isStreaming.value) return `streaming · ${s.eventCount} events`;
+  return "idle";
+});
+</script>
+
+<template>
+  <div
+    class="yagoo-analysis-app"
+    :class="{ 'yagoo-analysis-app--drag': dragOver }"
+    @dragenter.prevent="dragOver = true"
+    @dragover.prevent="dragOver = true"
+    @dragleave.prevent="dragOver = false"
+    @drop="onDrop"
+  >
+    <header class="yagoo-analysis-app__toolbar">
+      <div class="yagoo-analysis-app__brand">Yagoo Reviewer</div>
+      <div class="yagoo-analysis-app__controls">
+        <label class="yagoo-analysis-app__btn">
+          Open SGF
+          <input
+            type="file"
+            accept=".sgf,text/plain"
+            hidden
+            @change="onFileInput('sgf', $event)"
+          />
+        </label>
+        <label class="yagoo-analysis-app__btn">
+          Import NDJSON
+          <input
+            type="file"
+            accept=".ndjson,.jsonl,.json,text/plain"
+            hidden
+            @change="onFileInput('ndjson', $event)"
+          />
+        </label>
+        <button
+          type="button"
+          class="yagoo-analysis-app__btn"
+          :disabled="!liveAvailable"
+          :title="
+            liveAvailable
+              ? 'Connect to yagoo analyze --serve'
+              : 'Follow-up: yagoo analyze --serve (WebSocket/SSE)'
+          "
+          @click="tryLiveNative"
+        >
+          Live native
+        </button>
+        <button
+          type="button"
+          class="yagoo-analysis-app__btn"
+          :disabled="!browserAvailable"
+          title="Follow-up: browser engine after PR #7 merges"
+          @click="tryBrowserEngine"
+        >
+          Browser engine
+        </button>
+      </div>
+      <div class="yagoo-analysis-app__meta">
+        <span>RU {{ rulesLabel }}</span>
+        <span v-if="sourceLabel">· {{ sourceLabel }}</span>
+        <span>· {{ phaseBadge }}</span>
+      </div>
+    </header>
+
+    <p v-if="statusMessage" class="yagoo-analysis-app__status">
+      {{ statusMessage }}
+    </p>
+    <p v-if="dragOver" class="yagoo-analysis-app__drop">
+      Drop SGF and/or NDJSON analysis files…
+    </p>
+
+    <div class="yagoo-analysis-app__board">
+      <ReviewerLayout
+        :sgf="sgfText"
+        :winrate-data="series"
+        :heat-map="heatMap.length ? heatMap : emptyHeat"
+        :paint-map="paintMap"
+        :ghost-stone-map="ghostStoneMap"
+        :marker-map="markerMap"
+        :lines="lines"
+        :candidates="currentCandidates"
+        :preview-candidate-index="activePreview"
+        :selected-candidate-index="selectedCandidate"
+        :groups="currentGroups"
+        :preview-group-id="previewGroupId ?? pinnedGroupId"
+        :selected-group-id="selectedGroupId"
+        :group-outlines="groupOutlines"
+        :dimmed-vertices="dimmedVertices"
+        :selected-vertices="selectedVertices"
+        :comment-override="analysisComment"
+        comment-title="Analysis"
+        :vertex-size="vertexSize"
+        :show-coordinates="true"
+        :fuzzy-stone-placement="true"
+        :animate-stone-placement="true"
+        :fuzzy-seed="42"
+        @ply-change="onPlyChange"
+        @vertex-mouseenter="onVertexMouseEnter"
+        @vertex-mouseleave="onVertexMouseLeave"
+        @vertex-click="onVertexClick"
+        @preview-candidate="setPreview"
+        @clear-preview="clearPreview"
+        @toggle-candidate="togglePreview"
+        @select-candidate="(i) => (selectedCandidate = i)"
+        @preview-group="setGroupPreview"
+        @clear-group-preview="clearGroupPreview"
+        @select-group="selectGroup"
+      />
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.yagoo-analysis-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: #0d0d0d;
+  color: #eee;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+}
+
+.yagoo-analysis-app--drag {
+  outline: 2px dashed #0082f0;
+  outline-offset: -4px;
+}
+
+.yagoo-analysis-app__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding: 0.55rem 0.85rem;
+  background: #181818;
+  border-bottom: 1px solid #333;
+  flex: 0 0 auto;
+}
+
+.yagoo-analysis-app__brand {
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: #f2f2f2;
+}
+
+.yagoo-analysis-app__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.yagoo-analysis-app__btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.65rem;
+  border: 1px solid #444;
+  border-radius: 3px;
+  background: #222;
+  color: #eee;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.yagoo-analysis-app__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.yagoo-analysis-app__btn:not(:disabled):hover {
+  border-color: #0082f0;
+}
+
+.yagoo-analysis-app__meta {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: #9a9a9a;
+}
+
+.yagoo-analysis-app__status,
+.yagoo-analysis-app__drop {
+  margin: 0;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8rem;
+  color: #bbb;
+  background: #141414;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.yagoo-analysis-app__drop {
+  color: #0082f0;
+}
+
+.yagoo-analysis-app__board {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+</style>

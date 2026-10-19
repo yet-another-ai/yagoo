@@ -11,6 +11,7 @@ Versioned, typed JSON consumed by teaching modules (groups, tempo, zoning, ledge
 | Ownership arrays | Row-major from **A19**, length `size²` |
 | Coordinates in board/chains/moves | GTP strings (`D4`, `pass`) |
 | `chains` | Rules **chains** (串), not teaching **groups** (块) |
+| `groups` | **Not emitted yet** — teaching **groups** (块). See [groups proposal](./groups-proposal.md) |
 
 ## Documents
 

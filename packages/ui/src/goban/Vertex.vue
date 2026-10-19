@@ -101,8 +101,10 @@ const classList = computed(() => {
 
 const paintStyle = computed(() => {
   const paint = props.paint ?? 0;
+  // Opacity must be non-negative — signed paint encodes color via
+  // shudan-paint_±1; |paint| is the Sabaki territory strength.
   const sources = paint
-    ? [paint]
+    ? [Math.abs(paint)]
     : [props.paintLeft, props.paintRight, props.paintTop, props.paintBottom]
         .filter((x) => x !== 0 && x != null && !Number.isNaN(x))
         .map((x) => Math.abs(x!) * 0.5);
@@ -172,21 +174,22 @@ function abs(zIndex?: number) {
     :style="{ position: 'relative' }"
     v-on="listeners"
   >
-    <Marker
-      v-if="!sign && marker"
-      :sign="sign"
-      :type="marker.type"
-      :label="marker.label"
-      :z-index="0"
-    />
-
     <div
       v-if="!sign && ghostStone"
       class="shudan-ghost"
       :style="abs(1)"
     />
 
-    <div class="shudan-stone" :style="abs(2)">
+    <!-- Marker above ghost so PV / candidate labels stay legible. -->
+    <Marker
+      v-if="!sign && marker"
+      :sign="sign"
+      :type="marker.type"
+      :label="marker.label"
+      :z-index="2"
+    />
+
+    <div class="shudan-stone" :style="abs(3)">
       <div
         v-if="sign"
         class="shudan-inner shudan-stone-image"
@@ -200,6 +203,7 @@ function abs(zIndex?: number) {
         :sign="sign"
         :type="marker.type"
         :label="marker.label"
+        :z-index="4"
       />
     </div>
 
@@ -217,11 +221,12 @@ function abs(zIndex?: number) {
 
     <div v-if="selected" class="shudan-selection" :style="abs(4)" />
 
-    <div class="shudan-heat" :style="abs(5)" />
+    <!-- Heat under stones so ownership glow does not obscure them. -->
+    <div class="shudan-heat" :style="abs(0)" />
     <div
       v-if="heat?.text != null"
       class="shudan-heatlabel"
-      :style="abs(6)"
+      :style="abs(5)"
     >
       {{ heat.text.toString() }}
     </div>

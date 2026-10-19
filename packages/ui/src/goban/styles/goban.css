@@ -11,6 +11,10 @@
     --shudan-white-background-color: #eee;
     --shudan-white-foreground-color: #222;
 
+    /* Sabaki default — without this, paint fills render fully opaque. */
+    --shudan-paint-opacity: 0.35;
+    --shudan-paint-box-shadow: none;
+
     position: relative;
     border: var(--shudan-board-border-width) solid var(--shudan-board-border-color);
     color: var(--shudan-board-foreground-color);
@@ -226,17 +230,19 @@
   .shudan-vertex.shudan-smalllabel .shudan-marker {
     max-height: 2.7em;
     max-width: 2.7em;
-    font-size: .36em;
+    font-size: .42em;
+    font-weight: 650;
+    line-height: 1.15;
 }
 
-/* Ghost stones */
+/* Ghost stones — Sabaki-visible candidate rings + PV stone previews */
 
 .shudan-vertex .shudan-ghost {
     left: 50%;
     top: 50%;
-    width: .4em;
-    height: .4em;
-    opacity: .5;
+    width: .72em;
+    height: .72em;
+    opacity: .88;
     transform: translate(calc(-50% + .5px), calc(-50% + .5px));
   }
   .shudan-vertex .shudan-ghost::before {
@@ -246,36 +252,96 @@
     position: absolute;
     left: 50%;
     top: 50%;
-    width: .4em;
-    height: .4em;
+    width: .72em;
+    height: .72em;
     border-radius: 50%;
     transform: translate(-50%, -50%);
+    border: .06em solid rgba(255, 255, 255, .55);
+    box-shadow: 0 0 0 .04em rgba(0, 0, 0, .25);
   }
   .shudan-vertex.shudan-ghost_faint .shudan-ghost {
-    opacity: .3;
+    opacity: .55;
   }
   .shudan-vertex.shudan-sign_0.shudan-ghost_1 .shudan-ghost::before,
   .shudan-vertex.shudan-sign_0.shudan-ghost_-1 .shudan-ghost::before {
     display: block;
   }
+  /* PV preview: larger translucent B/W stones (no candidate type class). */
+  .shudan-vertex.shudan-sign_0.shudan-ghost_1:not(.shudan-ghost_good):not(.shudan-ghost_interesting):not(.shudan-ghost_doubtful):not(.shudan-ghost_bad) .shudan-ghost,
+  .shudan-vertex.shudan-sign_0.shudan-ghost_-1:not(.shudan-ghost_good):not(.shudan-ghost_interesting):not(.shudan-ghost_doubtful):not(.shudan-ghost_bad) .shudan-ghost {
+    width: .92em;
+    height: .92em;
+    opacity: .78;
+  }
+  .shudan-vertex.shudan-sign_0.shudan-ghost_1:not(.shudan-ghost_good):not(.shudan-ghost_interesting):not(.shudan-ghost_doubtful):not(.shudan-ghost_bad) .shudan-ghost::before,
+  .shudan-vertex.shudan-sign_0.shudan-ghost_-1:not(.shudan-ghost_good):not(.shudan-ghost_interesting):not(.shudan-ghost_doubtful):not(.shudan-ghost_bad) .shudan-ghost::before {
+    width: .92em;
+    height: .92em;
+    border: .04em solid rgba(0, 0, 0, .35);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .25);
+  }
+  .shudan-vertex.shudan-sign_0.shudan-ghost_-1:not(.shudan-ghost_good):not(.shudan-ghost_interesting):not(.shudan-ghost_doubtful):not(.shudan-ghost_bad) .shudan-ghost::before {
+    border-color: rgba(0, 0, 0, .45);
+    background: #f7f7f7;
+  }
   .shudan-vertex.shudan-ghost_1 .shudan-ghost::before {
-    background: rgba(0, 0, 0, .8);
+    background: rgba(0, 0, 0, .82);
   }
   .shudan-vertex.shudan-ghost_-1 .shudan-ghost::before {
-    background: white;
+    background: rgba(255, 255, 255, .92);
   }
   .shudan-vertex.shudan-ghost_good .shudan-ghost::before {
     background: #59A80F;
+    border-color: #d8f5a8;
+    box-shadow: 0 0 0 .07em rgba(89, 168, 15, .85);
   }
   .shudan-vertex.shudan-ghost_interesting .shudan-ghost::before {
     background: #4886D5;
+    border-color: #b7d4f7;
   }
   .shudan-vertex.shudan-ghost_doubtful .shudan-ghost::before {
     background: #92278F;
+    border-color: #e0a8de;
   }
   .shudan-vertex.shudan-ghost_bad .shudan-ghost::before {
     background: #F02311;
-}
+    border-color: #ffb3ab;
+  }
+  /* Number labels on PV ghosts: above the stone, high contrast, always readable. */
+  .shudan-vertex.shudan-sign_0.shudan-ghost_1.shudan-marker_label:not(.shudan-ghost_good):not(.shudan-ghost_interesting):not(.shudan-ghost_doubtful):not(.shudan-ghost_bad) .shudan-marker,
+  .shudan-vertex.shudan-sign_0.shudan-ghost_-1.shudan-marker_label:not(.shudan-ghost_good):not(.shudan-ghost_interesting):not(.shudan-ghost_doubtful):not(.shudan-ghost_bad) .shudan-marker {
+    background: transparent;
+    font-weight: 800;
+    font-size: .62em;
+    line-height: 1;
+    max-width: none;
+    max-height: none;
+    overflow: visible;
+    pointer-events: none;
+  }
+  .shudan-vertex.shudan-sign_0.shudan-ghost_1.shudan-marker_label:not(.shudan-ghost_good):not(.shudan-ghost_interesting):not(.shudan-ghost_doubtful):not(.shudan-ghost_bad) .shudan-marker {
+    color: #fff;
+    text-shadow:
+      0 0 2px rgba(0, 0, 0, .95),
+      0 1px 2px rgba(0, 0, 0, .85),
+      0 0 1px #000;
+  }
+  .shudan-vertex.shudan-sign_0.shudan-ghost_-1.shudan-marker_label:not(.shudan-ghost_good):not(.shudan-ghost_interesting):not(.shudan-ghost_doubtful):not(.shudan-ghost_bad) .shudan-marker {
+    color: #111;
+    text-shadow:
+      0 0 2px rgba(255, 255, 255, .95),
+      0 1px 1px rgba(255, 255, 255, .8),
+      0 0 1px #fff;
+  }
+  /* Candidate winrate/visits stay legible on the board. */
+  .shudan-vertex.shudan-ghost_good.shudan-marker_label .shudan-marker,
+  .shudan-vertex.shudan-ghost_interesting.shudan-marker_label .shudan-marker,
+  .shudan-vertex.shudan-ghost_doubtful.shudan-marker_label .shudan-marker,
+  .shudan-vertex.shudan-ghost_bad.shudan-marker_label .shudan-marker {
+    background: rgba(241, 180, 88, .92);
+    color: #3a1a08;
+    font-weight: 650;
+  }
 
 /* Paint map */
 
@@ -322,7 +388,7 @@
     border-bottom-right-radius: 0;
 }
 
-/* Heat map */
+/* Heat map — soft per-vertex glow (stones/grid stay readable). */
 
 .shudan-vertex .shudan-heat {
     top: 50%;
@@ -335,51 +401,52 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity .5s, box-shadow .5s;
+    z-index: 1;
   }
   .shudan-vertex.shudan-heat_9 .shudan-heat {
     background: #59A80F;
-    box-shadow: 0 0 1em 1em #59A80F;
-    opacity: .8;
+    box-shadow: 0 0 .55em .45em #59A80F;
+    opacity: .42;
   }
   .shudan-vertex.shudan-heat_8 .shudan-heat {
     background: #59A80F;
-    box-shadow: 0 0 1em .9em #59A80F;
-    opacity: .7;
+    box-shadow: 0 0 .5em .4em #59A80F;
+    opacity: .38;
   }
   .shudan-vertex.shudan-heat_7 .shudan-heat {
     background: #4886D5;
-    box-shadow: 0 0 1em .75em #4886D5;
-    opacity: .8;
+    box-shadow: 0 0 .48em .38em #4886D5;
+    opacity: .4;
   }
   .shudan-vertex.shudan-heat_6 .shudan-heat {
     background: #4886D5;
-    box-shadow: 0 0 1em .6em #4886D5;
-    opacity: .8;
+    box-shadow: 0 0 .45em .35em #4886D5;
+    opacity: .36;
   }
   .shudan-vertex.shudan-heat_5 .shudan-heat {
     background: #4886D5;
-    box-shadow: 0 0 .9em .55em #4886D5;
-    opacity: .7;
+    box-shadow: 0 0 .42em .32em #4886D5;
+    opacity: .32;
   }
   .shudan-vertex.shudan-heat_4 .shudan-heat {
     background: #92278F;
-    box-shadow: 0 0 .85em .5em #92278F;
-    opacity: .8;
+    box-shadow: 0 0 .4em .3em #92278F;
+    opacity: .34;
   }
   .shudan-vertex.shudan-heat_3 .shudan-heat {
     background: #92278F;
-    box-shadow: 0 0 .8em .45em #92278F;
-    opacity: .7;
+    box-shadow: 0 0 .38em .28em #92278F;
+    opacity: .3;
   }
   .shudan-vertex.shudan-heat_2 .shudan-heat {
     background: #F02311;
-    box-shadow: 0 0 .75em .4em #F02311;
-    opacity: .8;
+    box-shadow: 0 0 .35em .25em #F02311;
+    opacity: .32;
   }
   .shudan-vertex.shudan-heat_1 .shudan-heat {
     background: #F02311;
-    box-shadow: 0 0 .75em .4em #F02311;
-    opacity: .7;
+    box-shadow: 0 0 .32em .22em #F02311;
+    opacity: .28;
 }
 
 .shudan-vertex .shudan-heatlabel {

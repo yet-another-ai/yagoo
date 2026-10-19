@@ -69,6 +69,17 @@ watch([() => state.value, currentPly, selectedCandidate], refreshOverlays, {
   deep: true,
 });
 
+watch(
+  () => state.value.status,
+  (status) => {
+    if (status === "completed" && sourceLabel.value) {
+      statusMessage.value = `Loaded ${sourceLabel.value}`;
+    } else if (status === "error" && state.value.lastError) {
+      statusMessage.value = state.value.lastError;
+    }
+  },
+);
+
 const analysisComment = computed(() =>
   commentFor(currentPly.value, /* sgf comment merged inside */ ""),
 );

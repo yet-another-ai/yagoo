@@ -157,6 +157,7 @@ mod tests {
                 white: vec![],
             },
             chains: vec![],
+            groups: vec![],
             root: Some(EngineAnalysis {
                 neural: None,
                 visits: Some(100),

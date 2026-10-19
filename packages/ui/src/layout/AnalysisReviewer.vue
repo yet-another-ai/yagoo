@@ -90,6 +90,10 @@ const currentCandidates = computed(
   () => state.value.plies[currentPly.value]?.candidates ?? [],
 );
 
+const currentRootVisits = computed(
+  () => state.value.plies[currentPly.value]?.root?.visits ?? null,
+);
+
 const currentGroups = computed(
   () => state.value.plies[currentPly.value]?.groups ?? [],
 );
@@ -430,6 +434,7 @@ const phaseBadge = computed(() => {
         :marker-map="markerMap"
         :lines="lines"
         :candidates="currentCandidates"
+        :root-visits="currentRootVisits"
         :preview-candidate-index="activePreview"
         :selected-candidate-index="selectedCandidate"
         :groups="currentGroups"

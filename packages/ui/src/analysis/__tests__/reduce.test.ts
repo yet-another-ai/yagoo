@@ -10,8 +10,8 @@ import { buildReviewSeries } from "../display";
 
 const fixtureEvents = parseNdjson(fixtureText);
 /** Representative deepened ply from the real KataGo sample fixture. */
-const DEEP_PLY = 30;
-const DEEP_PLIES = [17, 19, 30, 31, 32, 35, 40, 42];
+const DEEP_PLY = 50;
+const DEEP_PLIES = [43, 44, 47, 49, 50, 60, 79, 95];
 /** Deep visits from `mise run fixtures:regen` (maxVisits may round slightly above). */
 const DEEP_VISITS = 503;
 
@@ -94,7 +94,7 @@ describe("reducePipelineEvent ordering", () => {
     }
     expect(state.status).toBe("completed");
     expect(state.size).toBe(19);
-    expect(state.rules).toBe("chinese");
+    expect(state.rules?.toLowerCase()).toBe("chinese");
   });
 
   it("lets deepen overwrite scan root while keeping earlier plies", () => {

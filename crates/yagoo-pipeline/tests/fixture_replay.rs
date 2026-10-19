@@ -147,6 +147,14 @@ async fn replay_recorded_fixture_groups_snapshot_and_sanity() {
     for (ply, groups) in &deep {
         for g in groups {
             let stone_n = g.members.black_stones.len() + g.members.white_stones.len();
+            // Label must be a real member stone (never an empty / territory id).
+            assert!(
+                g.members.black_stones.iter().any(|s| s == &g.group_id)
+                    || g.members.white_stones.iter().any(|s| s == &g.group_id),
+                "ply {ply} group_id {} is not a member stone (empties={:?})",
+                g.group_id,
+                g.members.empty
+            );
             // Lone stone in open space must not be labelled seki.
             if stone_n <= 1 {
                 assert_ne!(

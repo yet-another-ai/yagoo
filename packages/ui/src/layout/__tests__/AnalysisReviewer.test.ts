@@ -65,10 +65,10 @@ describe("AnalysisReviewer", () => {
 
       await drainProgressiveBatches();
 
-      // Navigate to a deep ply that has candidates (ply 30 in the real fixture).
+      // Navigate to a deep ply that has candidates (ply 50 in the real fixture).
       const layout = wrapper.findComponent({ name: "ReviewerLayout" });
       expect(layout.exists()).toBe(true);
-      layout.vm.goToPly(30);
+      layout.vm.goToPly(50);
       await flushPromises();
       await drainProgressiveBatches(8);
 
@@ -123,7 +123,7 @@ describe("AnalysisReviewer", () => {
 
       await drainProgressiveBatches();
       const layout = wrapper.findComponent({ name: "ReviewerLayout" });
-      layout.vm.goToPly(30);
+      layout.vm.goToPly(50);
       await flushPromises();
       await drainProgressiveBatches(8);
 
@@ -133,6 +133,11 @@ describe("AnalysisReviewer", () => {
       expect(panel.text()).not.toMatch(/fixture/i);
       const rows = panel.findAll("[data-group-id]");
       expect(rows.length).toBeGreaterThanOrEqual(3);
+      // Labels are member-stone GTP coords (not empty-point ids like A13).
+      for (const row of rows) {
+        const id = row.attributes("data-group-id") ?? "";
+        expect(id).toMatch(/^[A-HJ-T]\d{1,2}$/);
+      }
 
       // Outlines present before hover.
       expect(
@@ -167,7 +172,7 @@ describe("AnalysisReviewer", () => {
 
       await drainProgressiveBatches();
       const layout = wrapper.findComponent({ name: "ReviewerLayout" });
-      layout.vm.goToPly(30);
+      layout.vm.goToPly(50);
       await flushPromises();
       await drainProgressiveBatches(8);
 

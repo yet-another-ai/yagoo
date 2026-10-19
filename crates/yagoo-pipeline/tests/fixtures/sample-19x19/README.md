@@ -4,17 +4,23 @@ Recorded locally for deterministic CI replay. **Do not** regenerate in CI.
 
 | Field | Value |
 | --- | --- |
-| Recorded | 2026-10-19T10:48Z |
+| Recorded | 2026-10-19T12:17Z |
 | KataGo | KataGo v1.18.1 |
 | Binary | Eigen AVX2 Linux (see `mise run katago:fetch-dev`) |
 | Network | `kata1-b18c384nbt-s9996604416-d4316597426.bin.gz` |
-| SGF | `docs/public/app/sample.sgf` |
+| SGF | `docs/public/app/sample.sgf` (Shusaku vs Gennan Inseki 1846, first 100 moves) |
 | Strategy | `scan_then_deep` |
-| Scan visits | 100 |
+| Scan visits | 200 |
 | Deep visits | 500 |
 | maxDeepPlies | 8 |
 | topK | 5 |
 | Partials | off (final responses only) |
+
+## Game credit
+
+Public-domain historical game: Yasuda Shusaku (B, 4d) vs Inoue Gennan Inseki (W, 8d), 1846
+(the "ear-reddening" game). Source: Andries Brouwer Shusaku archive
+(https://homepages.cwi.nl/~aeb/go/games/), game 126. Truncated to 100 moves for the sample.
 
 ## Files
 
@@ -28,8 +34,3 @@ Recorded locally for deterministic CI replay. **Do not** regenerate in CI.
 mise run katago:fetch-dev
 mise run fixtures:regen
 ```
-
-## Notes from real-data review
-
-- `r* = 0.7` kept — cluster shapes on this sample looked coherent.
-- `likely_seki` requires ≥3 stones (`min_stones_for_seki`): a 2-stone H16/J17 flat clash was wrongly labelled seki; it is now `weak`.

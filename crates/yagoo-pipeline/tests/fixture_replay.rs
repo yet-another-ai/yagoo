@@ -143,8 +143,11 @@ async fn replay_recorded_fixture_groups_snapshot_and_sanity() {
         assert_groups_summary_eq(ply, got, exp);
     }
 
-    // --- Sanity on real judgments ---
-    for (ply, groups) in &deep {
+    assert_group_judgments_sane(&deep);
+}
+
+fn assert_group_judgments_sane(deep: &[(u32, Vec<GroupSnapshot>)]) {
+    for (ply, groups) in deep {
         for g in groups {
             let stone_n = g.members.black_stones.len() + g.members.white_stones.len();
             // Label must be a real member stone (never an empty / territory id).
@@ -164,51 +167,49 @@ async fn replay_recorded_fixture_groups_snapshot_and_sanity() {
                     g.group_id
                 );
             }
-            // Pipeline provenance.
             assert_eq!(
                 g.source,
                 Some(yagoo_snapshot::GroupSource::Pipeline),
                 "ply {ply} group {}",
                 g.group_id
             );
+            assert_corner_status_sane(*ply, g);
         }
+    }
+}
 
-        // Corner teaching positions in the sample: Q16 / D4 / etc. when present as
-        // multi-stone same-color groups with high |g±| should be Settled (alive), not Dead/Seki.
-        for g in groups {
-            let cornerish = g
-                .members
-                .black_stones
-                .iter()
-                .chain(g.members.white_stones.iter())
-                .any(|c| is_near_corner_gtp(c));
-            let mono = g.members.black_stones.is_empty() ^ g.members.white_stones.is_empty();
-            let stones = g.members.black_stones.len() + g.members.white_stones.len();
-            if cornerish && mono && stones >= 4 {
-                if let (Some(gp), Some(gm)) = (g.g_plus, g.g_minus) {
-                    // Strongly alive on both tempi → Settled.
-                    if gp >= 0.8 && gm >= 0.8 {
-                        assert_eq!(
-                            g.status,
-                            Some(GroupStatus::Settled),
-                            "ply {ply} corner group {} strongly alive but status={:?}",
-                            g.group_id,
-                            g.status
-                        );
-                    }
-                    // Strongly dead on both tempi → Dead (not seki).
-                    if gp <= -0.8 && gm <= -0.8 {
-                        assert_eq!(
-                            g.status,
-                            Some(GroupStatus::Dead),
-                            "ply {ply} corner group {} strongly dead but status={:?}",
-                            g.group_id,
-                            g.status
-                        );
-                    }
-                }
-            }
-        }
+fn assert_corner_status_sane(ply: u32, g: &GroupSnapshot) {
+    let cornerish = g
+        .members
+        .black_stones
+        .iter()
+        .chain(g.members.white_stones.iter())
+        .any(|c| is_near_corner_gtp(c));
+    let mono = g.members.black_stones.is_empty() ^ g.members.white_stones.is_empty();
+    let stones = g.members.black_stones.len() + g.members.white_stones.len();
+    if !(cornerish && mono && stones >= 4) {
+        return;
+    }
+    let (Some(gp), Some(gm)) = (g.g_plus, g.g_minus) else {
+        return;
+    };
+    if gp >= 0.8 && gm >= 0.8 {
+        assert_eq!(
+            g.status,
+            Some(GroupStatus::Settled),
+            "ply {ply} corner group {} strongly alive but status={:?}",
+            g.group_id,
+            g.status
+        );
+    }
+    if gp <= -0.8 && gm <= -0.8 {
+        assert_eq!(
+            g.status,
+            Some(GroupStatus::Dead),
+            "ply {ply} corner group {} strongly dead but status={:?}",
+            g.group_id,
+            g.status
+        );
     }
 }
 

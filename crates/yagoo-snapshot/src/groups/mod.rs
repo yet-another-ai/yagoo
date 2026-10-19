@@ -303,7 +303,7 @@ fn build_group(
         params,
     );
 
-    let group_id = representative_id(&black_stones, &white_stones, &empty);
+    let group_id = representative_stone_id(&black_stones, &white_stones, snap);
 
     Some(GroupSnapshot {
         group_id,
@@ -600,11 +600,56 @@ fn tempo_fields(
     })
 }
 
-fn representative_id(black: &[String], white: &[String], empty: &[String]) -> String {
+/// Label a teaching group by a **member stone** GTP coordinate (never an empty).
+///
+/// Prefer the lexicographically least stone of the **largest** rules chain that
+/// intersects the group (Sabaki-style anchor). Fall back to the least stone
+/// among all members. Empties must never become the id — they caused panel
+/// labels like `A13` / `A5` with no stone on that vertex.
+fn representative_stone_id(
+    black: &[String],
+    white: &[String],
+    snap: &PositionSnapshot,
+) -> String {
+    let member: std::collections::HashSet<&str> = black
+        .iter()
+        .chain(white.iter())
+        .map(String::as_str)
+        .collect();
+
+    let mut best: Option<(usize, String)> = None; // (chain_len, anchor)
+    for chain in &snap.chains {
+        let in_group: Vec<&String> = chain
+            .stones
+            .iter()
+            .filter(|s| member.contains(s.as_str()))
+            .collect();
+        if in_group.is_empty() {
+            continue;
+        }
+        let Some(anchor) = in_group.iter().map(|s| s.as_str()).min() else {
+            continue;
+        };
+        let anchor = anchor.to_owned();
+        let len = chain.stones.len();
+        let replace = match &best {
+            None => true,
+            Some((best_len, best_anchor)) => {
+                len > *best_len || (len == *best_len && anchor < *best_anchor)
+            }
+        };
+        if replace {
+            best = Some((len, anchor));
+        }
+    }
+
+    if let Some((_, anchor)) = best {
+        return anchor;
+    }
+
     black
         .iter()
         .chain(white.iter())
-        .chain(empty.iter())
         .min()
         .cloned()
         .unwrap_or_else(|| "G0".into())

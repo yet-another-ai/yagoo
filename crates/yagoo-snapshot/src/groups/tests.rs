@@ -117,6 +117,86 @@ fn alive_settled_group() {
     assert_eq!(alive.source, Some(GroupSource::Pipeline));
     assert!(alive.members.black_stones.len() >= 3);
     assert!(alive.g_minus.unwrap() >= 0.8);
+    // Label must be a member stone (never an empty / territory point).
+    assert!(
+        alive.members.black_stones.contains(&alive.group_id)
+            || alive.members.white_stones.contains(&alive.group_id),
+        "group_id {} is not a member stone",
+        alive.group_id
+    );
+}
+
+#[test]
+fn group_id_is_member_stone_not_empty() {
+    let size = 9_u8;
+    let n = 81;
+    let mut root = empty_own(n);
+    let mut pass = empty_own(n);
+    let mut c1 = empty_own(n);
+    let mut c2 = empty_own(n);
+    // Alive black corner + empties that would sort before A9 (A1..A8) if empties
+    // were allowed into the id.
+    for gtp in ["A9", "B9", "C9", "A8", "B8"] {
+        let i = idx(gtp, size);
+        root[i] = 0.95;
+        pass[i] = 0.90;
+        c1[i] = 0.2;
+        c2[i] = 0.1;
+    }
+    for gtp in ["H1", "J1", "J2"] {
+        let i = idx(gtp, size);
+        root[i] = -0.2;
+        pass[i] = 0.4;
+        c1[i] = -0.6;
+        c2[i] = 0.5;
+    }
+
+    let mut snap = snap_shell(size, ColorToken::B);
+    snap.board.black = vec![
+        "A9".into(),
+        "B9".into(),
+        "C9".into(),
+        "A8".into(),
+        "B8".into(),
+    ];
+    snap.chains = vec![ChainSnapshot {
+        color: ColorToken::B,
+        stones: vec!["A9".into(), "B9".into(), "C9".into()],
+        liberties: vec!["A8".into(), "B8".into(), "C8".into()],
+        liberty_count: 3,
+    }];
+    snap.root = Some(eng(root, Some(vec![0.05; n])));
+    snap.pass_probe = Some(eng(pass, None));
+    snap.candidates = vec![cand("D5", c1), cand("E5", c2)];
+
+    let groups = compute_groups(&snap);
+    assert!(!groups.is_empty());
+    for g in &groups {
+        let stones: Vec<&String> = g
+            .members
+            .black_stones
+            .iter()
+            .chain(g.members.white_stones.iter())
+            .collect();
+        assert!(
+            stones.iter().any(|s| s.as_str() == g.group_id),
+            "group_id {} not in member stones {:?}; empties={:?}",
+            g.group_id,
+            stones,
+            g.members.empty
+        );
+        assert!(
+            !g.members.empty.iter().any(|e| e == &g.group_id),
+            "group_id must not be an empty point ({})",
+            g.group_id
+        );
+    }
+    // Largest chain anchor should win over stray empties like A1.
+    let alive = groups
+        .iter()
+        .find(|g| g.members.black_stones.contains(&"A9".into()))
+        .expect("alive");
+    assert_eq!(alive.group_id, "A9");
 }
 
 /// Dead white stones sitting in black territory: g+ very negative.

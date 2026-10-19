@@ -61,7 +61,7 @@ fn fixture_pipeline_config() -> PipelineConfig {
     // Must match scripts/regen-fixtures.sh defaults.
     PipelineConfig {
         strategy: PipelineStrategy::ScanThenDeep,
-        scan_visits: 100,
+        scan_visits: 200,
         root_visits: 500,
         top_k: 5,
         from_ply: 0,

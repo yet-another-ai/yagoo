@@ -6,6 +6,8 @@ import {
 import {
   buildBoardOverlays,
   buildPvPreview,
+  candidateBoardVisitThreshold,
+  candidateVisibleOnBoard,
   colorToSign,
 } from "../display";
 import {
@@ -148,6 +150,29 @@ describe("buildBoardOverlays", () => {
       { size: 9, previewCandidate: 0 },
     );
     expect(overlays.markerMap[2]![2]?.label).toBe("1");
+  });
+
+  it("hides low-visit candidates from board ghosts/labels (Sabaki-like)", () => {
+    expect(candidateBoardVisitThreshold(500)).toBe(10); // max(3, 2% of 500)
+    expect(candidateBoardVisitThreshold(100)).toBe(3); // floor
+    expect(
+      candidateVisibleOnBoard({ move: "C7", order: 0, visits: 2 }, 500),
+    ).toBe(false);
+
+    const overlays = buildBoardOverlays(
+      stateWithCandidates([
+        { move: "C7", order: 0, visits: 120, winrate: 0.58 },
+        { move: "D4", order: 1, visits: 2, winrate: 0.4 }, // below 2% of 200
+      ]),
+      0,
+      { size: 9 },
+    );
+    // Top candidate still labeled.
+    expect(overlays.ghostStoneMap[2]![2]?.type).toBe("good");
+    expect(overlays.markerMap[2]![2]?.label).toContain("%");
+    // Low-visit D4 = [5,3] must not get a board ghost/label.
+    expect(overlays.ghostStoneMap[5]![3]).toBeNull();
+    expect(overlays.markerMap[5]![3]).toBeNull();
   });
 });
 

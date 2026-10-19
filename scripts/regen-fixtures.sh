@@ -15,7 +15,7 @@ export YAGOO_KATAGO="${YAGOO_KATAGO:-$DATA_DIR/bin/katago}"
 export YAGOO_MODEL="${YAGOO_MODEL:-$DATA_DIR/models/kata1-b18c384nbt-s9996604416-d4316597426.bin.gz}"
 export YAGOO_ANALYSIS_CONFIG="${YAGOO_ANALYSIS_CONFIG:-$DATA_DIR/config/analysis.cfg}"
 
-SCAN_VISITS="${YAGOO_FIXTURE_SCAN_VISITS:-100}"
+SCAN_VISITS="${YAGOO_FIXTURE_SCAN_VISITS:-200}"
 DEEP_VISITS="${YAGOO_FIXTURE_DEEP_VISITS:-500}"
 MAX_DEEP="${YAGOO_FIXTURE_MAX_DEEP_PLIES:-8}"
 TOP_K="${YAGOO_FIXTURE_TOP_K:-5}"
@@ -81,7 +81,7 @@ Recorded locally for deterministic CI replay. **Do not** regenerate in CI.
 | KataGo | $KATAGO_VER |
 | Binary | Eigen AVX2 Linux (see \`mise run katago:fetch-dev\`) |
 | Network | \`$MODEL_NAME\` |
-| SGF | \`docs/public/app/sample.sgf\` |
+| SGF | \`docs/public/app/sample.sgf\` (Shusaku vs Gennan Inseki 1846, first 100 moves) |
 | Strategy | \`scan_then_deep\` |
 | Scan visits | $SCAN_VISITS |
 | Deep visits | $DEEP_VISITS |
@@ -89,10 +89,17 @@ Recorded locally for deterministic CI replay. **Do not** regenerate in CI.
 | topK | $TOP_K |
 | Partials | off (final responses only) |
 
+## Game credit
+
+Public-domain historical game: Yasuda Shusaku (B, 4d) vs Inoue Gennan Inseki (W, 8d), 1846
+(the "ear-reddening" game). Source: Andries Brouwer Shusaku archive
+(https://homepages.cwi.nl/~aeb/go/games/), game 126. Truncated to 100 moves for the sample.
+
 ## Files
 
 - \`responses.json.gz\` — JSON array of trimmed KataGo stdout lines (query order).
-- Replay via \`yagoo analyze --scripted-fixture …\` or pipeline tests.
+- \`groups-snapshot.json\` — compact deep-ply group summaries for the replay test.
+- Replay via \`yagoo analyze --scripted-fixture …\` or \`cargo test -p yagoo-pipeline --test fixture_replay\`.
 
 ## Regenerate
 

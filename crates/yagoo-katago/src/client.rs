@@ -48,6 +48,9 @@ enum StdoutTransport {
 struct Inner {
     stdin: Mutex<StdinTransport>,
     scripted_written: Mutex<Vec<String>>,
+    /// Raw stdout lines (process mode only), for fixture recording.
+    recorded_lines: Mutex<Vec<String>>,
+    record: bool,
     routes: Mutex<HashMap<String, mpsc::UnboundedSender<RouteMsg>>>,
     /// Responses that arrived before their route was registered.
     orphans: Mutex<VecDeque<AnalysisResponse>>,
@@ -69,6 +72,15 @@ impl AnalysisClient {
         program: impl AsRef<std::ffi::OsStr>,
         args: &[impl AsRef<std::ffi::OsStr>],
     ) -> KatagoResult<Self> {
+        Self::spawn_with_recording(program, args, false)
+    }
+
+    /// Like [`Self::spawn`], optionally recording every stdout JSON line for fixtures.
+    pub fn spawn_with_recording(
+        program: impl AsRef<std::ffi::OsStr>,
+        args: &[impl AsRef<std::ffi::OsStr>],
+        record: bool,
+    ) -> KatagoResult<Self> {
         let mut child = Command::new(program)
             .args(args)
             .stdin(Stdio::piped())
@@ -87,6 +99,8 @@ impl AnalysisClient {
         let inner = Arc::new(Inner {
             stdin: Mutex::new(StdinTransport::Process(stdin)),
             scripted_written: Mutex::new(Vec::new()),
+            recorded_lines: Mutex::new(Vec::new()),
+            record,
             routes: Mutex::new(HashMap::new()),
             orphans: Mutex::new(VecDeque::new()),
             stdout: Mutex::new(StdoutTransport::Process {
@@ -104,6 +118,8 @@ impl AnalysisClient {
         let inner = Arc::new(Inner {
             stdin: Mutex::new(StdinTransport::Scripted),
             scripted_written: Mutex::new(Vec::new()),
+            recorded_lines: Mutex::new(Vec::new()),
+            record: false,
             routes: Mutex::new(HashMap::new()),
             orphans: Mutex::new(VecDeque::new()),
             stdout: Mutex::new(StdoutTransport::Scripted {
@@ -148,6 +164,10 @@ impl AnalysisClient {
                     }
                 };
 
+                if inner.record {
+                    inner.recorded_lines.lock().await.push(line.clone());
+                }
+
                 let resp: AnalysisResponse = match serde_json::from_str(&line) {
                     Ok(r) => r,
                     Err(e) => {
@@ -169,6 +189,11 @@ impl AnalysisClient {
     /// Lines written by a scripted client (test helper).
     pub async fn scripted_writes(&self) -> Vec<String> {
         self.inner.scripted_written.lock().await.clone()
+    }
+
+    /// Raw engine stdout lines recorded when spawned with `record: true`.
+    pub async fn recorded_lines(&self) -> Vec<String> {
+        self.inner.recorded_lines.lock().await.clone()
     }
 
     /// Send one query and wait for the finished response (ignores partials).

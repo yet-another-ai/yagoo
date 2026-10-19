@@ -16,16 +16,17 @@ The bundled sample is an original **19×19** teaching game (~70 legality-checked
 
 ### Groups / 块 in the sample
 
-Deep `positionCompleted` events carry `groups[]` from `yagoo_snapshot::compute_groups` (`source: "pipeline"`). Scan plies omit groups. The bundled NDJSON was regenerated with the groups module after enriching deep-ply scenario ownership (scripted fixtures alone often copy root ownership onto candidates, which yields no fate signal). Prefer regenerating from a real KataGo deep run when a local `b18c384nbt` setup is available:
+Deep `positionCompleted` events carry `groups[]` from `yagoo_snapshot::compute_groups` (`source: "pipeline"`). Scan plies omit groups. The bundled NDJSON and the recorded KataGo responses under `crates/yagoo-pipeline/tests/fixtures/sample-19x19/` come from a real local CPU run (`mise run fixtures:regen`). CI only **replays** those committed responses — it never downloads models or runs KataGo.
 
 ```sh
-mise run katago:fetch-dev   # local only — never in CI
-cargo run -p yagoo-cli -- analyze docs/public/app/sample.sgf \
-  -o docs/public/app/sample-scan-deep.ndjson \
-  --strategy scan-then-deep --partials --from 0 --to 70
-cp docs/public/app/sample-scan-deep.ndjson \
-  packages/ui/src/analysis/__fixtures__/sample-scan-deep.ndjson
+mise run katago:fetch-dev   # local only — Eigen AVX2 + b18c384nbt into .yagoo-data/
+mise run fixtures:regen     # local only — NOT part of `mise run ci`
 ```
+
+That writes:
+
+- `crates/yagoo-pipeline/tests/fixtures/sample-19x19/responses.json.gz` (+ README / groups snapshot)
+- `docs/public/app/sample-scan-deep.ndjson` (copied to `packages/ui/.../__fixtures__/`)
 
 Without KataGo, re-apply groups to an existing sample via:
 

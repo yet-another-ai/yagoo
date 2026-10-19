@@ -575,11 +575,16 @@ fn tempo_fields(
         return (None, None, None, None);
     };
 
+    let stone_count = member_indices
+        .iter()
+        .filter(|&&i| stone_color.get(i).copied().flatten().is_some())
+        .count();
+
     let mut best: Option<(GroupStatus, f64, f64, f64, f64)> = None;
     for side in sides {
         let (g_plus, g_minus) = side_strengths(side, to_play, root_strength, &pass_strength);
         let delta = g_plus - g_minus;
-        let status = classify_status(g_plus, g_minus, certainty, params);
+        let status = classify_status(g_plus, g_minus, certainty, stone_count, params);
         let urgency = delta.abs();
         let replace = match &best {
             None => true,

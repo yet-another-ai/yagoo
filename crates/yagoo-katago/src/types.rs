@@ -39,7 +39,8 @@ pub struct AnalysisQuery {
     pub initial_player: Option<PlayerToken>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub initial_stones: Vec<MoveListEntry>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Always serialized (even as `[]`) — KataGo ≥1.16 rejects a missing `moves` field.
+    #[serde(default)]
     pub moves: Vec<MoveListEntry>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rules: Option<String>,

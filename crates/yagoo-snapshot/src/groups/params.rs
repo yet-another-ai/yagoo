@@ -23,6 +23,8 @@ pub struct GroupParams {
     pub seki_band: f64,
     /// Minimum certainty for likely-seki (no Path-B seki head yet).
     pub seki_certainty: f64,
+    /// Minimum stones before `likely_seki` is allowed (flat 1–2 stone clashes → `weak`).
+    pub min_stones_for_seki: usize,
     /// Same-direction \(|d|\) gate for remote-binding scenario check.
     pub binding_delta: f64,
 }
@@ -33,6 +35,8 @@ impl Default for GroupParams {
             epsilon: 0.1,
             keep_stdev: 0.3,
             gamma: 2.0,
+            // Kept at 0.7 after real b18 fixture review — clustering shapes looked
+            // coherent; seki false-positives were fixed via `min_stones_for_seki`.
             r_star: 0.7,
             n_min: 3,
             contested_color_share: 0.20,
@@ -40,6 +44,9 @@ impl Default for GroupParams {
             tempo_threshold: 0.4,
             seki_band: 0.3,
             seki_certainty: 0.7,
+            // Real fixture: H16/J17 (2 stones, flat g±) was labelled likely_seki —
+            // nonsense for open-board contact. Seki needs a mutual-life shaped mass.
+            min_stones_for_seki: 3,
             binding_delta: 0.3,
         }
     }

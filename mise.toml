@@ -95,8 +95,12 @@ description = "CI entrypoint (no performance or timing tests)"
 depends = ["check"]
 
 [tasks."katago:fetch-dev"]
-description = "Download b18 checkpoint for local dev (not used in CI)"
+description = "Download Eigen AVX2 KataGo + b18 net for local dev (not used in CI)"
 run = "bash scripts/fetch-katago-dev.sh"
+
+[tasks."fixtures:regen"]
+description = "Regenerate sample KataGo fixtures + NDJSON with a local real engine (NOT for CI)"
+run = "bash scripts/regen-fixtures.sh"
 
 [tasks."yagoo:analyze"]
 description = "Run yagoo analyze (requires YAGOO_KATAGO, YAGOO_MODEL, YAGOO_ANALYSIS_CONFIG)"

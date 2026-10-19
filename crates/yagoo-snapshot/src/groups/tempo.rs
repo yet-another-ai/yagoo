@@ -32,11 +32,15 @@ fn strength_of(side: ColorToken, s: &GroupStrength) -> Option<f64> {
 }
 
 /// Classify status from initial tempo thresholds (no Path-B seki head yet).
+///
+/// `stone_count` gates `likely_seki`: tiny flat-ownership clashes (1–2 stones) are
+/// `weak`, not seki — real seki needs a mutual-life shaped mass.
 #[must_use]
 pub fn classify_status(
     g_plus: f64,
     g_minus: f64,
     certainty: f64,
+    stone_count: usize,
     params: &GroupParams,
 ) -> GroupStatus {
     let t_set = params.settled_threshold;
@@ -52,8 +56,13 @@ pub fn classify_status(
     if g_plus >= t_tempo && g_minus <= -t_tempo {
         return GroupStatus::TempoCritical;
     }
-    // Likely seki: both |g±| small, high certainty. (Seki head deferred — Path B.)
-    if g_plus.abs() < band && g_minus.abs() < band && certainty >= params.seki_certainty {
+    // Likely seki: both |g±| small, high certainty, enough stones.
+    // (Geometric seki head deferred — Path B.)
+    if stone_count >= params.min_stones_for_seki
+        && g_plus.abs() < band
+        && g_minus.abs() < band
+        && certainty >= params.seki_certainty
+    {
         return GroupStatus::LikelySeki;
     }
     GroupStatus::Weak
@@ -81,21 +90,35 @@ mod unit_tests {
     #[test]
     fn dead_when_g_plus_very_negative() {
         let p = GroupParams::default();
-        assert_eq!(classify_status(-0.9, -0.95, 0.9, &p), GroupStatus::Dead);
+        assert_eq!(classify_status(-0.9, -0.95, 0.9, 5, &p), GroupStatus::Dead);
     }
 
     #[test]
     fn settled_when_g_minus_high() {
         let p = GroupParams::default();
-        assert_eq!(classify_status(0.95, 0.85, 0.9, &p), GroupStatus::Settled);
+        assert_eq!(classify_status(0.95, 0.85, 0.9, 5, &p), GroupStatus::Settled);
     }
 
     #[test]
     fn tempo_critical_symmetric_swing() {
         let p = GroupParams::default();
         assert_eq!(
-            classify_status(0.5, -0.5, 0.6, &p),
+            classify_status(0.5, -0.5, 0.6, 5, &p),
             GroupStatus::TempoCritical
+        );
+    }
+
+    #[test]
+    fn tiny_flat_clash_is_weak_not_seki() {
+        let p = GroupParams::default();
+        assert_eq!(
+            classify_status(0.1, -0.2, 0.9, 2, &p),
+            GroupStatus::Weak,
+            "2-stone flat ownership must not be likely_seki"
+        );
+        assert_eq!(
+            classify_status(0.1, -0.2, 0.9, 5, &p),
+            GroupStatus::LikelySeki
         );
     }
 }

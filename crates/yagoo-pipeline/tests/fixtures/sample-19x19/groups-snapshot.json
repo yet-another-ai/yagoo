@@ -1,0 +1,415 @@
+{
+  "deepPlies": [
+    17,
+    19,
+    30,
+    31,
+    32,
+    35,
+    40,
+    42
+  ],
+  "groupsByPly": {
+    "17": [
+      {
+        "blackStones": [
+          "F3"
+        ],
+        "certainty": 0.684,
+        "gMinus": 0.486,
+        "gPlus": 0.578,
+        "groupId": "A1",
+        "kind": "simple",
+        "status": "weak",
+        "whiteStones": []
+      },
+      {
+        "blackStones": [],
+        "certainty": 0.891,
+        "gMinus": 0.515,
+        "gPlus": 0.664,
+        "groupId": "L14",
+        "kind": "simple",
+        "status": "weak",
+        "whiteStones": [
+          "O15",
+          "O17"
+        ]
+      }
+    ],
+    "19": [
+      {
+        "blackStones": [],
+        "certainty": 0.825,
+        "gMinus": 0.499,
+        "gPlus": 0.744,
+        "groupId": "F16",
+        "kind": "simple",
+        "status": "weak",
+        "whiteStones": [
+          "O17"
+        ]
+      }
+    ],
+    "30": [
+      {
+        "blackStones": [
+          "C17",
+          "D17"
+        ],
+        "certainty": 0.789,
+        "gMinus": -0.442,
+        "gPlus": 0.954,
+        "groupId": "A1",
+        "kind": "contested",
+        "status": "tempo_critical",
+        "whiteStones": [
+          "F17"
+        ]
+      },
+      {
+        "blackStones": [],
+        "certainty": 0.819,
+        "gMinus": 0.637,
+        "gPlus": 0.861,
+        "groupId": "A13",
+        "kind": "simple",
+        "status": "weak",
+        "whiteStones": [
+          "C16",
+          "D16"
+        ]
+      },
+      {
+        "blackStones": [],
+        "certainty": 0.849,
+        "gMinus": 0.818,
+        "gPlus": 0.821,
+        "groupId": "A5",
+        "kind": "simple",
+        "status": "settled",
+        "whiteStones": [
+          "C6"
+        ]
+      },
+      {
+        "blackStones": [
+          "G17"
+        ],
+        "certainty": 0.924,
+        "gMinus": -0.498,
+        "gPlus": 0.753,
+        "groupId": "G17",
+        "kind": "simple",
+        "status": "tempo_critical",
+        "whiteStones": []
+      },
+      {
+        "blackStones": [
+          "H16"
+        ],
+        "certainty": 0.85,
+        "gMinus": -0.27,
+        "gPlus": 0.123,
+        "groupId": "H16",
+        "kind": "contested",
+        "status": "weak",
+        "whiteStones": [
+          "J17"
+        ]
+      }
+    ],
+    "31": [
+      {
+        "blackStones": [
+          "C17",
+          "D17"
+        ],
+        "certainty": 0.635,
+        "gMinus": 0.261,
+        "gPlus": 0.882,
+        "groupId": "A14",
+        "kind": "contested",
+        "status": "weak",
+        "whiteStones": [
+          "C16",
+          "D16",
+          "F17"
+        ]
+      },
+      {
+        "blackStones": [
+          "G17",
+          "H16",
+          "J16"
+        ],
+        "certainty": 0.903,
+        "gMinus": -0.372,
+        "gPlus": 0.543,
+        "groupId": "G15",
+        "kind": "contested",
+        "status": "weak",
+        "whiteStones": [
+          "H15",
+          "J17"
+        ]
+      }
+    ],
+    "32": [
+      {
+        "blackStones": [
+          "C17",
+          "D17",
+          "F3"
+        ],
+        "certainty": 0.695,
+        "gMinus": 0.49,
+        "gPlus": 0.799,
+        "groupId": "A1",
+        "kind": "contested",
+        "status": "weak",
+        "whiteStones": [
+          "C16",
+          "D16",
+          "D4",
+          "F17"
+        ]
+      },
+      {
+        "blackStones": [
+          "H16",
+          "J16"
+        ],
+        "certainty": 0.862,
+        "gMinus": -0.595,
+        "gPlus": -0.415,
+        "groupId": "G15",
+        "kind": "contested",
+        "status": "weak",
+        "whiteStones": [
+          "J15",
+          "J17"
+        ]
+      }
+    ],
+    "35": [
+      {
+        "blackStones": [
+          "C3"
+        ],
+        "certainty": 0.74,
+        "gMinus": 0.267,
+        "gPlus": 0.338,
+        "groupId": "A1",
+        "kind": "contested",
+        "status": "weak",
+        "whiteStones": [
+          "D4"
+        ]
+      },
+      {
+        "blackStones": [
+          "C17",
+          "D17"
+        ],
+        "certainty": 0.916,
+        "gMinus": -0.228,
+        "gPlus": 0.904,
+        "groupId": "A14",
+        "kind": "contested",
+        "status": "weak",
+        "whiteStones": [
+          "C16",
+          "D16",
+          "F17"
+        ]
+      },
+      {
+        "blackStones": [
+          "G17",
+          "H16",
+          "H17",
+          "J16"
+        ],
+        "certainty": 0.406,
+        "gMinus": 0.375,
+        "gPlus": 0.923,
+        "groupId": "F18",
+        "kind": "contested",
+        "status": "weak",
+        "whiteStones": [
+          "J17"
+        ]
+      },
+      {
+        "blackStones": [
+          "F3"
+        ],
+        "certainty": 0.653,
+        "gMinus": 0.29,
+        "gPlus": 0.293,
+        "groupId": "F2",
+        "kind": "simple",
+        "status": "weak",
+        "whiteStones": []
+      },
+      {
+        "blackStones": [],
+        "certainty": 0.527,
+        "gMinus": 0.772,
+        "gPlus": 0.393,
+        "groupId": "L13",
+        "kind": "simple",
+        "status": "weak",
+        "whiteStones": [
+          "O15",
+          "O17",
+          "P16",
+          "P17",
+          "P18"
+        ]
+      }
+    ],
+    "40": [
+      {
+        "blackStones": [
+          "C3",
+          "C4",
+          "E3",
+          "F3"
+        ],
+        "certainty": 0.925,
+        "gMinus": 0.542,
+        "gPlus": 0.785,
+        "groupId": "A1",
+        "kind": "contested",
+        "status": "weak",
+        "whiteStones": [
+          "C6",
+          "D4",
+          "D5",
+          "E4"
+        ]
+      },
+      {
+        "blackStones": [
+          "C17",
+          "D17"
+        ],
+        "certainty": 0.851,
+        "gMinus": 0.079,
+        "gPlus": -0.16,
+        "groupId": "A15",
+        "kind": "contested",
+        "status": "likely_seki",
+        "whiteStones": [
+          "C16",
+          "D16",
+          "F17"
+        ]
+      },
+      {
+        "blackStones": [
+          "G17",
+          "H16",
+          "H17",
+          "J16"
+        ],
+        "certainty": 0.575,
+        "gMinus": 0.117,
+        "gPlus": 0.628,
+        "groupId": "G17",
+        "kind": "contested",
+        "status": "weak",
+        "whiteStones": [
+          "J17"
+        ]
+      },
+      {
+        "blackStones": [],
+        "certainty": 0.692,
+        "gMinus": 0.667,
+        "gPlus": 0.879,
+        "groupId": "K15",
+        "kind": "simple",
+        "status": "weak",
+        "whiteStones": [
+          "O17",
+          "P16",
+          "P17",
+          "P18"
+        ]
+      }
+    ],
+    "42": [
+      {
+        "blackStones": [
+          "C3",
+          "C4",
+          "E3",
+          "F3",
+          "F4"
+        ],
+        "certainty": 0.807,
+        "gMinus": 0.065,
+        "gPlus": 0.94,
+        "groupId": "A1",
+        "kind": "contested",
+        "status": "weak",
+        "whiteStones": [
+          "C6",
+          "D3",
+          "D4",
+          "D5",
+          "E4"
+        ]
+      },
+      {
+        "blackStones": [
+          "C17",
+          "D17",
+          "G17",
+          "H16",
+          "H17",
+          "J16"
+        ],
+        "certainty": 0.763,
+        "gMinus": 0.452,
+        "gPlus": -0.198,
+        "groupId": "A15",
+        "kind": "contested",
+        "status": "weak",
+        "whiteStones": [
+          "C16",
+          "D16",
+          "F17",
+          "J17"
+        ]
+      },
+      {
+        "blackStones": [],
+        "certainty": 0.659,
+        "gMinus": 0.207,
+        "gPlus": 0.601,
+        "groupId": "E5",
+        "kind": "simple",
+        "status": "weak",
+        "whiteStones": [
+          "G4"
+        ]
+      },
+      {
+        "blackStones": [],
+        "certainty": 0.712,
+        "gMinus": 0.816,
+        "gPlus": 0.851,
+        "groupId": "K15",
+        "kind": "simple",
+        "status": "settled",
+        "whiteStones": [
+          "O17"
+        ]
+      }
+    ]
+  }
+}

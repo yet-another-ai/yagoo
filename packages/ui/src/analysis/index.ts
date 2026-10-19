@@ -10,11 +10,31 @@ export type {
   DeepPlySelection,
   EngineAnalysis,
   GameSnapshot,
+  GroupKind,
+  GroupMembers,
+  GroupPart,
+  GroupSnapshot,
+  GroupStatus,
+  GroupStrength,
   PipelineEvent,
   PlyAnalysis,
   PositionSnapshot,
   StreamStatus,
 } from "./types";
+
+export {
+  buildGroupOutlines,
+  buildGroupVertexIndex,
+  dimVerticesOutsideGroup,
+  groupMemberVertices,
+  groupOutlineColor,
+  groupPrimaryColor,
+  groupStatusLabel,
+  groupStoneCount,
+  groupStoneVertices,
+  groupValueLabel,
+} from "./groups";
+export type { GroupOutlineSpec } from "./groups";
 
 export {
   parseNdjson,

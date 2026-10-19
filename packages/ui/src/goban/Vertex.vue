@@ -174,21 +174,22 @@ function abs(zIndex?: number) {
     :style="{ position: 'relative' }"
     v-on="listeners"
   >
-    <Marker
-      v-if="!sign && marker"
-      :sign="sign"
-      :type="marker.type"
-      :label="marker.label"
-      :z-index="0"
-    />
-
     <div
       v-if="!sign && ghostStone"
       class="shudan-ghost"
       :style="abs(1)"
     />
 
-    <div class="shudan-stone" :style="abs(2)">
+    <!-- Marker above ghost so PV / candidate labels stay legible. -->
+    <Marker
+      v-if="!sign && marker"
+      :sign="sign"
+      :type="marker.type"
+      :label="marker.label"
+      :z-index="2"
+    />
+
+    <div class="shudan-stone" :style="abs(3)">
       <div
         v-if="sign"
         class="shudan-inner shudan-stone-image"
@@ -202,6 +203,7 @@ function abs(zIndex?: number) {
         :sign="sign"
         :type="marker.type"
         :label="marker.label"
+        :z-index="4"
       />
     </div>
 

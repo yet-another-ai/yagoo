@@ -24,6 +24,20 @@ describe("parseNdjson / fixture format", () => {
       true,
     );
     expect(fixtureEvents.some((e) => e.type === "stagePartial")).toBe(true);
+    // Additive groups (块) proposal — fixture_proposal until pipeline emits them.
+    const deep = fixtureEvents.find(
+      (e) =>
+        e.type === "positionCompleted" &&
+        e.phase === "deep" &&
+        e.snapshot.ply === 48,
+    );
+    expect(deep?.type).toBe("positionCompleted");
+    if (deep?.type === "positionCompleted") {
+      expect(deep.snapshot.groups?.length).toBeGreaterThan(0);
+      expect(deep.snapshot.groups?.[0]?.source).toBe("fixture_proposal");
+      // Chains (串) remain present and distinct.
+      expect(deep.snapshot.chains.length).toBeGreaterThan(0);
+    }
   });
 });
 

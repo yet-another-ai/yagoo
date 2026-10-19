@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import {
+  buildGroupOutlines,
+  buildGroupVertexIndex,
   createBrowserEngineSource,
   createLiveNativeSource,
   createNdjsonTextSource,
+  dimVerticesOutsideGroup,
+  groupMemberVertices,
   isBrowserEngineAvailable,
   isLiveNativeAvailable,
   parseGtpVertex,
@@ -49,6 +53,10 @@ const currentPly = ref(0);
 const previewCandidate = ref<number | null>(null);
 /** Touch tap-to-toggle pin; survives mouseleave until toggled off or ply change. */
 const pinnedPreview = ref<number | null>(null);
+/** Hovered / selected teaching group (块). */
+const previewGroupId = ref<string | null>(null);
+const pinnedGroupId = ref<string | null>(null);
+const selectedGroupId = ref<string | null>(null);
 
 const {
   state,
@@ -73,8 +81,17 @@ const activePreview = computed(() => {
   return previewCandidate.value;
 });
 
+const activeGroupId = computed(() => {
+  if (pinnedGroupId.value != null) return pinnedGroupId.value;
+  return previewGroupId.value ?? selectedGroupId.value;
+});
+
 const currentCandidates = computed(
   () => state.value.plies[currentPly.value]?.candidates ?? [],
+);
+
+const currentGroups = computed(
+  () => state.value.plies[currentPly.value]?.groups ?? [],
 );
 
 /** Map board vertex → candidate index for the current ply. */
@@ -87,6 +104,33 @@ const candidateVertexIndex = computed(() => {
     map.set(`${v[0]},${v[1]}`, idx);
   });
   return map;
+});
+
+const groupVertexIndex = computed(() => {
+  const size = state.value.size ?? boardSizeFromSgf.value;
+  return buildGroupVertexIndex(currentGroups.value, size);
+});
+
+const groupOutlines = computed(() => {
+  const size = state.value.size ?? boardSizeFromSgf.value;
+  return buildGroupOutlines(currentGroups.value, size, activeGroupId.value);
+});
+
+const dimmedVertices = computed(() => {
+  const size = state.value.size ?? boardSizeFromSgf.value;
+  const focus = currentGroups.value.find(
+    (g) => g.groupId === activeGroupId.value,
+  );
+  return dimVerticesOutsideGroup(focus, size);
+});
+
+const selectedVertices = computed(() => {
+  const size = state.value.size ?? boardSizeFromSgf.value;
+  const focus = currentGroups.value.find(
+    (g) => g.groupId === activeGroupId.value,
+  );
+  if (focus == null) return [] as Vertex[];
+  return groupMemberVertices(focus, size);
 });
 
 function refreshOverlays() {
@@ -112,6 +156,9 @@ watch(currentPly, () => {
   previewCandidate.value = null;
   pinnedPreview.value = null;
   selectedCandidate.value = 0;
+  previewGroupId.value = null;
+  pinnedGroupId.value = null;
+  selectedGroupId.value = null;
 });
 
 watch(
@@ -236,29 +283,60 @@ function togglePreview(index: number) {
   }
 }
 
+function setGroupPreview(groupId: string) {
+  previewGroupId.value = groupId;
+}
+
+function clearGroupPreview() {
+  if (pinnedGroupId.value != null) return;
+  previewGroupId.value = null;
+}
+
+function selectGroup(groupId: string) {
+  if (selectedGroupId.value === groupId && pinnedGroupId.value === groupId) {
+    selectedGroupId.value = null;
+    pinnedGroupId.value = null;
+    previewGroupId.value = null;
+    return;
+  }
+  selectedGroupId.value = groupId;
+  pinnedGroupId.value = groupId;
+  previewGroupId.value = groupId;
+}
+
 function onVertexMouseEnter(_evt: MouseEvent, vertex: Vertex) {
-  const idx = candidateVertexIndex.value.get(`${vertex[0]},${vertex[1]}`);
-  if (idx == null) return;
-  setPreview(idx);
+  const key = `${vertex[0]},${vertex[1]}`;
+  const idx = candidateVertexIndex.value.get(key);
+  if (idx != null) {
+    setPreview(idx);
+    return;
+  }
+  const gid = groupVertexIndex.value.get(key);
+  if (gid != null) setGroupPreview(gid);
 }
 
 function onVertexMouseLeave(_evt: MouseEvent, _vertex: Vertex) {
   clearPreview();
+  clearGroupPreview();
 }
 
 function onVertexClick(evt: MouseEvent, vertex: Vertex) {
-  const idx = candidateVertexIndex.value.get(`${vertex[0]},${vertex[1]}`);
-  if (idx == null) return;
-  // Tap-to-toggle for touch / pen; mouse click also pins so users can inspect.
-  const isTouch =
-    evt.detail === 0 ||
-    ("pointerType" in evt &&
-      (evt as PointerEvent).pointerType === "touch") ||
-    (typeof window !== "undefined" &&
-      window.matchMedia?.("(pointer: coarse)")?.matches);
-  if (isTouch || evt.detail >= 1) {
-    togglePreview(idx);
+  const key = `${vertex[0]},${vertex[1]}`;
+  const idx = candidateVertexIndex.value.get(key);
+  if (idx != null) {
+    const isTouch =
+      evt.detail === 0 ||
+      ("pointerType" in evt &&
+        (evt as PointerEvent).pointerType === "touch") ||
+      (typeof window !== "undefined" &&
+        window.matchMedia?.("(pointer: coarse)")?.matches);
+    if (isTouch || evt.detail >= 1) {
+      togglePreview(idx);
+    }
+    return;
   }
+  const gid = groupVertexIndex.value.get(key);
+  if (gid != null) selectGroup(gid);
 }
 
 const phaseBadge = computed(() => {
@@ -354,6 +432,12 @@ const phaseBadge = computed(() => {
         :candidates="currentCandidates"
         :preview-candidate-index="activePreview"
         :selected-candidate-index="selectedCandidate"
+        :groups="currentGroups"
+        :preview-group-id="previewGroupId ?? pinnedGroupId"
+        :selected-group-id="selectedGroupId"
+        :group-outlines="groupOutlines"
+        :dimmed-vertices="dimmedVertices"
+        :selected-vertices="selectedVertices"
         :comment-override="analysisComment"
         comment-title="Analysis"
         :vertex-size="vertexSize"
@@ -369,6 +453,9 @@ const phaseBadge = computed(() => {
         @clear-preview="clearPreview"
         @toggle-candidate="togglePreview"
         @select-candidate="(i) => (selectedCandidate = i)"
+        @preview-group="setGroupPreview"
+        @clear-group-preview="clearGroupPreview"
+        @select-group="selectGroup"
       />
     </div>
   </div>

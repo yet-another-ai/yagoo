@@ -47,8 +47,17 @@ export class SvgOverlayRenderer implements OverlayRenderer {
       );
       path.setAttribute("fill", "none");
       path.setAttribute("stroke", outline.color ?? "#0082F0");
-      path.setAttribute("stroke-width", "2");
+      path.setAttribute(
+        "stroke-width",
+        String(outline.strokeWidth ?? 2),
+      );
+      if (outline.dasharray) {
+        path.setAttribute("stroke-dasharray", outline.dasharray);
+      }
       path.setAttribute("class", "yagoo-group-outline");
+      if (outline.groupId) {
+        path.setAttribute("data-group-id", outline.groupId);
+      }
       this.group.appendChild(path);
     }
 

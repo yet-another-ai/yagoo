@@ -54,6 +54,54 @@ export interface PvEndSnapshot {
   analysis: EngineAnalysis;
 }
 
+/**
+ * Teaching group (块) — fate-correlated unit, **not** a rules chain (串).
+ * Additive proposal: see `docs/pipeline/groups-proposal.md`. Pipeline does not
+ * emit this yet; fixtures may set `source: "fixture_proposal"`.
+ */
+export type GroupKind = "simple" | "contested" | "bound";
+export type GroupStatus =
+  | "settled"
+  | "weak"
+  | "tempo_critical"
+  | "dead"
+  | "likely_seki";
+
+export interface GroupMembers {
+  blackStones: string[];
+  whiteStones: string[];
+  empty: string[];
+}
+
+export interface GroupPart {
+  points: string[];
+  chains?: string[];
+}
+
+export interface GroupStrength {
+  black?: number;
+  white?: number;
+}
+
+export interface GroupSnapshot {
+  groupId: string;
+  members: GroupMembers;
+  chains?: string[];
+  parts?: GroupPart[];
+  kind: GroupKind;
+  strength?: GroupStrength;
+  certainty?: number;
+  cohesion?: number;
+  boundConfidence?: number | null;
+  /** Tempo module status (docs/modules/tempo-sensitivity.md). */
+  status?: GroupStatus;
+  gPlus?: number | null;
+  gMinus?: number | null;
+  delta?: number | null;
+  /** `"fixture_proposal"` = hand-authored demo until pipeline groups land. */
+  source?: "pipeline" | "fixture_proposal";
+}
+
 export interface PositionSnapshot {
   schemaVersion: number;
   ply: number;
@@ -61,7 +109,13 @@ export interface PositionSnapshot {
   lastMove?: string | null;
   ownershipConvention: OwnershipConvention;
   board: BoardSnapshot;
+  /** Rules chains (串) — not teaching groups. */
   chains: ChainSnapshot[];
+  /**
+   * Teaching groups (块). Optional / additive — see groups-proposal.md.
+   * Absent until the pipeline groups module exists.
+   */
+  groups?: GroupSnapshot[];
   root?: EngineAnalysis | null;
   passProbe?: EngineAnalysis | null;
   passProbeSkipped?: string | null;
@@ -163,6 +217,8 @@ export interface PlyAnalysis {
   /** Authoritative snapshot when `positionCompleted` arrived for this phase. */
   snapshot?: PositionSnapshot | null;
   candidates: CandidateSnapshot[];
+  /** Teaching groups (块) from the latest snapshot, if present. */
+  groups: GroupSnapshot[];
   passProbe?: EngineAnalysis | null;
   complete: boolean;
 }

@@ -98,6 +98,46 @@ describe("AnalysisReviewer", () => {
     wrapper.unmount();
   });
 
+  it("shows Groups/块 panel and highlights on group hover", async () => {
+    const wrapper = mount(AnalysisReviewer, {
+      props: {
+        initialSgf: sampleSgf,
+        initialNdjson: fixtureText,
+        vertexSize: 16,
+      },
+      attachTo: document.body,
+    });
+
+    await drainProgressiveBatches();
+    const layout = wrapper.findComponent({ name: "ReviewerLayout" });
+    layout.vm.goToPly(48);
+    await flushPromises();
+    await drainProgressiveBatches(8);
+
+    const panel = wrapper.find('[data-testid="groups-panel"]');
+    expect(panel.exists()).toBe(true);
+    expect(panel.text()).toMatch(/Groups|块/);
+    expect(panel.text()).toMatch(/fixture/i);
+    const rows = panel.findAll("[data-group-id]");
+    expect(rows.length).toBeGreaterThanOrEqual(3);
+
+    // Outlines present before hover.
+    expect(document.querySelectorAll(".yagoo-group-outline").length).toBeGreaterThan(
+      0,
+    );
+
+    await rows[0]!.trigger("mouseenter");
+    await flushPromises();
+    expect(rows[0]!.classes()).toContain("yagoo-groups__row--preview");
+    // Dimmed vertices appear while a group is focused.
+    expect(wrapper.findAll(".shudan-dimmed").length).toBeGreaterThan(0);
+
+    await rows[0]!.trigger("mouseleave");
+    await flushPromises();
+
+    wrapper.unmount();
+  });
+
   it("tap-toggles PV preview from the candidates panel", async () => {
     const wrapper = mount(AnalysisReviewer, {
       props: {

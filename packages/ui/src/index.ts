@@ -5,6 +5,7 @@ export { default as AnalysisReviewer } from "./layout/AnalysisReviewer.vue";
 export { default as BottomBar } from "./layout/BottomBar.vue";
 export { default as CandidatesPanel } from "./layout/CandidatesPanel.vue";
 export { default as CommentBox } from "./layout/CommentBox.vue";
+export { default as GroupsPanel } from "./layout/GroupsPanel.vue";
 export { default as WinrateGraph } from "./layout/WinrateGraph.vue";
 export type { WinratePoint } from "./layout/WinrateGraph.vue";
 
@@ -15,6 +16,8 @@ export {
   PIPELINE_SCHEMA_VERSION,
   OWNERSHIP_PAINT_STRENGTH,
   buildBoardOverlays,
+  buildGroupOutlines,
+  buildGroupVertexIndex,
   buildPvPreview,
   buildReviewSeries,
   colorToSign,
@@ -24,7 +27,15 @@ export {
   createNdjsonEventsSource,
   createNdjsonFileSource,
   createNdjsonTextSource,
+  dimVerticesOutsideGroup,
   formatAnalysisComment,
+  groupMemberVertices,
+  groupOutlineColor,
+  groupPrimaryColor,
+  groupStatusLabel,
+  groupStoneCount,
+  groupStoneVertices,
+  groupValueLabel,
   isBrowserEngineAvailable,
   isLiveNativeAvailable,
   ownershipToHeatMap,
@@ -46,6 +57,10 @@ export type {
   CandidateSnapshot,
   DeepPlySelection,
   EngineAnalysis,
+  GroupKind,
+  GroupOutlineSpec,
+  GroupSnapshot,
+  GroupStatus,
   PipelineEvent,
   PlyAnalysis,
   PositionSnapshot,

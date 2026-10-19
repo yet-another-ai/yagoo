@@ -29,6 +29,7 @@ function stateWithCandidates(
     complete: true,
     phase: "deep",
     candidates,
+    groups: [],
     root: {
       visits: 200,
       winrate: 0.55,

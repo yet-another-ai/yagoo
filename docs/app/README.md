@@ -14,6 +14,10 @@ Missing SGF `RU` is treated as **Chinese** (same as `yagoo-sgf` / the pipeline).
 
 The bundled sample is an original **19×19** teaching game (~70 legality-checked moves). Analysis covers the main line via `scan_then_deep`; one ownership-swing ply is deepened. The board auto-sizes to the container (`ResizeObserver`). Other board sizes still work when you open an SGF with a different `SZ`.
 
+### Groups / 块 in the sample
+
+`yagoo-pipeline` currently emits rules **chains** (串) only — teaching **groups** (块) are **not** implemented yet. The deep ply in `sample-scan-deep.ndjson` includes hand-authored `groups` with `"source": "fixture_proposal"` so the reviewer can exercise the Groups panel and board outlines against the [additive schema proposal](../pipeline/groups-proposal.md). Regenerating via `--scripted-fixture` alone will **not** produce groups until the pipeline module exists.
+
 ## Local regenerate fixture
 
 ```sh

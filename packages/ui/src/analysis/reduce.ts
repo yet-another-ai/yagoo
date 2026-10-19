@@ -12,6 +12,7 @@ function ensurePly(state: AnalysisState, ply: number): PlyAnalysis {
     ply,
     rootPartial: false,
     candidates: [],
+    groups: [],
     complete: false,
   };
   state.plies[ply] = created;
@@ -30,6 +31,7 @@ function cloneState(state: AnalysisState): AnalysisState {
         {
           ...v,
           candidates: [...v.candidates],
+          groups: [...(v.groups ?? [])],
           root: v.root ? { ...v.root } : v.root,
           passProbe: v.passProbe ? { ...v.passProbe } : v.passProbe,
           snapshot: v.snapshot,
@@ -131,6 +133,8 @@ export function reducePipelineEvent(
         ply.passProbe = { ...snap.passProbe };
       }
       ply.candidates = snap.candidates ? [...snap.candidates] : [];
+      // Teaching groups (块) — additive; empty until pipeline emits them.
+      ply.groups = snap.groups ? [...snap.groups] : [];
       ply.complete = true;
       break;
     }

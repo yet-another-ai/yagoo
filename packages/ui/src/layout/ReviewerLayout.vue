@@ -7,7 +7,7 @@ import {
   ref,
   watch,
 } from "vue";
-import type { CandidateSnapshot } from "../analysis/types";
+import type { CandidateSnapshot, GroupSnapshot } from "../analysis/types";
 import { useGame } from "../composables/useGame";
 import Goban from "../goban/Goban.vue";
 import OverlayLayer from "../overlays/OverlayLayer.vue";
@@ -24,8 +24,17 @@ import type {
 import BottomBar from "./BottomBar.vue";
 import CandidatesPanel from "./CandidatesPanel.vue";
 import CommentBox from "./CommentBox.vue";
+import GroupsPanel from "./GroupsPanel.vue";
 import WinrateGraph, { type WinratePoint } from "./WinrateGraph.vue";
 import "./styles/reviewer.css";
+
+export type GroupOutlineProp = {
+  vertices: Vertex[];
+  color?: string;
+  strokeWidth?: number;
+  dasharray?: string;
+  groupId?: string;
+};
 
 const props = withDefaults(
   defineProps<{
@@ -40,13 +49,17 @@ const props = withDefaults(
     fuzzyStonePlacement?: boolean;
     animateStonePlacement?: boolean;
     fuzzySeed?: number;
-    /** Demo group outline vertices (proves OverlayLayer alignment). */
+    /** @deprecated Prefer `groupOutlines` (块). Kept for the docs demo page. */
     demoGroupOutline?: Vertex[];
+    /** Teaching group (块) outlines — distinct from chains (串). */
+    groupOutlines?: GroupOutlineProp[];
     heatMap?: BoardMap<HeatVertex | null>;
     paintMap?: BoardMap<number>;
     ghostStoneMap?: BoardMap<GhostStone | null>;
     markerMap?: BoardMap<Marker | null>;
     lines?: LineMarker[];
+    selectedVertices?: Vertex[];
+    dimmedVertices?: Vertex[];
     /** Override the SGF node comment (e.g. live analysis text). */
     commentOverride?: string | null;
     commentTitle?: string;
@@ -54,6 +67,10 @@ const props = withDefaults(
     candidates?: CandidateSnapshot[];
     previewCandidateIndex?: number | null;
     selectedCandidateIndex?: number;
+    /** Teaching groups (块) for the current ply. */
+    groups?: GroupSnapshot[];
+    previewGroupId?: string | null;
+    selectedGroupId?: string | null;
   }>(),
   {
     showCoordinates: true,
@@ -61,13 +78,19 @@ const props = withDefaults(
     animateStonePlacement: true,
     fuzzySeed: 42,
     demoGroupOutline: () => [],
+    groupOutlines: () => [],
     winrateData: () => [],
     lines: () => [],
+    selectedVertices: () => [],
+    dimmedVertices: () => [],
     commentOverride: null,
     commentTitle: "Comment",
     candidates: () => [],
     previewCandidateIndex: null,
     selectedCandidateIndex: 0,
+    groups: () => [],
+    previewGroupId: null,
+    selectedGroupId: null,
   },
 );
 
@@ -81,6 +104,9 @@ const emit = defineEmits<{
   (e: "clear-preview"): void;
   (e: "toggle-candidate", index: number): void;
   (e: "select-candidate", index: number): void;
+  (e: "preview-group", groupId: string): void;
+  (e: "clear-group-preview"): void;
+  (e: "select-group", groupId: string): void;
 }>();
 
 const {
@@ -160,12 +186,20 @@ watch(
 watch(boardSize, () => updateAutoVertexSize());
 watch(moveNumber, (n) => emit("ply-change", n));
 
-const overlayData = computed<OverlayData>(() => ({
-  groupOutlines:
-    props.demoGroupOutline.length > 0
-      ? [{ vertices: props.demoGroupOutline, color: "#0082F0" }]
-      : [],
-}));
+const overlayData = computed<OverlayData>(() => {
+  if (props.groupOutlines.length > 0) {
+    return { groupOutlines: props.groupOutlines };
+  }
+  // Legacy demo prop (docs ReviewerDemo).
+  if (props.demoGroupOutline.length > 0) {
+    return {
+      groupOutlines: [
+        { vertices: props.demoGroupOutline, color: "#0082F0" },
+      ],
+    };
+  }
+  return { groupOutlines: [] };
+});
 
 const emptySignMap = computed<BoardMap<Sign>>(() => {
   const n = boardSize.value;
@@ -217,6 +251,8 @@ defineExpose({
           :ghost-stone-map="ghostStoneMap"
           :marker-map="markerMap"
           :lines="lines"
+          :selected-vertices="selectedVertices"
+          :dimmed-vertices="dimmedVertices"
           :vertex-size="effectiveVertexSize"
           :show-coordinates="showCoordinates"
           :fuzzy-stone-placement="fuzzyStonePlacement"
@@ -252,6 +288,14 @@ defineExpose({
         @clear-preview="emit('clear-preview')"
         @toggle="(i) => emit('toggle-candidate', i)"
         @select="(i) => emit('select-candidate', i)"
+      />
+      <GroupsPanel
+        :groups="groups"
+        :preview-id="previewGroupId"
+        :selected-id="selectedGroupId"
+        @preview="(id) => emit('preview-group', id)"
+        @clear-preview="emit('clear-group-preview')"
+        @select="(id) => emit('select-group', id)"
       />
       <div class="yagoo-gametree-placeholder">
         Game tree panel — placeholder (out of scope for MVP).

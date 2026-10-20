@@ -452,15 +452,16 @@ function reviewGame() {
     return;
   }
   if (chosenSource.value === "native" && liveAvailable) {
+    reviewer.value?.openReport();
     tryLiveNative();
   } else if (props.browserEngine && chosenSource.value !== "native") {
+    reviewer.value?.openReport();
     tryBrowserEngine();
   } else {
     sourceOpen.value = true;
     statusMessage.value = "Choose an available engine or load recorded analysis to review this game.";
     return;
   }
-  reviewer.value?.openReport();
 }
 
 function onPlyChange(ply: number) {
@@ -698,7 +699,7 @@ const phaseBadge = computed(() => {
         @clear-group-preview="clearGroupPreview"
         @select-group="selectGroup"
         @commentary="saveCommentary"
-        @cancel-review="stop"
+        @cancel-review="stopAnalysis"
       />
     </div>
   </div>

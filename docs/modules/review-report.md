@@ -2,6 +2,8 @@
 
 The **Review** action runs the available chosen engine and opens a report that updates as completed evidence arrives. Recorded NDJSON can be reviewed without an engine or model. If no engine is configured and no recording is loaded, Review opens source configuration. Stopping analysis preserves a clearly partial report.
 
+Review exits Try mode or an SGF side variation, cancels its pending position request, and restores the main line before starting full-game analysis. Repeated Review clicks reuse an active full-game run; late variation results cannot replace its report.
+
 ## Evidence and alignment
 
 A played move `p` is compared at the board **before it was played**, root `p - 1`. Only the authoritative `PositionSnapshot.comparison` for `p` may establish its score or winrate loss. The comparison's context carries both candidate lines, the root groups, query IDs, visits, and available history hashes. The ordinary snapshot at `p` describes the *next* player; its ledger and groups are not explanations of move `p`.

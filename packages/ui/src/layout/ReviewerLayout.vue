@@ -367,7 +367,7 @@ function previewStones(stones: string[]) {
     .map((coordinate) => parseGtpVertex(coordinate, boardSize.value))
     .filter((vertex): vertex is Vertex => vertex != null) };
 }
-watch(suspendAnalysis, (active) => emit("variation-change", active), { immediate: true });
+watch(suspendAnalysis, (active) => emit("variation-change", active), { immediate: true, flush: "sync" });
 const variationPly = computed(() => moveNumber.value + tryDepth.value);
 const variationInfo = computed(() => variation.state.value.plies[variationPly.value] ?? null);
 const displayCandidates = computed(() => suspendAnalysis.value ? variationInfo.value?.candidates ?? [] : props.candidates);
@@ -568,6 +568,15 @@ function clearTry() {
   variation.clear();
   tryNodes.value = [];
   tryCursor.value = null;
+}
+
+function openReport() {
+  // Stop the old position request before the parent starts a full-game run on
+  // the same adapter. Queued variation watchers will then see a main-line key.
+  clearTry();
+  tryMode.value = false;
+  if (!onMainLine.value) goToPly(moveNumber.value);
+  view.value = "report";
 }
 
 function captureAnchor() {
@@ -813,7 +822,7 @@ function onSplitterKey(event: KeyboardEvent) {
 }
 
 defineExpose({
-  openReport: () => { view.value = "report"; },
+  openReport,
   boardSize,
   moveNumber,
   goToPly,
@@ -1051,7 +1060,7 @@ defineExpose({
       @back="onBack"
       @forward="onForward"
       @toggle-try="toggleTry"
-      @toggle-report="view = view === 'report' ? 'board' : 'report'"
+      @toggle-report="view === 'report' ? (view = 'board') : openReport()"
     />
   </div>
 </template>

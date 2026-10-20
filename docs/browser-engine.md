@@ -114,6 +114,12 @@ adapter is [#20](https://github.com/yet-another-ai/yagoo/issues/20)). Weights ar
 not shipped in git and are not fetched until you click **Load model** (or stage
 local files first).
 
+The page’s `#model-island` (`data-slot="model-island"`) is the catalog, size,
+progress, cancel, OPFS clear, and local-file island. The reviewer engine menu
+exposes the same slot so that island can mount there when #20 wires the adapter
+([reviewer UI](./design/reviewer-ui.md)). Opening either surface does not fetch
+weights.
+
 `build:wasm` installs a matching wasm-bindgen CLI into the repository's ignored
 `.yagoo-data/wasm-tools` directory when needed. `WASM_BINDGEN` can select an
 already installed matching executable. `mise run browser:check` combines the

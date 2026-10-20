@@ -61,6 +61,7 @@ export default defineConfig({
         items: [
           { text: "Architecture & data flow", link: "/architecture" },
           { text: "Reviewer app", link: "/app/" },
+          { text: "Reviewer UI", link: "/design/reviewer-ui" },
           { text: "Frontend demo", link: "/demo/" },
           { text: "MVP & validation", link: "/mvp" },
           { text: "Open questions", link: "/open-questions" },

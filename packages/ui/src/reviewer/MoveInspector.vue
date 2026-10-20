@@ -1,0 +1,538 @@
+<script setup lang="ts">
+import { ref, watch } from "vue";
+import type {
+  GainLossLedger,
+  LlmCommentary,
+  MoveComparison,
+  SacrificeAnnotation,
+} from "../analysis/modules";
+import type { CandidateSnapshot, EngineAnalysis } from "../analysis/types";
+import CandidatesPanel from "../layout/CandidatesPanel.vue";
+import StubPane from "./StubPane.vue";
+
+export type InspectorPerspective =
+  | "ai"
+  | "why"
+  | "ledger"
+  | "sacrifice"
+  | "notes";
+
+const props = withDefaults(
+  defineProps<{
+    candidates: CandidateSnapshot[];
+    root?: EngineAnalysis | null;
+    rootVisits?: number | null;
+    previewIndex?: number | null;
+    selectedIndex?: number;
+    ledger?: GainLossLedger | null;
+    comparison?: MoveComparison | null;
+    sacrifices?: SacrificeAnnotation[] | null;
+    commentary?: LlmCommentary | null;
+    initialPerspective?: InspectorPerspective;
+    /** Ply shown in the header, for key-move context. */
+    ply?: number;
+    keyIndex?: number;
+    keyCount?: number;
+  }>(),
+  {
+    root: null,
+    rootVisits: null,
+    previewIndex: null,
+    selectedIndex: 0,
+    ledger: null,
+    comparison: null,
+    sacrifices: null,
+    commentary: null,
+    initialPerspective: "ai",
+    ply: 0,
+    keyIndex: -1,
+    keyCount: 0,
+  },
+);
+
+const emit = defineEmits<{
+  (e: "preview", index: number): void;
+  (e: "clear-preview"): void;
+  (e: "toggle", index: number): void;
+  (e: "select", index: number): void;
+  (e: "preview-group", groupId: string): void;
+  (e: "prev-key"): void;
+  (e: "next-key"): void;
+}>();
+
+const tabs: { id: InspectorPerspective; label: string }[] = [
+  { id: "ai", label: "AI" },
+  { id: "why", label: "Why not" },
+  { id: "ledger", label: "Ledger" },
+  { id: "sacrifice", label: "Sacrifice" },
+  { id: "notes", label: "Notes" },
+];
+
+const perspective = ref<InspectorPerspective>(props.initialPerspective);
+
+watch(
+  () => props.initialPerspective,
+  (next) => {
+    perspective.value = next;
+  },
+);
+
+function onTabKey(event: KeyboardEvent, index: number) {
+  if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+  event.preventDefault();
+  event.stopPropagation();
+  const dir = event.key === "ArrowRight" ? 1 : -1;
+  const next = (index + dir + tabs.length) % tabs.length;
+  const tab = tabs[next];
+  if (tab == null) return;
+  perspective.value = tab.id;
+  const button = (event.currentTarget as HTMLElement).parentElement
+    ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
+    .item(next);
+  button?.focus();
+}
+
+function percent(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function points(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(1)}`;
+}
+
+defineExpose({ perspective });
+</script>
+
+<template>
+  <section class="yagoo-inspector" data-testid="move-inspector" :aria-label="`Move ${ply} inspector`">
+    <header class="yagoo-inspector__bar">
+      <div class="yagoo-inspector__title">
+        Move {{ ply }}
+        <span v-if="keyCount > 0" class="yagoo-inspector__key">
+          <template v-if="keyIndex >= 0">
+            Key {{ keyIndex + 1 }} / {{ keyCount }}
+          </template>
+          <template v-else>Not a key move</template>
+        </span>
+      </div>
+      <div class="yagoo-inspector__keys">
+        <button
+          type="button"
+          data-testid="prev-key-move"
+          :disabled="keyCount === 0"
+          aria-label="Previous key move"
+          @click="emit('prev-key')"
+        >
+          Prev key
+        </button>
+        <button
+          type="button"
+          data-testid="next-key-move"
+          :disabled="keyCount === 0"
+          aria-label="Next key move"
+          @click="emit('next-key')"
+        >
+          Next key
+        </button>
+      </div>
+    </header>
+
+    <div class="yagoo-inspector__tabs" role="tablist" aria-label="Move perspectives">
+      <button
+        v-for="(tab, index) in tabs"
+        :id="`yagoo-tab-${tab.id}`"
+        :key="tab.id"
+        type="button"
+        role="tab"
+        :data-testid="`perspective-${tab.id}`"
+        :aria-selected="perspective === tab.id"
+        :tabindex="perspective === tab.id ? 0 : -1"
+        :aria-controls="`yagoo-panel-${tab.id}`"
+        @click="perspective = tab.id"
+        @keydown="onTabKey($event, index)"
+      >
+        {{ tab.label }}
+      </button>
+    </div>
+
+    <div
+      v-show="perspective === 'ai'"
+      :id="'yagoo-panel-ai'"
+      role="tabpanel"
+      aria-labelledby="yagoo-tab-ai"
+      class="yagoo-inspector__panel"
+    >
+      <dl v-if="root" class="yagoo-inspector__root">
+        <div>
+          <dt>Winrate</dt>
+          <dd>{{ percent(root.winrate) }}</dd>
+        </div>
+        <div>
+          <dt>Score</dt>
+          <dd>{{ points(root.scoreLead) }}</dd>
+        </div>
+        <div>
+          <dt>Visits</dt>
+          <dd>{{ root.visits ?? "—" }}</dd>
+        </div>
+      </dl>
+      <p v-else class="yagoo-inspector__wait">No root analysis at this ply yet.</p>
+      <CandidatesPanel
+        embedded
+        :candidates="candidates"
+        :root-visits="rootVisits"
+        :preview-index="previewIndex"
+        :selected-index="selectedIndex"
+        @preview="emit('preview', $event)"
+        @clear-preview="emit('clear-preview')"
+        @toggle="emit('toggle', $event)"
+        @select="emit('select', $event)"
+      />
+    </div>
+
+    <div
+      v-show="perspective === 'why'"
+      id="yagoo-panel-why"
+      role="tabpanel"
+      aria-labelledby="yagoo-tab-why"
+      class="yagoo-inspector__panel"
+    >
+      <div v-if="comparison" class="yagoo-compare" data-testid="comparison-body">
+        <table>
+          <thead>
+            <tr>
+              <th></th>
+              <th>Actual {{ comparison.actualMove }}</th>
+              <th>AI {{ comparison.aiMove }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th>Winrate</th>
+              <td>{{ percent(comparison.actualWinrate) }}</td>
+              <td>{{ percent(comparison.aiWinrate) }}</td>
+            </tr>
+            <tr>
+              <th>Score</th>
+              <td>{{ points(comparison.actualScoreLead) }}</td>
+              <td>{{ points(comparison.aiScoreLead) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-if="comparison.ownershipDelta == null" class="yagoo-inspector__wait">
+          Ownership diff is part of the #24 payload and is not attached.
+        </p>
+        <ul
+          v-if="comparison.ledgerDiff"
+          class="yagoo-ledger"
+        >
+          <li v-for="(line, i) in comparison.ledgerDiff.ledger" :key="i">
+            <button
+              v-if="line.id"
+              type="button"
+              class="yagoo-ledger__link"
+              @mouseenter="emit('preview-group', line.id)"
+              @focus="emit('preview-group', line.id)"
+            >
+              {{ line.id }}
+            </button>
+            <span>{{ line.kind }}</span>
+            <span v-if="line.change">{{ line.change }}</span>
+            <span>{{ points(line.points) }}</span>
+          </li>
+        </ul>
+      </div>
+      <StubPane
+        v-else
+        :issue="24"
+        title="Why not this move"
+        summary="The actual move will be compared with KataGo's choice: winrate, score lead, ownership, and the per-group ledger. That comparison is not in the event stream yet."
+      />
+    </div>
+
+    <div
+      v-show="perspective === 'ledger'"
+      id="yagoo-panel-ledger"
+      role="tabpanel"
+      aria-labelledby="yagoo-tab-ledger"
+      class="yagoo-inspector__panel"
+    >
+      <div v-if="ledger" class="yagoo-ledger-wrap" data-testid="ledger-body">
+        <p class="yagoo-inspector__wait">
+          {{ ledger.move }} vs {{ ledger.vs }} ·
+          {{ points(ledger.value) }}
+          <template v-if="!ledger.consistent">
+            · book and search disagree
+          </template>
+        </p>
+        <ul class="yagoo-ledger">
+          <li v-for="(line, i) in ledger.ledger" :key="i">
+            <button
+              v-if="line.kind === 'group' && line.id"
+              type="button"
+              class="yagoo-ledger__link"
+              :data-ledger-group="line.id"
+              @mouseenter="emit('preview-group', line.id)"
+              @focus="emit('preview-group', line.id)"
+            >
+              {{ line.id }}
+            </button>
+            <span v-else>{{ line.kind.replace(/_/g, " ") }}</span>
+            <span v-if="line.change">{{ line.change }}</span>
+            <span v-if="line.tempo">{{ line.tempo }}</span>
+            <span class="yagoo-ledger__pts">{{ points(line.points) }}</span>
+          </li>
+        </ul>
+      </div>
+      <StubPane
+        v-else
+        :issue="23"
+        title="Gain / loss by group"
+        summary="Each move will attribute ownership and score change to the groups (块) on the board, including sente and gote. Hovering a row will highlight that group. The ledger is not computed in the browser."
+      />
+    </div>
+
+    <div
+      v-show="perspective === 'sacrifice'"
+      id="yagoo-panel-sacrifice"
+      role="tabpanel"
+      aria-labelledby="yagoo-tab-sacrifice"
+      class="yagoo-inspector__panel"
+    >
+      <ul
+        v-if="sacrifices && sacrifices.length"
+        class="yagoo-ledger"
+        data-testid="sacrifice-body"
+      >
+        <li v-for="item in sacrifices" :key="item.groupId">
+          <button
+            type="button"
+            class="yagoo-ledger__link"
+            @mouseenter="emit('preview-group', item.groupId)"
+            @focus="emit('preview-group', item.groupId)"
+          >
+            {{ item.groupId }}
+          </button>
+          <span>flip {{ item.ownershipFlip.toFixed(2) }}</span>
+          <span v-if="item.compensationPoints != null">
+            exchange {{ points(item.compensationPoints) }}
+          </span>
+          <span v-if="item.exchangedWith.length">
+            via {{ item.exchangedWith.join(", ") }}
+          </span>
+        </li>
+      </ul>
+      <p
+        v-else-if="sacrifices && sacrifices.length === 0"
+        class="yagoo-inspector__wait"
+        data-testid="sacrifice-none"
+      >
+        The pipeline reported no sacrifice on the preferred line.
+      </p>
+      <StubPane
+        v-else
+        :issue="25"
+        title="Sacrifice (弃子)"
+        summary="When KataGo's preferred line gives up a group and the winrate holds, that group will be marked here with what is gained in exchange. No sacrifice detector is running."
+      />
+    </div>
+
+    <div
+      v-show="perspective === 'notes'"
+      id="yagoo-panel-notes"
+      role="tabpanel"
+      aria-labelledby="yagoo-tab-notes"
+      class="yagoo-inspector__panel"
+    >
+      <div v-if="commentary" data-testid="commentary-body" class="yagoo-notes">
+        <p>{{ commentary.text }}</p>
+        <p class="yagoo-inspector__wait">
+          {{ commentary.provider }} ·
+          {{ commentary.verified ? "verified" : "template fallback" }}
+          <template v-if="commentary.citedFactIds.length">
+            · {{ commentary.citedFactIds.join(", ") }}
+          </template>
+        </p>
+      </div>
+      <div v-else>
+        <StubPane
+          :issue="28"
+          title="Natural-language notes"
+          summary="An optional model may paraphrase the structured facts (candidates, ledger, comparison, sacrifices, opening). It will not judge the position itself. Commentary stays off, including in CI."
+        />
+        <label class="yagoo-notes__opt">
+          <input type="checkbox" disabled />
+          Generate commentary (off until #28)
+        </label>
+      </div>
+    </div>
+  </section>
+</template>
+
+<style scoped>
+.yagoo-inspector {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--yagoo-panel, #fff);
+  color: var(--yagoo-text, #1a1a1a);
+}
+
+.yagoo-inspector__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0.55rem 0.15rem;
+}
+
+.yagoo-inspector__title {
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.yagoo-inspector__key {
+  margin-left: 0.4rem;
+  font-weight: 500;
+  color: var(--yagoo-muted, #5c5c66);
+  font-size: 0.75rem;
+}
+
+.yagoo-inspector__keys {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.yagoo-inspector__keys button,
+.yagoo-inspector__tabs button {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--yagoo-muted, #5c5c66);
+  font: inherit;
+  font-size: 0.75rem;
+  border-radius: 4px;
+  padding: 0.22rem 0.45rem;
+  cursor: pointer;
+}
+
+.yagoo-inspector__keys button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.yagoo-inspector__tabs {
+  display: flex;
+  gap: 0.1rem;
+  padding: 0 0.35rem;
+  border-bottom: 1px solid var(--yagoo-border, #e2e2e6);
+  overflow-x: auto;
+}
+
+.yagoo-inspector__tabs button[aria-selected="true"] {
+  color: var(--yagoo-text, #1a1a1a);
+  font-weight: 700;
+  box-shadow: inset 0 -2px 0 var(--yagoo-accent, #0082f0);
+}
+
+.yagoo-inspector__panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.yagoo-inspector__root {
+  display: flex;
+  gap: 0.8rem;
+  margin: 0;
+  padding: 0.45rem 0.7rem 0.1rem;
+}
+
+.yagoo-inspector__root div {
+  display: flex;
+  flex-direction: column;
+}
+
+.yagoo-inspector__root dt {
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--yagoo-muted, #5c5c66);
+}
+
+.yagoo-inspector__root dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+.yagoo-inspector__wait {
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+  color: var(--yagoo-muted, #5c5c66);
+  font-size: 0.8rem;
+}
+
+.yagoo-compare {
+  padding: 0.55rem 0.7rem;
+  font-size: 0.82rem;
+}
+
+.yagoo-compare table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.yagoo-compare th,
+.yagoo-compare td {
+  text-align: left;
+  padding: 0.25rem 0.35rem;
+  border-bottom: 1px solid var(--yagoo-border, #e2e2e6);
+}
+
+.yagoo-ledger {
+  list-style: none;
+  margin: 0;
+  padding: 0.2rem 0.45rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.yagoo-ledger li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+  align-items: center;
+  padding: 0.28rem 0.25rem;
+  border-bottom: 1px solid var(--yagoo-border, #ececf1);
+}
+
+.yagoo-ledger__link {
+  border: none;
+  background: transparent;
+  color: var(--yagoo-accent, #0066cc);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.yagoo-ledger__pts {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.yagoo-notes__opt {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0.85rem 0.8rem;
+  color: var(--yagoo-muted, #5c5c66);
+  font-size: 0.8rem;
+}
+
+.yagoo-ledger-wrap {
+  padding-top: 0.25rem;
+}
+</style>

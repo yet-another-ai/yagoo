@@ -1,5 +1,14 @@
 /** Wire types for `yagoo analyze` / `yagoo-pipeline` NDJSON events (schema v1). */
 
+import type {
+  GainLossLedger,
+  LlmCommentary,
+  MoveComparison,
+  OpeningMatch,
+  ReviewReportDocument,
+  SacrificeAnnotation,
+} from "./modules";
+
 export const PIPELINE_SCHEMA_VERSION = 1;
 
 export type AnalysisPhase = "scan" | "deep";
@@ -221,6 +230,17 @@ export interface PlyAnalysis {
   groups: GroupSnapshot[];
   passProbe?: EngineAnalysis | null;
   complete: boolean;
+  /**
+   * Per-move gain/loss ledger (#23). Null until `positionCompleted` carries it.
+   * The UI must not derive this from ownership on the client.
+   */
+  ledger: GainLossLedger | null;
+  /** Actual move versus KataGo's choice (#24). */
+  comparison: MoveComparison | null;
+  /** Sacrifices on the preferred line (#25). Null means "not emitted". */
+  sacrifices: SacrificeAnnotation[] | null;
+  /** Opt-in LLM paraphrase (#28). */
+  commentary: LlmCommentary | null;
 }
 
 export type StreamStatus =
@@ -251,6 +271,10 @@ export interface AnalysisState {
   warnings: string[];
   lastError: string | null;
   game: GameSnapshot | null;
+  /** Matched opening / joseki (#27). */
+  opening: OpeningMatch | null;
+  /** Automatic review document (#29). */
+  report: ReviewReportDocument | null;
 }
 
 export function createInitialAnalysisState(): AnalysisState {
@@ -274,5 +298,7 @@ export function createInitialAnalysisState(): AnalysisState {
     warnings: [],
     lastError: null,
     game: null,
+    opening: null,
+    report: null,
   };
 }

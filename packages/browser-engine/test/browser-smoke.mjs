@@ -60,7 +60,7 @@ try {
   if (!gpu) await page.locator('#wasm').check();
   await page.locator('#threads').fill('4');
   if (outputsOnly) await page.locator('#activations').check();
-  await page.getByRole('button', { name: 'Load and validate model' }).click();
+  await page.getByRole('button', { name: 'Load model', exact: true }).click();
   // Generous liveness bound; no recorded duration or throughput requirement.
   await page.waitForFunction(() => !document.querySelector('#scan').disabled || /failed:|Error:/.test(document.querySelector('#status').textContent), null, { timeout: 300_000 });
   const status = await page.locator('#status').innerText();

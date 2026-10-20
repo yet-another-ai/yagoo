@@ -7,8 +7,11 @@ const sgf = ref<string>("");
 const ndjson = ref<string>("");
 const ready = ref(false);
 const error = ref<string | null>(null);
+const theme = ref<"auto" | "light" | "dark">("auto");
 
 onMounted(async () => {
+  const requested = new URLSearchParams(window.location.search).get("theme");
+  if (requested === "dark" || requested === "light") theme.value = requested;
   try {
     const [sgfRes, ndjsonRes] = await Promise.all([
       fetch("/app/sample.sgf"),
@@ -34,6 +37,7 @@ onMounted(async () => {
       v-else
       :initial-sgf="sgf"
       :initial-ndjson="ndjson"
+      :theme="theme"
     />
   </div>
 </template>

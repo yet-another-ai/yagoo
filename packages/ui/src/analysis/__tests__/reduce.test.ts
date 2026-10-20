@@ -46,6 +46,19 @@ describe("parseNdjson / fixture format", () => {
   });
 });
 
+describe("unimplemented review modules", () => {
+  it("leaves ledger, comparison, sacrifice, commentary, opening, and report empty", () => {
+    const state = reducePipelineEvents(fixtureEvents);
+    expect(state.opening).toBeNull();
+    expect(state.report).toBeNull();
+    const ply = state.plies[DEEP_PLY];
+    expect(ply?.ledger).toBeNull();
+    expect(ply?.comparison).toBeNull();
+    expect(ply?.sacrifices).toBeNull();
+    expect(ply?.commentary).toBeNull();
+  });
+});
+
 describe("reducePipelineEvent ordering", () => {
   it("applies scan results before deepPliesSelected and deepen updates", () => {
     const types = fixtureEvents.map((e) => e.type);

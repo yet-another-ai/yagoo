@@ -9,6 +9,8 @@ withDefaults(
     canGoBack?: boolean;
     canGoForward?: boolean;
     moveNumber?: number;
+    tryMode?: boolean;
+    reportMode?: boolean;
   }>(),
   {
     players: () => [
@@ -19,12 +21,16 @@ withDefaults(
     canGoBack: false,
     canGoForward: false,
     moveNumber: 0,
+    tryMode: false,
+    reportMode: false,
   },
 );
 
 const emit = defineEmits<{
   (e: "back"): void;
   (e: "forward"): void;
+  (e: "toggle-try"): void;
+  (e: "toggle-report"): void;
 }>();
 </script>
 
@@ -35,10 +41,16 @@ const emit = defineEmits<{
       <span v-if="players[0].rank" class="yagoo-bottom-bar__rank">
         {{ players[0].rank }}
       </span>
-      <span class="yagoo-bottom-bar__captures">{{ players[0].captures }}</span>
+      <span class="yagoo-bottom-bar__captures" data-testid="captures-black">{{
+        players[0].captures
+      }}</span>
     </div>
 
-    <div class="yagoo-bottom-bar__turn" :title="`Move ${moveNumber}`">
+    <div
+      class="yagoo-bottom-bar__turn"
+      :title="`Move ${moveNumber}`"
+      :data-to-play="currentPlayer"
+    >
       <span
         class="yagoo-stone-icon yagoo-stone-icon--black"
         :class="{ 'yagoo-stone-icon--active': currentPlayer === 1 }"
@@ -50,7 +62,9 @@ const emit = defineEmits<{
     </div>
 
     <div class="yagoo-bottom-bar__player yagoo-bottom-bar__player--white">
-      <span class="yagoo-bottom-bar__captures">{{ players[1].captures }}</span>
+      <span class="yagoo-bottom-bar__captures" data-testid="captures-white">{{
+        players[1].captures
+      }}</span>
       <span v-if="players[1].rank" class="yagoo-bottom-bar__rank">
         {{ players[1].rank }}
       </span>
@@ -58,11 +72,37 @@ const emit = defineEmits<{
     </div>
 
     <div class="yagoo-bottom-bar__nav">
-      <button type="button" :disabled="!canGoBack" @click="emit('back')">
+      <button
+        type="button"
+        aria-label="Previous move"
+        :disabled="!canGoBack"
+        @click="emit('back')"
+      >
         ←
       </button>
-      <button type="button" :disabled="!canGoForward" @click="emit('forward')">
+      <button
+        type="button"
+        aria-label="Next move"
+        :disabled="!canGoForward"
+        @click="emit('forward')"
+      >
         →
+      </button>
+      <button
+        type="button"
+        data-testid="try-move-toggle"
+        :aria-pressed="tryMode"
+        @click="emit('toggle-try')"
+      >
+        {{ tryMode ? "End try" : "Try" }}
+      </button>
+      <button
+        type="button"
+        data-testid="report-toggle"
+        :aria-pressed="reportMode"
+        @click="emit('toggle-report')"
+      >
+        Report
       </button>
     </div>
   </footer>

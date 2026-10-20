@@ -46,6 +46,54 @@ describe("AnalysisReviewer", () => {
       // Goban should be sized for 19×19.
       expect(wrapper.findAll(".shudan-vertex")).toHaveLength(19 * 19);
 
+      expect(wrapper.get('[data-testid="opening-badge"]').text()).toMatch(
+        /Coming in #27/,
+      );
+      wrapper.get('[data-testid="move-inspector"]');
+
+      for (const [tab, issue] of [
+        ["why", "#24"],
+        ["ledger", "#23"],
+        ["sacrifice", "#25"],
+        ["notes", "#28"],
+      ] as const) {
+        await wrapper.get(`[data-testid="perspective-${tab}"]`).trigger("click");
+        expect(wrapper.get(`#yagoo-panel-${tab}`).text()).toContain(
+          `Coming in ${issue}`,
+        );
+      }
+
+      await wrapper.get('[data-testid="perspective-ai"]').trigger("click");
+      await wrapper.get('[data-testid="next-key-move"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.text()).toMatch(/Key 1/);
+
+      await wrapper.get('[data-testid="report-toggle"]').trigger("click");
+      expect(wrapper.get('[data-testid="review-report"]').text()).toMatch(
+        /Coming in #29/,
+      );
+      expect(wrapper.get('[data-testid="review-report"]').text()).toMatch(
+        /Move 50/,
+      );
+      await wrapper.get('[data-testid="report-toggle"]').trigger("click");
+
+      await wrapper.get('[data-testid="engine-source-button"]').trigger("click");
+      const source = wrapper.get('[data-testid="engine-source"]');
+      expect(source.text()).toMatch(/Coming in #19/);
+      expect(source.text()).toMatch(/Coming in #20/);
+      expect(source.get('[data-testid="model-island-slot"]').text()).toMatch(
+        /#22/,
+      );
+      expect(source.get('[data-testid="model-island-slot"]').text()).toMatch(
+        /Coming in #20/,
+      );
+      expect(source.text()).toMatch(/never downloaded/i);
+
+      await wrapper.get('[data-testid="try-move-toggle"]').trigger("click");
+      expect(wrapper.get('[data-testid="variation-tree"]').text()).toMatch(
+        /Coming in #26/,
+      );
+
       wrapper.unmount();
     },
     timeout,

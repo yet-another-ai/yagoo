@@ -2,12 +2,19 @@ import Board from "@sabaki/go-board";
 import GameTree from "@sabaki/immutable-gametree";
 import sgf from "@sabaki/sgf";
 import { computed, ref, shallowRef, type Ref } from "vue";
+import { formatGtpVertex } from "../analysis/coords";
 import type { BoardMap, Sign, Vertex } from "../types";
 
 export interface GamePlayerInfo {
   name: string;
   rank: string;
   captures: number;
+}
+
+/** A child of the current SGF node, labelled with a GTP move. */
+export interface GameChildInfo {
+  index: number;
+  label: string;
 }
 
 export interface UseGameResult {
@@ -19,6 +26,10 @@ export interface UseGameResult {
   players: Ref<[GamePlayerInfo, GamePlayerInfo]>;
   comment: Ref<string>;
   moveNumber: Ref<number>;
+  /** False when the current node is not on the first-child path from the root. */
+  onMainLine: Ref<boolean>;
+  /** Variations available at the current node. */
+  children: Ref<GameChildInfo[]>;
   loadSgf: (contents: string) => void;
   goForward: (childIndex?: number) => boolean;
   goBack: () => boolean;
@@ -38,6 +49,23 @@ function parseSize(sz: string | undefined): number {
   if (sz == null) return 19;
   const parts = sz.split(":");
   return Number.parseInt(parts[0] ?? "19", 10) || 19;
+}
+
+function childMoveLabel(
+  data: Record<string, string[]>,
+  size: number,
+): string {
+  const black = data.B?.[0];
+  const white = data.W?.[0];
+  if (black != null) {
+    const v = parsePoint(black);
+    return v ? `B ${formatGtpVertex(v, size)}` : "B pass";
+  }
+  if (white != null) {
+    const v = parsePoint(white);
+    return v ? `W ${formatGtpVertex(v, size)}` : "W pass";
+  }
+  return "node";
 }
 
 function parsePoint(raw: string): Vertex | null {
@@ -236,6 +264,37 @@ export function useGame(): UseGameResult {
     return t.get(id)?.children.length ?? 0;
   });
 
+  const onMainLine = computed(() => {
+    const t = tree.value;
+    let id = currentId.value;
+    if (t == null || id == null) return true;
+    while (id != null) {
+      const node = t.get(id);
+      if (node?.parentId == null) return true;
+      const parent = t.get(node.parentId);
+      if (parent == null) return true;
+      if (parent.children[0]?.id !== id) return false;
+      id = node.parentId;
+    }
+    return true;
+  });
+
+  const children = computed<GameChildInfo[]>(() => {
+    const t = tree.value;
+    const id = currentId.value;
+    if (t == null || id == null) return [];
+    const node = t.get(id);
+    const size = boardSize.value;
+    return (node?.children ?? []).map((child, index) => {
+      const data =
+        (child as { data?: Record<string, string[]> }).data ?? {};
+      return {
+        index,
+        label: childMoveLabel(data, size),
+      };
+    });
+  });
+
   return {
     tree,
     currentId,
@@ -245,6 +304,8 @@ export function useGame(): UseGameResult {
     players,
     comment,
     moveNumber,
+    onMainLine,
+    children,
     loadSgf,
     goForward,
     goBack,

@@ -3,6 +3,7 @@ import {
   OWNERSHIP_PAINT_STRENGTH,
   ownershipToHeatMap,
   ownershipToPaintMap,
+  formatGtpVertex,
   parseGtpVertex,
 } from "../coords";
 import { resolveSgfRules } from "../display";
@@ -65,6 +66,8 @@ describe("parseGtpVertex on 19×19", () => {
     expect(parseGtpVertex("D4", 19)).toEqual([3, 15]);
     expect(parseGtpVertex("Q16", 19)).toEqual([15, 3]);
     expect(parseGtpVertex("K10", 19)).toEqual([9, 9]);
+    expect(formatGtpVertex([15, 3], 19)).toBe("Q16");
+    expect(formatGtpVertex([-1, -1], 19)).toBe("pass");
   });
 });
 

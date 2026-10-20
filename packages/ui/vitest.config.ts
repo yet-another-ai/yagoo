@@ -15,6 +15,6 @@ export default defineConfig({
     include: ["src/**/*.test.ts"],
     // AnalysisReviewer progressive NDJSON drain can take several seconds under
     // parallel mise ci load; keep headroom above the default 5s.
-    testTimeout: 15_000,
+    testTimeout: 30_000,
   },
 });

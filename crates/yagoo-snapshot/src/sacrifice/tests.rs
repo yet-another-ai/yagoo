@@ -254,3 +254,44 @@ fn legal_lineage_keeps_capture_identity_after_same_color_replacement() {
     candidate.pv = Some(vec!["E5".into(), "B3".into(), "B3".into()]);
     assert!(trace_candidate_pv(0, &state, &candidate).is_none());
 }
+
+#[test]
+fn explicit_saving_probe_retains_forced_provenance_and_requires_matching_root_hash() {
+    let mut comparison = constructed(Color::Black);
+    let reference = comparison.context.actual.clone();
+    comparison.context.actual = comparison.context.preferred.clone();
+    comparison.actual_move.clone_from(&comparison.ai_move);
+    comparison.context.root_candidates = vec![comparison.context.preferred.clone()];
+    comparison.context.saving_probes = vec![crate::SavingCandidateProbe {
+        query_id: "constructed-saving-B3".into(),
+        root_hash: comparison.evidence.root_hash.clone(),
+        candidate: reference,
+    }];
+    let supported = compute_sacrifices(&comparison);
+    assert_eq!(supported.annotations.len(), 1);
+    let evidence = &supported.annotations[0].evidence;
+    assert_eq!(
+        evidence.reference_source,
+        SacrificeReferenceSource::SavingForced
+    );
+    assert_eq!(evidence.reference_query_id, "constructed-saving-B3");
+    assert_eq!(evidence.reference_root_hash, comparison.evidence.root_hash);
+    for root_hash in [None, Some(String::new()), Some("different-root".into())] {
+        comparison.context.saving_probes[0].root_hash = root_hash;
+        assert_eq!(compute_sacrifices(&comparison).annotations, []);
+    }
+}
+
+#[test]
+fn actual_forced_reference_is_not_labelled_as_unrestricted() {
+    let mut comparison = constructed(Color::White);
+    comparison.evidence.actual_source = crate::ComparisonCandidateSource::Forced;
+    comparison.evidence.actual_query_id = "constructed-actual-forced".into();
+    let supported = compute_sacrifices(&comparison);
+    let evidence = &supported.annotations[0].evidence;
+    assert_eq!(
+        evidence.reference_source,
+        SacrificeReferenceSource::ActualForced
+    );
+    assert_eq!(evidence.reference_query_id, "constructed-actual-forced");
+}

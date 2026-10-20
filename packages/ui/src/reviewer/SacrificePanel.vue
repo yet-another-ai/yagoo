@@ -81,6 +81,8 @@ function signed(value: number) { return `${value > 0 ? "+" : ""}${value.toFixed(
             <p>Saving: {{ item.evidence.referencePv.join(" → ") }}</p>
             <p>Queries: {{ item.evidence.rootQueryId }}, {{ item.evidence.referenceQueryId }},
               {{ item.evidence.preferredPvQueryId }}.</p>
+            <p>Saving evidence: {{ (item.evidence.referenceSource ?? 'root_candidate').replaceAll('_', ' ') }}.
+              Root hash: {{ item.evidence.referenceRootHash ?? item.evidence.rootHash ?? 'unavailable' }}.</p>
           </details>
         </li>
       </ol>

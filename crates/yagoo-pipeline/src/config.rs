@@ -31,6 +31,10 @@ pub struct PipelineConfig {
     /// Query the preferred PV endpoint for downstream sacrifice evidence.
     #[serde(default = "enabled")]
     pub comparison_pv_end: bool,
+    /// Maximum additional forced saving-branch queries per comparison (0 disables).
+    /// Liberty candidates come from captured original groups; hard-capped at 8.
+    #[serde(default = "comparison_saving_probes")]
+    pub comparison_saving_probes: usize,
     pub strategy: PipelineStrategy,
     /// Deep / primary root visits (default mid of 500–2000).
     pub root_visits: u32,
@@ -69,6 +73,7 @@ impl Default for PipelineConfig {
             comparison_min_visits: comparison_min_visits(),
             comparison_branch_probes: true,
             comparison_pv_end: true,
+            comparison_saving_probes: comparison_saving_probes(),
             strategy: PipelineStrategy::ScanThenDeep,
             root_visits: 800,
             scan_visits: 100,
@@ -93,4 +98,7 @@ const fn enabled() -> bool {
 }
 const fn comparison_min_visits() -> u64 {
     16
+}
+const fn comparison_saving_probes() -> usize {
+    2
 }

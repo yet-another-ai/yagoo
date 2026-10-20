@@ -85,11 +85,24 @@ pub struct SacrificeExchange {
     pub points: Option<f64>,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SacrificeReferenceSource {
+    #[default]
+    RootCandidate,
+    ActualForced,
+    SavingForced,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SacrificeEvidence {
     pub root_query_id: String,
     pub reference_query_id: String,
+    #[serde(default)]
+    pub reference_source: SacrificeReferenceSource,
+    #[serde(default)]
+    pub reference_root_hash: Option<String>,
     pub preferred_pv_query_id: String,
     pub root_hash: Option<String>,
     pub preferred_visits: u64,
@@ -170,7 +183,7 @@ pub fn compute_sacrifices_with_params(
         limitations: vec![
             "Initial thresholds are uncalibrated; a supported candidate is not proof of intent."
                 .into(),
-            "Only retained same-root candidates and finite legal PVs are checked. Unseen saving alternatives, partial captures, single stones and newly played throw-ins may be missed.".into(),
+            "Only retained same-root candidates, bounded explicit saving probes and finite legal PVs are checked. Unseen saving alternatives, partial captures, single stones and newly played throw-ins may be missed.".into(),
             "Ownership book units are not points. Later-root analysis is used only for viability, never for exchange attribution.".into(),
         ],
     };
@@ -362,6 +375,17 @@ fn check_group(
         alternatives.push(&context.actual);
     }
     alternatives.sort_by_key(|candidate| candidate.order.unwrap_or(u32::MAX));
+    // Forced saving candidates remain distinct from unrestricted candidates. Only
+    // query provenance at this same root may support a new reference branch.
+    alternatives.extend(context.saving_probes.iter().filter_map(|probe| {
+        (!probe.query_id.is_empty()
+            && comparison
+                .evidence
+                .root_hash
+                .as_ref()
+                .is_some_and(|root| !root.is_empty() && probe.root_hash.as_ref() == Some(root)))
+        .then_some(&probe.candidate)
+    }));
     let mut failure = Reason::SavingAlternativeUnavailable;
     for reference in alternatives {
         if reference.move_ == preferred.move_
@@ -509,6 +533,33 @@ fn build_annotation(
     };
     let compensation_points =
         priced.then(|| -elsewhere.iter().filter_map(|line| line.points).sum::<f64>());
+    let (reference_source, reference_query_id, reference_root_hash) = if let Some(probe) =
+        context.saving_probes.iter().find(|probe| {
+            std::ptr::eq(
+                std::ptr::from_ref(&probe.candidate),
+                std::ptr::from_ref(reference),
+            )
+        }) {
+        (
+            SacrificeReferenceSource::SavingForced,
+            probe.query_id.clone(),
+            probe.root_hash.clone(),
+        )
+    } else if reference.move_ == context.actual.move_
+        && comparison.evidence.actual_source == crate::ComparisonCandidateSource::Forced
+    {
+        (
+            SacrificeReferenceSource::ActualForced,
+            comparison.evidence.actual_query_id.clone(),
+            comparison.evidence.actual_root_hash.clone(),
+        )
+    } else {
+        (
+            SacrificeReferenceSource::RootCandidate,
+            comparison.evidence.root_query_id.clone(),
+            comparison.evidence.root_hash.clone(),
+        )
+    };
     Ok(SacrificeAnnotation {
         root_ply: comparison.root_ply,
         mover: comparison.mover,
@@ -545,11 +596,9 @@ fn build_annotation(
         pv: preferred.pv.clone().unwrap_or_default(),
         evidence: SacrificeEvidence {
             root_query_id: comparison.evidence.root_query_id.clone(),
-            reference_query_id: if reference.move_ == context.actual.move_ {
-                comparison.evidence.actual_query_id.clone()
-            } else {
-                comparison.evidence.root_query_id.clone()
-            },
+            reference_query_id,
+            reference_source,
+            reference_root_hash,
             preferred_pv_query_id: context.preferred_pv_query_id.clone().unwrap_or_default(),
             root_hash: comparison.evidence.root_hash.clone(),
             preferred_visits: preferred.visits.unwrap_or(0),

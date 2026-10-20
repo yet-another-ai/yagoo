@@ -1,14 +1,16 @@
 //! Compare played move p at its complete, historical root p-1.
 
 use crate::{AnalysisEngine, PipelineConfig, PipelineError, PipelineResult};
-use yagoo_core::{GameState, Point};
+use std::collections::BTreeSet;
+use yagoo_core::{GameState, Point, Stone};
 use yagoo_katago::{AnalysisQuery, AnalysisQueryBuilder, AnalysisResponse};
 use yagoo_sgf::{move_to_gtp, GameRecord, ReplayedPosition};
 use yagoo_snapshot::{
     best_candidate, board_from_game, candidate_has_comparison_evidence, candidates_from_response,
     chains_from_game, compute_groups, compute_move_comparison, engine_from_response,
-    trace_candidate_pv, ColorToken, ComparisonBranch, ComparisonCandidateSource, ComparisonContext,
-    ComparisonEvidence, MoveComparison, PositionSnapshot, PvEndSnapshot,
+    trace_candidate_pv, CandidatePvLineage, CandidateSnapshot, ColorToken, ComparisonBranch,
+    ComparisonCandidateSource, ComparisonContext, ComparisonEvidence, GroupSnapshot,
+    MoveComparison, PositionSnapshot, PvEndSnapshot, SacrificeParams, SavingCandidateProbe,
 };
 
 /// Analyze the move that produced `position`, never the next player's move.
@@ -176,6 +178,43 @@ pub async fn analyze_move_comparison(
         None
     };
     let preferred_pv_query_id = preferred_pv_end.as_ref().map(|_| pv_id);
+    let mut lineage_candidates = snapshot.candidates.clone();
+    if let Some(candidate) = lineage_candidates
+        .iter_mut()
+        .find(|candidate| candidate.move_ == actual.move_)
+    {
+        *candidate = actual.clone();
+    } else {
+        lineage_candidates.push(actual.clone());
+    }
+    let mut pv_lineages: Vec<_> = lineage_candidates
+        .iter()
+        .filter_map(|candidate| trace_candidate_pv(root_ply, &root_state, candidate))
+        .collect();
+    let saving_probes = if preferred_pv_end.as_ref().is_some_and(|endpoint| {
+        endpoint.analysis.visits.unwrap_or(0) >= SacrificeParams::default().minimum_visits
+    }) {
+        saving_probes(
+            &prefix,
+            &root_state,
+            &snapshot.groups,
+            &preferred,
+            &lineage_candidates,
+            root_hash.as_deref(),
+            record,
+            engine,
+            config,
+            &mut limitations,
+        )
+        .await
+    } else {
+        vec![]
+    };
+    pv_lineages.extend(
+        saving_probes
+            .iter()
+            .filter_map(|probe| trace_candidate_pv(root_ply, &root_state, &probe.candidate)),
+    );
     let evidence = ComparisonEvidence {
         root_query_id: root_query.id,
         actual_query_id,
@@ -189,19 +228,6 @@ pub async fn analyze_move_comparison(
         actual_root_hash,
         limitations,
     };
-    let mut lineage_candidates = snapshot.candidates.clone();
-    if let Some(candidate) = lineage_candidates
-        .iter_mut()
-        .find(|candidate| candidate.move_ == actual.move_)
-    {
-        *candidate = actual.clone();
-    } else {
-        lineage_candidates.push(actual.clone());
-    }
-    let pv_lineages = lineage_candidates
-        .iter()
-        .filter_map(|candidate| trace_candidate_pv(root_ply, &root_state, candidate))
-        .collect();
     Ok(compute_move_comparison(
         position.ply,
         ComparisonContext {
@@ -220,9 +246,148 @@ pub async fn analyze_move_comparison(
             preferred_pv_query_id,
             root_candidates: lineage_candidates,
             pv_lineages,
+            saving_probes,
         },
         evidence,
     ))
+}
+
+/// Choose legal root-liberty extensions without consulting a hand-picked move or
+/// the outcome of a probe. Candidate ranking is stable board-index order (A19 first).
+fn saving_probe_moves(
+    root: &GameState,
+    groups: &[GroupSnapshot],
+    preferred: &CandidateSnapshot,
+    line: &CandidatePvLineage,
+    existing: &[CandidateSnapshot],
+    config: &PipelineConfig,
+) -> Vec<String> {
+    let params = SacrificeParams::default();
+    let minimum_visits = config.comparison_min_visits.max(params.minimum_visits);
+    if config.comparison_saving_probes == 0 || preferred.visits.unwrap_or(0) < minimum_visits {
+        return vec![];
+    }
+    let size = root.board().size();
+    let mover = ColorToken::from(root.to_play());
+    let mut points = BTreeSet::new();
+    for group in groups {
+        let (stones, other) = if mover == ColorToken::B {
+            (&group.members.black_stones, &group.members.white_stones)
+        } else {
+            (&group.members.white_stones, &group.members.black_stones)
+        };
+        if stones.len() < params.minimum_stones
+            || !other.is_empty()
+            || !stones.iter().all(|stone| {
+                line.captures
+                    .iter()
+                    .any(|capture| capture.color == mover && &capture.stone == stone)
+            })
+        {
+            continue;
+        }
+        for stone in stones {
+            let Ok(Some(point)) = Point::parse_gtp(stone, size) else {
+                continue;
+            };
+            if root.board().get(point).ok() != Some(Stone::from_color(root.to_play())) {
+                continue;
+            }
+            points.extend(point.neighbors(size).filter_map(|neighbor| {
+                (root.board().get(neighbor).ok() == Some(Stone::Empty))
+                    .then_some(neighbor.index(size))
+            }));
+        }
+    }
+    points
+        .into_iter()
+        .filter_map(|index| Point::from_index(index, size))
+        .filter(|point| root.clone().play(*point).is_ok())
+        .map(|point| point.to_gtp(size))
+        .filter(|move_| {
+            move_ != &preferred.move_
+                && !existing.iter().any(|candidate| {
+                    &candidate.move_ == move_
+                        && candidate_has_comparison_evidence(candidate, size)
+                        && candidate.visits.unwrap_or(0) >= minimum_visits
+                })
+        })
+        .take(config.comparison_saving_probes.min(8))
+        .collect()
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn saving_probes(
+    prefix: &str,
+    root: &GameState,
+    groups: &[GroupSnapshot],
+    preferred: &CandidateSnapshot,
+    existing: &[CandidateSnapshot],
+    root_hash: Option<&str>,
+    record: &GameRecord,
+    engine: &dyn AnalysisEngine,
+    config: &PipelineConfig,
+    limitations: &mut Vec<String>,
+) -> Vec<SavingCandidateProbe> {
+    let Some(line) = trace_candidate_pv(0, root, preferred) else {
+        return vec![];
+    };
+    let moves = saving_probe_moves(root, groups, preferred, &line, existing, config);
+    if moves.is_empty() {
+        return vec![];
+    }
+    let Some(root_hash) = root_hash.filter(|hash| !hash.is_empty()) else {
+        limitations.push("Saving probes unavailable: unrestricted root hash is missing.".into());
+        return vec![];
+    };
+    let minimum_visits = config
+        .comparison_min_visits
+        .max(SacrificeParams::default().minimum_visits);
+    let mut probes = vec![];
+    for move_ in moves {
+        let mut request = query(&format!("{prefix}-saving-{move_}"), root, record, config);
+        request.allow_moves = Some(serde_json::json!([{
+            "player": root.to_play().to_string(), "moves": [move_], "untilDepth": 1,
+        }]));
+        let response = match engine.analyze(&request).await {
+            Ok(response) => response,
+            Err(error) => {
+                limitations.push(format!(
+                    "{}: saving probe unavailable ({error}).",
+                    request.id
+                ));
+                continue;
+            }
+        };
+        if position_hash(&response).as_deref() != Some(root_hash) {
+            limitations.push(format!(
+                "{}: saving probe root hash missing or conflicting.",
+                request.id
+            ));
+            continue;
+        }
+        let candidate = candidates_from_response(&response, usize::MAX)
+            .into_iter()
+            .find(|candidate| {
+                candidate.move_ == move_
+                    && candidate_has_comparison_evidence(candidate, root.board().size())
+                    && candidate.visits.unwrap_or(0) >= minimum_visits
+                    && trace_candidate_pv(0, root, candidate).is_some()
+            });
+        if let Some(candidate) = candidate {
+            probes.push(SavingCandidateProbe {
+                query_id: request.id,
+                root_hash: Some(root_hash.into()),
+                candidate,
+            });
+        } else {
+            limitations.push(format!(
+                "{}: saving probe evidence is incomplete, illegal or undersampled.",
+                request.id
+            ));
+        }
+    }
+    probes
 }
 
 fn query(
@@ -370,3 +535,7 @@ fn play_gtp(state: &mut GameState, move_: &str) -> PipelineResult<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "comparison_saving_tests.rs"]
+mod saving_tests;

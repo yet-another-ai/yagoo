@@ -44,6 +44,16 @@ pub struct ComparisonBranch {
     pub pass_query_id: Option<String>,
 }
 
+/// A bounded, explicit saving-move query from the identical historical root.
+/// It is kept separate from unrestricted engine candidates in the wire contract.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SavingCandidateProbe {
+    pub query_id: String,
+    pub root_hash: Option<String>,
+    pub candidate: CandidateSnapshot,
+}
+
 /// Self-contained context for comparison and preferred-line sacrifice modules.
 /// All group member coordinates refer to `board`, before either move is played.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -65,6 +75,9 @@ pub struct ComparisonContext {
     /// Retained candidates of this same root, used to find saving alternatives.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub root_candidates: Vec<CandidateSnapshot>,
+    /// Forced legal root-liberty moves, never relabelled as unrestricted choices.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub saving_probes: Vec<SavingCandidateProbe>,
     /// Legal replays from the complete root, preserving original stone identity.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub pv_lineages: Vec<crate::CandidatePvLineage>,

@@ -6,8 +6,9 @@ engine's preferred line. It does not infer a player's intention.
 
 The input is `snapshot.comparison` for played move *p*, rooted at *p − 1*.
 Ordinary snapshot-*p* candidates describe the next mover and must not be used.
-The detector adds no engine process or query: it consumes the comparison root,
-retained candidate ownership/PVs and its preferred-PV endpoint query.
+The detector consumes the comparison root, retained candidate ownership/PVs and
+its preferred-PV endpoint query. The pipeline may add bounded saving-move probes
+through the same engine when the preferred PV captures an eligible group.
 
 ## Counterfactual criterion
 
@@ -46,7 +47,8 @@ These are explicit **initial, uncalibrated tolerances**, not fitted confidence
 intervals or severity thresholds. `compute_sacrifices_with_params` exposes them
 for controlled experiments. The shipped pipeline uses the published defaults.
 The selected saving alternative is the first fully qualifying retained candidate
-in engine-rank order. Root ownership is diagnostic only: an already
+in engine-rank order, followed by explicit saving probes in deterministic order.
+Root ownership is diagnostic only: an already
 opponent-favored root can qualify when an alternative demonstrates avoidability.
 
 The value check at the later PV endpoint only checks viability. All exchange
@@ -60,6 +62,25 @@ plus the actual candidate, replacing its low-visit copy if a forced query
 supplied better evidence. `pvLineages` records each legal replay, endpoint board,
 and original-stone capture coordinates with one-based PV move offsets.
 Illegal PVs produce no lineage and cannot support an annotation.
+
+`savingProbes` is separate from `rootCandidates`: each entry has its forced
+`candidate`, exact `queryId` and matching `rootHash`. The pipeline derives these
+probes from eligible root groups whose original stones are all captured in the
+preferred legal PV. It considers their empty adjacent root intersections in
+board-index order (A19 first), rejects illegal moves under the full history and
+skips the preferred move or alternatives with sufficient retained evidence.
+It forces each selected move at depth one using the original root history.
+The public `PipelineConfig.comparison_saving_probes` (`comparisonSavingProbes`
+in JSON) defaults to **2** additional queries, accepts **0** to disable and has
+a hard maximum of **8**. Probe and preferred candidates require at least the
+greater of 16 visits and `comparison_min_visits`; the endpoint requires 16.
+The unrestricted root and probe must provide the same nonempty position hash.
+Failures, missing hashes and insufficient or illegal probe evidence remain
+limitations, never fabricated alternatives. No additional engine is started.
+
+These direct liberty extensions are a limited source of saving alternatives;
+they do not cover distant tactical defenses. Query selection is independent of
+probe outcomes and does not select a special move for a particular fixture.
 
 `comparison.sacrificeAssessment` contains:
 
@@ -79,6 +100,9 @@ root/end diagnostic means, `ownershipFlip` (**saving minus preferred**),
 visit/value provenance. `compensationPoints` is null unless the same-root ledger
 is consistent within its 3-point tolerance and scaling preserves the signs.
 The UI labels raw book units explicitly; it never calls them points.
+Evidence also distinguishes `referenceSource` (`root_candidate`, `actual_forced`
+or `saving_forced`) and carries `referenceRootHash`; forced saving probes are
+never described as unrestricted engine choices.
 
 Missing/malformed primary evidence or insufficient preferred/endpoint visits
 gives `unassessed`. An assessed empty array means **no supported candidate among
@@ -91,7 +115,9 @@ assessed comparison. It uses `null` for absent/unassessed evidence, `[]` for a
 scoped negative, and clears old results on replacement/restart. The exported
 `alignedSacrificeAssessment` and `sacrificesFromComparison` helpers enforce the
 same root/mover and annotation provenance contract for commentary and reports.
-They validate the producer's payload; they do not run a second detector.
+They validate candidate, PV, endpoint, lineage and query linkage, achieved
+visits, reported ownership means and numerical criteria in the producer's
+payload; they do not run a second Go replay engine.
 
 ## Reviewer behavior
 
@@ -111,6 +137,9 @@ human intent.
 
 The unchanged genuine full-history `comparison-19x19` corpus contains five
 positions at 64 requested visits. CI replays responses; it never loads a model.
+None of its groups meets the saving-probe selection criteria, so no additional
+queries are requested during replay. This does not validate the new collection
+path; separate bounded probe tests and historical screening records do.
 
 | Played move | Result with defaults | Relevant boundary |
 | --- | --- | --- |
@@ -137,3 +166,24 @@ sacrifices, throw-ins and one-stone sacrifices. Finite-visit engine errors can
 still produce false positives despite the guards. Threshold iteration requires
 new recorded evidence and documented review outcomes. This calibration
 acceptance item remains open.
+
+## Replaying additional historical screens
+
+The offline example checks completed recording requests against queries made by
+the production comparison pipeline, using the default sacrifice thresholds and
+candidate-visit requirement. Branch pass/status probes are disabled because
+they are unrelated to sacrifice detection. Missing core responses make the
+comparison unavailable; missing optional saving responses remain limitations.
+No missing values are invented.
+
+```sh
+cargo run -p yagoo-pipeline --example sacrifice_screen -- RECORDING output.json SUPPLEMENT
+```
+
+`SUPPLEMENT` is optional and may repeat for additional recorded folders. Each
+folder contains `analysis.cfg`, `queries.ndjson` and `responses.ndjson`; the
+primary folder also has a completed `manifest.json` and references source SGFs
+under `sources/` or its parent. The output includes the raw-to-pipeline query-ID
+mapping and exact `missingQueries` for a coordinated future recording. The
+example is offline and never runs a model. Validate file hashes and recording
+provenance separately before treating a screen as empirical evidence.

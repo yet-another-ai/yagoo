@@ -82,7 +82,10 @@ describe("AnalysisReviewer", () => {
       expect(source.text()).toMatch(/Coming in #19/);
       expect(source.text()).toMatch(/Coming in #20/);
       expect(source.get('[data-testid="model-island-slot"]').text()).toMatch(
-        /Coming in #22/,
+        /#22/,
+      );
+      expect(source.get('[data-testid="model-island-slot"]').text()).toMatch(
+        /Coming in #20/,
       );
       expect(source.text()).toMatch(/never downloaded/i);
 

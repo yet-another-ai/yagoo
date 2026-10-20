@@ -10,23 +10,36 @@
   <header class="hero">
     <h1>Yagoo browser engine <span class="badge">EXPERIMENTAL</span></h1>
     <p><strong>EXPERIMENTAL.</strong> Not a drop-in replacement for native KataGo.
-      Self-hosted b18 SWA analysis with Chinese/Chinese-OGS two-pass area scoring.
-      Japanese encore stops analysis with an explicit error.
-      Weights are <em>never</em> fetched on page load or in CI — press Load to validate a bundle you already host.
-      The reviewer imports the NDJSON this page downloads. The native CLI path is unchanged.</p>
+      Weights are <em>never</em> downloaded on page load or in CI — you choose a model,
+      see its size, download with progress (cancellable), or load files you already exported.
+      Cached in OPFS (content-addressed), like jet’s playground. Native CLI path is unchanged.</p>
   </header>
 
   <section class="island" id="model-island" data-slot="model-island" role="group" aria-label="Model download and load">
-    <p class="island__notes">Choose a manifest, then Load. Nothing downloads until you do.
-      Catalog, cancel, OPFS clear, and local files mount in this island
-      (<a href="https://github.com/yet-another-ai/yagoo/pull/22">#22</a>).
-      The reviewer hosts the same slot (<code>data-slot="model-island"</code>) when
-      <a href="https://github.com/yet-another-ai/yagoo/issues/20">#20</a> wires the adapter.</p>
-    <label class="island__field island__grow">Model manifest
+    <div class="island__row">
+      <label class="island__field">Model
+        <select id="model-select"></select>
+      </label>
+      <span id="model-size" class="island__meta" role="status">—</span>
+      <span id="cache-status" class="island__meta" role="status">Cache: checking…</span>
+    </div>
+    <p id="model-notes" class="island__notes"></p>
+    <label class="island__field island__grow">Hosted / same-origin manifest URL
       <input id="manifest" size="65" value="models/manifest.json" spellcheck="false">
     </label>
+    <div class="island__status" id="model-status-wrap">
+      <i class="island__dot" id="model-dot" aria-hidden="true"></i>
+      <span id="model-status" class="island__text" role="status">No model loaded</span>
+      <span id="download-bar" class="island__progress" hidden aria-hidden="true"></span>
+    </div>
     <div class="island__actions">
-      <button type="button" id="load" class="island__button island__button--solid">Load and validate model</button>
+      <button type="button" id="load" class="island__button island__button--solid">Load model</button>
+      <button type="button" id="cancel-download" class="island__button" disabled>Cancel download</button>
+      <button type="button" id="clear-cache" class="island__button">Clear model cache</button>
+      <label class="island__button island__file">
+        Load local files…
+        <input id="local-files" type="file" multiple accept=".json,.onnx,application/json,application/octet-stream">
+      </label>
     </div>
   </section>
 
@@ -40,19 +53,20 @@
       <button type="button" id="isolation">Enable threads on static hosting</button>
       <button type="button" id="stop">Stop / release engine</button>
     </p>
-    <p id="status" role="status">Export and serve the official model bundle before loading.</p>
-    <label>SGF <textarea id="sgf" rows="5" cols="80">(;SZ[9]KM[7.5]RU[Chinese];B[cc];W[gg])</textarea></label>
-    <p><label>Deep visit budget <input id="visits" type="number" min="1" max="10000" value="200"></label>
-      <label><input id="all" type="checkbox"> Deepen every position (otherwise at most 12 selected positions)</label></p>
-    <p><label>Neural batch <input id="batch" type="number" min="1" max="4" value="4"></label>
-      <label><input id="symmetries" type="checkbox"> Average 8 root symmetries (8 evaluations per analysis root)</label></p>
-    <p>
-      <button type="button" id="scan" disabled>Scan only</button>
-      <button type="button" id="deep" disabled>Scan and deepen</button>
-      <button type="button" id="download">Download events</button>
-    </p>
-    <pre id="events"></pre>
+    <p id="status" role="status">Choose a model above, then Load model. Export instructions: docs/browser-engine.md.</p>
   </section>
+
+  <label>SGF <textarea id="sgf" rows="5" cols="80">(;SZ[9]KM[7.5]RU[Chinese];B[cc];W[gg])</textarea></label>
+  <p><label>Deep visit budget <input id="visits" type="number" min="1" max="10000" value="200"></label>
+    <label><input id="all" type="checkbox"> Deepen every position (otherwise at most 12 selected positions)</label></p>
+  <p><label>Neural batch <input id="batch" type="number" min="1" max="4" value="4"></label>
+    <label><input id="symmetries" type="checkbox"> Average 8 root symmetries (8 evaluations per analysis root)</label></p>
+  <p>
+    <button type="button" id="scan" disabled>Scan only</button>
+    <button type="button" id="deep" disabled>Scan and deepen</button>
+    <button type="button" id="download">Download events</button>
+  </p>
+  <pre id="events"></pre>
 </main>
 <script type="module" src="/src/demo.ts"></script>
 </body>

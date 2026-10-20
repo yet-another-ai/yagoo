@@ -1,36 +1,38 @@
 :root {
   color-scheme: light dark;
-  --bg: #f4f1ea;
-  --ink: #1c1b19;
-  --ink-2: #5c584f;
-  --edge: rgb(40 32 20 / 14%);
-  --panel: #fffdf8;
-  --accent: #0b6bcb;
-  --accent-ink: #fff;
-  --amber: #8a5a00;
-  --tatami: #c2cb9c;
-  --font: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --bg: #f4f6f8;
+  --ink: #1b1d23;
+  --ink-2: #5d6271;
+  --edge: rgb(24 28 40 / 12%);
+  --panel: #fff;
+  --teal: #0f766e;
+  --teal-fill: #14b8a6;
+  --amber: #b45309;
+  --red: #b42318;
+  --font: "IBM Plex Sans", "Source Sans 3", "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", "SFMono-Regular", Menlo, monospace;
   font-family: var(--font);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #14151a;
+    --bg: #0e1116;
     --ink: #eceae4;
-    --ink-2: #b4b6c2;
-    --edge: rgb(255 255 255 / 14%);
-    --panel: #1e2028;
-    --accent: #3c9eff;
-    --accent-ink: #071018;
-    --amber: #f0a000;
+    --ink-2: #a5a8b3;
+    --edge: rgb(255 255 255 / 12%);
+    --panel: #1a1f27;
+    --teal: #5eead4;
+    --teal-fill: #2dd4bf;
+    --amber: #fbbf77;
+    --red: #fca5a5;
   }
 }
 
 body {
   margin: 0;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--tatami) 35%, var(--bg)), var(--bg) 14rem);
+    radial-gradient(50% 40% at 12% 0%, color-mix(in srgb, var(--teal-fill) 16%, transparent), transparent 70%),
+    var(--bg);
   color: var(--ink);
 }
 
@@ -58,6 +60,7 @@ body {
   border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
   border-radius: 0.35rem;
   padding: 0.15rem 0.45rem;
+  vertical-align: middle;
 }
 
 .hero p {
@@ -72,9 +75,17 @@ body {
   gap: 0.75rem;
   padding: 1rem 1.1rem;
   border: 1px solid var(--edge);
-  border-radius: 0.75rem;
-  background: var(--panel);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  box-shadow: 0 10px 30px rgb(20 30 50 / 6%);
   margin-bottom: 1.25rem;
+}
+
+.island__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: end;
 }
 
 .island__field {
@@ -86,32 +97,86 @@ body {
 
 .island__grow { width: 100%; }
 
-.island__notes {
-  margin: 0;
-  font-size: 0.85rem;
-  color: var(--ink-2);
-  line-height: 1.45;
-}
-
-.island__notes a { color: var(--accent); }
-
-#manifest,
-textarea,
-input[type="number"] {
+.island__field select,
+.island__field input[type="text"],
+.island__field input:not([type]),
+#manifest {
   font: inherit;
   color: var(--ink);
-  background: var(--bg);
+  background: var(--panel);
   border: 1px solid var(--edge);
-  border-radius: 0.4rem;
+  border-radius: 0.55rem;
   padding: 0.45rem 0.6rem;
+  min-width: min(100%, 18rem);
 }
 
 #manifest { width: min(100%, 42rem); }
 
-.island__actions { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.island__meta {
+  font-size: 0.85rem;
+  color: var(--ink-2);
+  padding-bottom: 0.45rem;
+}
 
-button,
-.island__button {
+.island__notes {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-2);
+  line-height: 1.4;
+}
+
+.island__status {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--teal-fill) 8%, var(--panel));
+  border: 1px solid var(--edge);
+  overflow: hidden;
+}
+
+.island__dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--ink-2);
+  flex: none;
+}
+
+.island__status.is-ready .island__dot { background: var(--teal-fill); }
+.island__status.is-busy .island__dot {
+  background: var(--amber);
+  animation: pulse 1s ease-in-out infinite;
+}
+.island__status.is-error .island__dot { background: var(--red); }
+
+@keyframes pulse {
+  50% { opacity: 0.35; }
+}
+
+.island__text { font-size: 0.92rem; }
+
+.island__progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: calc(var(--p, 0) * 100%);
+  background: var(--teal-fill);
+  transition: width 120ms linear;
+}
+
+.island__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.island__button,
+.controls button,
+button {
   font: inherit;
   color: var(--ink);
   background: var(--panel);
@@ -122,21 +187,40 @@ button,
 }
 
 .island__button--solid {
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--teal);
+  color: #fff;
   border-color: transparent;
 }
 
-button:disabled { opacity: 0.45; cursor: not-allowed; }
-button:focus-visible, input:focus-visible, textarea:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+@media (prefers-color-scheme: dark) {
+  .island__button--solid { color: #06221f; }
+}
+
+.island__button:disabled,
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.island__file {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.island__file input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .controls { margin-bottom: 1rem; }
-textarea { display: block; width: min(100%, 52rem); }
-#threads, #visits, #batch { width: 4.5rem; }
 
+input, textarea, button { font: inherit; padding: 0.4rem; margin: 0.25rem 0.15rem; }
+textarea { display: block; width: 95%; }
+#threads, #visits, #batch { width: 4.5rem; }
 pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -144,21 +228,9 @@ pre {
   overflow: auto;
   font-family: var(--mono);
   font-size: 0.85rem;
-  background: var(--panel);
-  border: 1px solid var(--edge);
-  border-radius: 0.5rem;
-  padding: 0.75rem;
 }
-
-#status,
-#activation-status {
-  border-left: 0.25rem solid var(--accent);
+#status {
+  border-left: 0.25rem solid color-mix(in srgb, var(--teal-fill) 70%, #778f81);
   padding: 0.8rem;
-  background: var(--panel);
-  border-radius: 0.35rem;
-}
-
-@media (max-width: 640px) {
-  .shell { padding: 1rem 0.75rem 2rem; }
-  button { margin-top: 0.25rem; }
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
 }

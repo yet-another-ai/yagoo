@@ -104,7 +104,7 @@ Defined in `packages/ui/src/analysis/modules.ts` and stored on `PlyAnalysis` / `
 2. **Live native** — button disabled, points at `yagoo analyze --serve` (#19).
 3. **Browser engine** — button disabled (#20). Inside it, `[data-slot="model-island"]` is where the experimental page’s model island mounts.
 
-The experimental page (`packages/browser-engine/index.html`) groups the manifest URL and **Load and validate model** in `#model-island`. Load is explicit. The page does not fetch weights on startup. Catalog, cancel, OPFS clear, and local files are the #22 controls; they drop into that island without changing the reviewer slot. The element ids the engine demo already binds (`#load`, `#manifest`, `#scan`, `#status`, …) stay put.
+The experimental page (`packages/browser-engine/index.html`) is the #22 model island: catalog, size, **Load model**, cancel, OPFS clear, and local files, in `#model-island` (`data-slot="model-island"`). Load is explicit. The page does not fetch weights on startup. The reviewer keeps the same slot for #20 and does not download weights itself. The element ids the engine demo binds (`#load`, `#manifest`, `#model-select`, `#cancel-download`, `#scan`, `#status`, …) stay put.
 
 ## Tests
 

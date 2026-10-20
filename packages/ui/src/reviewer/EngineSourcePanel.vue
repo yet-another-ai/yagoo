@@ -106,9 +106,9 @@ function onFile(kind: "sgf" | "ndjson", ev: Event) {
         <slot name="model-island">
           <p class="yagoo-model-island__title">Model island</p>
           <p>
-            Catalog, progress, cancel, OPFS cache, and local model files mount
-            in this slot.
-            <strong>Coming in #22.</strong>
+            Catalog, progress, cancel, OPFS cache, and local model files are on
+            the experimental page (#22). This slot is where that island mounts.
+            <strong>Coming in #20.</strong>
             Page load does not fetch weights.
           </p>
         </slot>

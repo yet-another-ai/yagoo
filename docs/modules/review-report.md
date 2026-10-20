@@ -8,6 +8,8 @@ A played move `p` is compared at the board **before it was played**, root `p - 1
 
 Ranking is deterministic: descending signed `scoreLoss`, then signed `winrateLoss`, then ascending actual move number. Loss is preferred minus actual, from the mover's perspective. Equality and negative finite-visit estimates remain in the report. Neither a negative estimate nor agreement with the preferred candidate proves optimal play.
 
+Report validation checks the copied score and winrate values against their root candidates, requires visited candidate evidence and query identifiers, and rejects a nonzero loss when the played and preferred moves are identical. Rejected comparisons remain explicitly missing while completed position coverage is retained.
+
 `deepPliesSelected.reasons` contains unsigned scan priorities. These are shown separately as **unassessed scan leads** when a played-move comparison is absent. They never establish mistakes, point losses, captures, or sacrifices.
 
 ## Pipeline metadata

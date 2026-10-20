@@ -3,8 +3,9 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
+use yagoo_core::Point;
 
-use crate::{ColorToken, MoveComparison, PositionSnapshot};
+use crate::{candidate_has_comparison_evidence, ColorToken, MoveComparison, PositionSnapshot};
 
 /// A played-move comparison reference, always anchored at `root_ply = ply - 1`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -35,18 +36,81 @@ pub struct ReviewSummary {
     pub limitations: Vec<String>,
 }
 
-fn valid_comparison(comparison: &MoveComparison, ply: u32) -> bool {
+fn valid_coordinate(value: &str, size: u8) -> bool {
+    let bytes = value.as_bytes();
+    (2..=3).contains(&bytes.len())
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] != b'0'
+        && bytes[1..].iter().all(u8::is_ascii_digit)
+        && Point::parse_gtp(value, size).is_ok()
+}
+
+fn valid_comparison(comparison: &MoveComparison, ply: u32, size: u8) -> bool {
     let sign = if comparison.mover == ColorToken::B {
         1.0
     } else {
         -1.0
     };
+    let context = &comparison.context;
+    let evidence = &comparison.evidence;
+    let mover_winrate = |value: f64| if sign > 0.0 { value } else { 1.0 - value };
+    let close = |a: f64, b: f64| a.is_finite() && b.is_finite() && (a - b).abs() <= 1e-8;
     comparison.ply == ply
         && comparison.root_ply.checked_add(1) == Some(ply)
         && comparison.context.root_ply == comparison.root_ply
         && comparison.context.mover == comparison.mover
         && comparison.context.actual.move_ == comparison.actual_move
         && comparison.context.preferred.move_ == comparison.ai_move
+        && context.board.size == size
+        && context
+            .board
+            .black
+            .iter()
+            .chain(&context.board.white)
+            .all(|stone| valid_coordinate(stone, size))
+        && candidate_has_comparison_evidence(&context.actual, context.board.size)
+        && candidate_has_comparison_evidence(&context.preferred, context.board.size)
+        && [&context.actual, &context.preferred]
+            .iter()
+            .all(|candidate| {
+                candidate.move_.eq_ignore_ascii_case("pass")
+                    || valid_coordinate(&candidate.move_, size)
+            })
+        && !evidence.root_query_id.trim().is_empty()
+        && !evidence.actual_query_id.trim().is_empty()
+        && evidence.actual_visits.is_some_and(|visits| visits > 0)
+        && evidence.ai_visits.is_some_and(|visits| visits > 0)
+        && context
+            .actual
+            .score_lead
+            .is_some_and(|value| close(value, comparison.actual_score_lead))
+        && context
+            .preferred
+            .score_lead
+            .is_some_and(|value| close(value, comparison.ai_score_lead))
+        && context
+            .actual
+            .winrate
+            .is_some_and(|value| close(mover_winrate(value), comparison.actual_winrate))
+        && context
+            .preferred
+            .winrate
+            .is_some_and(|value| close(mover_winrate(value), comparison.ai_winrate))
+        && (!comparison
+            .actual_move
+            .eq_ignore_ascii_case(&comparison.ai_move)
+            || (comparison.score_loss == 0.0 && comparison.winrate_loss == 0.0))
+        && comparison.ownership_delta.len() == usize::from(size).pow(2)
+        && comparison
+            .ownership_delta
+            .iter()
+            .all(|value| value.is_finite() && value.abs() <= 2.0)
+        && comparison.ledger_diff.as_ref().is_none_or(|ledger| {
+            ledger.root_ply == comparison.root_ply
+                && ledger.mover == comparison.mover
+                && ledger.move_ == comparison.actual_move
+                && ledger.reference_move == comparison.ai_move
+        })
         && comparison.score_loss.is_finite()
         && comparison.winrate_loss.is_finite()
         && (comparison.score_loss
@@ -77,8 +141,8 @@ pub fn summarize_review<'a>(
         .values()
         .filter_map(|snapshot| {
             let comparison = snapshot.comparison.as_ref()?;
-            (snapshot.ply > 0 && valid_comparison(comparison, snapshot.ply)).then(|| {
-                ReviewMoveReference {
+            (snapshot.ply > 0 && valid_comparison(comparison, snapshot.ply, snapshot.board.size))
+                .then(|| ReviewMoveReference {
                     ply: comparison.ply,
                     root_ply: comparison.root_ply,
                     mover: comparison.mover,
@@ -86,8 +150,7 @@ pub fn summarize_review<'a>(
                     ai_move: comparison.ai_move.clone(),
                     score_loss: comparison.score_loss,
                     winrate_loss: comparison.winrate_loss,
-                }
-            })
+                })
         })
         .collect();
     ranked_moves.sort_by(|a, b| {
@@ -181,5 +244,45 @@ mod tests {
         assert_eq!(summary.missing_position_plies, vec![0, 1, 3]);
         assert_eq!(summary.missing_comparison_plies, vec![1, 2, 3]);
         assert_eq!(summary.ranked_moves.len(), 0);
+    }
+
+    #[test]
+    fn contradictory_candidate_values_and_nonzero_same_move_loss_are_unassessed() {
+        let snapshots: Vec<PositionSnapshot> = serde_json::from_str(include_str!(
+            "../../../packages/ui/src/analysis/__fixtures__/comparison-positions.json"
+        ))
+        .unwrap();
+        let mut inconsistent = snapshots.iter().find(|s| s.ply == 60).unwrap().clone();
+        let comparison = inconsistent.comparison.as_mut().unwrap();
+        // Arithmetic alone is insufficient when the copied values contradict the candidate.
+        comparison.actual_score_lead += 1.0;
+        comparison.score_loss += 1.0;
+        assert_eq!(
+            summarize_review(100, [&inconsistent]).ranked_moves,
+            Vec::<ReviewMoveReference>::new()
+        );
+
+        let mut equal = snapshots.iter().find(|s| s.ply == 43).unwrap().clone();
+        let comparison = equal.comparison.as_mut().unwrap();
+        comparison.actual_score_lead += 1.0;
+        comparison.context.actual.score_lead = Some(comparison.actual_score_lead);
+        comparison.score_loss = -1.0;
+        let summary = summarize_review(100, [&equal]);
+        assert_eq!(summary.ranked_moves, Vec::<ReviewMoveReference>::new());
+        assert!(summary.missing_comparison_plies.contains(&43));
+        assert_eq!(summary.completed_position_plies, vec![43]);
+
+        let mut missing_source = snapshots.iter().find(|s| s.ply == 60).unwrap().clone();
+        missing_source
+            .comparison
+            .as_mut()
+            .unwrap()
+            .evidence
+            .actual_query_id
+            .clear();
+        assert_eq!(
+            summarize_review(100, [&missing_source]).ranked_moves,
+            Vec::<ReviewMoveReference>::new()
+        );
     }
 }

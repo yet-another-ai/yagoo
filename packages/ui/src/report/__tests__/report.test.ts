@@ -88,6 +88,29 @@ describe("deterministic review from genuine full-history fixtures", () => {
     expect(safe.moves[0]!.explanation.text).toBe(report.moves[0]!.explanation.text);
   });
 
+  it("rejects copied values that contradict candidates and nonzero losses for the same move", () => {
+    const inconsistent = structuredClone(snapshots.find((s) => s.ply === 60)!.comparison!);
+    inconsistent.actualScoreLead += 1;
+    inconsistent.scoreLoss += 1; // Still arithmetically consistent for White.
+    expect(isReportComparison(inconsistent, 60)).toBe(false);
+
+    const equal = structuredClone(snapshots.find((s) => s.ply === 43)!);
+    equal.comparison!.actualScoreLead += 1;
+    equal.comparison!.context.actual.scoreLead = equal.comparison!.actualScoreLead;
+    equal.comparison!.scoreLoss = -1;
+    const report = reviewPipelineEvents([start, {
+      type: "positionCompleted", v: 1, phase: "deep", snapshot: equal,
+    }]);
+    expect(report.moves).toEqual([]);
+    expect(report.coverage.missingComparisonPlies).toContain(43);
+    expect(report.coverage.completedPositionPlies).toEqual([43]);
+
+    const offBoard = structuredClone(snapshots.find((s) => s.ply === 60)!.comparison!);
+    offBoard.actualMove = offBoard.context.actual.move = "Z25";
+    offBoard.ledgerDiff = null;
+    expect(isReportComparison(offBoard, 60)).toBe(false);
+  });
+
   it("a new game clears prior comparison and report metadata even without a wrapper reset", () => {
     const state = reducePipelineEvents(evidenceEvents());
     state.reportSummary = buildReviewReport(state).coverage;

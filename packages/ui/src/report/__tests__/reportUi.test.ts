@@ -71,6 +71,40 @@ describe("report UI orchestration", () => {
     wrapper.unmount();
   });
 
+  it("restarts a stopped review and rejects both pending runs after an SGF switch", async () => {
+    const releases: Array<() => void> = [];
+    const analyzeSgf = vi.fn(async function* () {
+      const pending = new Promise<void>((resolve) => { releases.push(resolve); });
+      yield JSON.stringify(events[0]);
+      yield JSON.stringify(events[1]);
+      await pending;
+      yield JSON.stringify(events[1]);
+      yield JSON.stringify(events[2]);
+    });
+    const stop = vi.fn();
+    const wrapper = mount(AnalysisReviewer, {
+      props: { initialSgf: sampleSgf, browserEngine: { analyzeSgf, stop }, vertexSize: 12 },
+    });
+    await wrapper.get('[data-testid="review-game"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="cancel-review"]').trigger("click");
+    await wrapper.get('[data-testid="review-game"]').trigger("click");
+    await flushPromises();
+    expect(analyzeSgf).toHaveBeenCalledTimes(2);
+    // Opening an already running report must not start another engine request.
+    await wrapper.get('[data-testid="review-game"]').trigger("click");
+    expect(analyzeSgf).toHaveBeenCalledTimes(2);
+    await wrapper.setProps({ initialSgf: "(;SZ[9];B[aa])" });
+    releases.forEach((release) => release());
+    await flushPromises();
+    expect(stop).toHaveBeenCalled();
+    expect(wrapper.get('[data-testid="review-report"]').text()).not.toContain("Move 60");
+    expect(wrapper.find('[data-testid="cancel-review"]').exists()).toBe(false);
+    await wrapper.findAll("button").find((button) => button.text() === "Back to board")!.trigger("click");
+    expect(wrapper.findAll(".shudan-vertex")).toHaveLength(81);
+    wrapper.unmount();
+  });
+
   it("exports repeatedly without retaining object URLs", async () => {
     const createObjectURL = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:report");
     const revokeObjectURL = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});

@@ -1,6 +1,7 @@
 import type { MoveComparison } from "../analysis/modules";
 import type { AnalysisState } from "../analysis/types";
 import { isAlignedComparison } from "../analysis/comparison";
+import { parseGtpVertex } from "../analysis/coords";
 import type { ReviewMoveReference, ReviewSummary } from "./types";
 
 const finite = (n: unknown): n is number => typeof n === "number" && Number.isFinite(n);
@@ -28,11 +29,28 @@ export function isReportComparison(
       context.mover !== comparison.mover ||
       context.actual?.move !== comparison.actualMove ||
       context.preferred?.move !== comparison.aiMove ||
-      !evidence?.rootQueryId || !evidence.actualQueryId ||
-      !(evidence.actualVisits! > 0) || !(evidence.aiVisits! > 0) ||
+      typeof evidence?.rootQueryId !== "string" || !evidence.rootQueryId.trim() ||
+      typeof evidence.actualQueryId !== "string" || !evidence.actualQueryId.trim() ||
+      !Number.isSafeInteger(evidence.actualVisits) || !(evidence.actualVisits! > 0) ||
+      !Number.isSafeInteger(evidence.aiVisits) || !(evidence.aiVisits! > 0) ||
       (evidence.rootHash && evidence.actualRootHash &&
         evidence.rootHash !== evidence.actualRootHash)) return false;
   const sign = comparison.mover === "B" ? 1 : -1;
+  const candidates = [context.actual, context.preferred];
+  if (candidates.some((candidate) =>
+    (candidate.move.toLowerCase() !== "pass" && parseGtpVertex(candidate.move, context.board.size) === null) ||
+    !Number.isSafeInteger(candidate.visits) || candidate.visits! <= 0 ||
+    !finite(candidate.scoreLead) || !finite(candidate.winrate) ||
+    candidate.winrate < 0 || candidate.winrate > 1 ||
+    !Array.isArray(candidate.ownership) || candidate.ownership.length !== context.board.size ** 2 ||
+    candidate.ownership.some((value) => !finite(value) || Math.abs(value) > 1))) return false;
+  const moverWinrate = (value: number) => comparison.mover === "B" ? value : 1 - value;
+  if (!close(comparison.actualScoreLead, context.actual.scoreLead!) ||
+      !close(comparison.aiScoreLead, context.preferred.scoreLead!) ||
+      !close(comparison.actualWinrate, moverWinrate(context.actual.winrate!)) ||
+      !close(comparison.aiWinrate, moverWinrate(context.preferred.winrate!)) ||
+      (comparison.actualMove.toLowerCase() === comparison.aiMove.toLowerCase() &&
+        (comparison.scoreLoss !== 0 || comparison.winrateLoss !== 0))) return false;
   return close(comparison.scoreLoss, sign * (comparison.aiScoreLead - comparison.actualScoreLead)) &&
     close(comparison.winrateLoss, comparison.aiWinrate - comparison.actualWinrate);
 }

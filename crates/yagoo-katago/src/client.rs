@@ -414,6 +414,13 @@ fn fail_process(inner: &Inner) {
 }
 
 fn dispatch_response(inner: &Inner, mut resp: AnalysisResponse) {
+    // KataGo can emit an advisory before the analysis for the same ID (for
+    // example v1.16.4's includePvVisits warning). It must not consume the route.
+    // Recognize only a warning envelope; errors and malformed/result payloads
+    // still follow normal delivery and downstream validation.
+    if is_warning_envelope(&resp) {
+        return;
+    }
     let destination = {
         let mut routes = inner.routes.lock().expect("routes lock");
         let wire_id = if routes.contains_key(&resp.id) {
@@ -451,6 +458,24 @@ fn dispatch_response(inner: &Inner, mut resp: AnalysisResponse) {
     };
     resp.id = logical_id;
     deliver_to_route(&tx, resp);
+}
+
+fn is_warning_envelope(resp: &AnalysisResponse) -> bool {
+    resp.warning.is_some()
+        && resp.error.is_none()
+        && resp.is_during_search.is_none()
+        && resp.root_info.is_none()
+        && resp.move_infos.is_none()
+        && resp.ownership.is_none()
+        && resp.ownership_stdev.is_none()
+        && resp.policy.is_none()
+        && resp.human_policy.is_none()
+        && resp.neural.is_none()
+        && resp.extra.keys().all(|key| key == "field")
+        && resp
+            .extra
+            .get("field")
+            .is_none_or(serde_json::Value::is_string)
 }
 
 async fn write_line<W: tokio::io::AsyncWrite + Unpin>(
@@ -531,6 +556,95 @@ mod cancellation_tests {
 
     fn respond(client: &AnalysisClient, value: serde_json::Value) {
         dispatch_response(&client.inner, serde_json::from_value(value).unwrap());
+    }
+
+    #[tokio::test]
+    async fn recorded_warning_keeps_route_until_real_final_and_preserves_other_query() {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            let (client, mut peer) = controlled_client(4096);
+            let first_client = client.clone();
+            let first = tokio::spawn(async move {
+                first_client
+                    .analyze(&AnalysisQueryBuilder::new("first").build())
+                    .await
+            });
+            let first_wire = next_line(&mut peer).await;
+            let other_client = client.clone();
+            let other = tokio::spawn(async move {
+                other_client
+                    .analyze(&AnalysisQueryBuilder::new("other").build())
+                    .await
+            });
+            let other_wire = next_line(&mut peer).await;
+            let mut recorded =
+                include_str!("../tests/fixtures/katago1164-warning-then-final.ndjson").lines();
+            let warning: serde_json::Value =
+                serde_json::from_str(recorded.next().unwrap()).unwrap();
+            assert_eq!(warning["id"], first_wire["id"]);
+            respond(&client, warning);
+            assert_eq!(client.inner.routes.lock().unwrap().len(), 2);
+            assert!(!first.is_finished());
+            assert!(!other.is_finished());
+            respond(
+                &client,
+                serde_json::json!({"id": other_wire["id"], "rootInfo": {"visits": 17}}),
+            );
+            let other_result = other.await.unwrap().unwrap();
+            assert_eq!(other_result.id, "other");
+            assert_eq!(other_result.root_info.unwrap().visits, Some(17));
+            assert_eq!(client.inner.routes.lock().unwrap().len(), 1);
+            let final_value = serde_json::from_str(recorded.next().unwrap()).unwrap();
+            respond(&client, final_value);
+            let result = first.await.unwrap().unwrap();
+            assert_eq!(result.id, "first");
+            assert_eq!(result.root_info.unwrap().visits, Some(8));
+            assert_eq!(result.ownership.unwrap().len(), 361);
+            assert!(client.inner.routes.lock().unwrap().is_empty());
+            assert!(recorded.next().is_none());
+        })
+        .await
+        .expect("warning must not consume the final result or another query");
+    }
+
+    #[tokio::test]
+    async fn warnings_do_not_hide_errors_results_or_malformed_payloads() {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            for line in [
+                r#"{"id":"q","warning":"advisory","error":"fatal"}"#,
+                r#"{"id":"q","warning":"advisory","rootInfo":{"visits":1}}"#,
+                r#"{"id":"q","warning":"advisory","isDuringSearch":false}"#,
+                r#"{"id":"q","warning":"advisory","moveInfos":[]}"#,
+                r#"{"id":"q","warning":"advisory","ownership":[0.1]}"#,
+                r#"{"id":"q","warning":"advisory","field":42}"#,
+                r#"{"id":"q","warning":"advisory","unexpected":"payload"}"#,
+                r#"{"id":"q"}"#,
+            ] {
+                let (client, mut peer) = controlled_client(4096);
+                let running_client = client.clone();
+                let running = tokio::spawn(async move {
+                    running_client
+                        .analyze(&AnalysisQueryBuilder::new("q").build())
+                        .await
+                });
+                let wire = next_line(&mut peer).await;
+                let expected: AnalysisResponse = serde_json::from_str(line).unwrap();
+                let mut value: serde_json::Value = serde_json::from_str(line).unwrap();
+                value["id"] = wire["id"].clone();
+                respond(&client, value);
+                let received = running.await.unwrap();
+                if expected.error.is_some() {
+                    assert!(matches!(received, Err(KatagoError::Engine { id, error })
+                        if id == "q" && error == "fatal"));
+                } else {
+                    // Missing-root payloads still reach downstream validation;
+                    // they must not silently leave the caller waiting forever.
+                    assert_eq!(received.unwrap(), expected);
+                }
+                assert!(client.inner.routes.lock().unwrap().is_empty());
+            }
+        })
+        .await
+        .expect("only warning envelopes may be skipped");
     }
 
     #[tokio::test]

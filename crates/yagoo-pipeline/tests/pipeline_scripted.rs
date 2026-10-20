@@ -86,7 +86,6 @@ async fn opening_precedes_analysis_and_uses_full_game_outside_requested_range() 
         include_pv_ends: false,
         include_comparison: false,
         emit_game_aggregate: true,
-        include_comparison: false,
         ..PipelineConfig::default()
     };
     let events = analyze_game_collected("(;SZ[19];B[dd];W[cc];B[dc];W[ce])", client, config)

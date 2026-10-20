@@ -3,7 +3,7 @@ min_version = "2025.10.0"
 [tools]
 node = "22"
 pnpm = "10"
-rust = { channel = "stable", version = "latest", components = "rustfmt,clippy" }
+rust = { channel = "stable", version = "latest", components = "rustfmt,clippy", targets = "wasm32-unknown-unknown" }
 uv = "latest"
 
 [settings]
@@ -96,8 +96,8 @@ description = "Run Rust Clippy"
 depends = ["rust:clippy"]
 
 [tasks.check]
-description = "Format check, Clippy, cargo test, UI tests, and docs build"
-depends = ["format-check", "lint", "rust:test", "ui:test", "browser:check", "docs-build"]
+description = "Format check, Clippy, Rust tests, UI typecheck and tests, browser check, and docs build"
+depends = ["format-check", "lint", "rust:test", "ui:check", "ui:test", "browser:check", "docs-build"]
 
 [tasks."python:sync"]
 description = "Sync the uv-managed Python environment"

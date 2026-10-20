@@ -82,6 +82,7 @@ specifiers = ["latest"]
 
 [tools.rust.options]
 components = "clippy,rustfmt"
+targets = "wasm32-unknown-unknown"
 
 [[tools.uv]]
 version = "0.13.1"

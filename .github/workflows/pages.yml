@@ -17,9 +17,13 @@ permissions:
   pages: write
   id-token: write
 
+# Production deploys share the `pages` group and are not cancelled mid-flight.
+# A newer push only replaces a deploy that has not started. Pull-request builds
+# use their own group: GitHub keeps a single queued run per group, so a PR
+# build in `pages` would cancel a main deploy that was still waiting.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('pages-pr-{0}', github.event.pull_request.number) || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always

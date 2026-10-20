@@ -52,7 +52,8 @@ The **Why not** tab shows `context.board`, explicitly labelled as the board
 before move *p*. A/AI markers, ownership shading, group outlines and row
 highlights all belong to that board. The difference toggle maps −2…+2 to
 −1…+1 for display opacity; dark means a difference toward Black, light toward
-White. Other inspector perspectives return to the selected position *p*.
+White. The [Sacrifice](sacrifices.md) perspective also uses the before-move
+board, with its own group/exchange highlights. Other perspectives return to *p*.
 Wrong-ply payloads and local try boards do not display this comparison.
 Replacing, cancelling or resetting a source rejects its late callbacks.
 

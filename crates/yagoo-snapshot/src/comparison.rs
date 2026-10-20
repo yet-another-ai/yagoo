@@ -62,6 +62,12 @@ pub struct ComparisonContext {
     pub preferred_branch: Option<ComparisonBranch>,
     pub preferred_pv_end: Option<PvEndSnapshot>,
     pub preferred_pv_query_id: Option<String>,
+    /// Retained candidates of this same root, used to find saving alternatives.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub root_candidates: Vec<CandidateSnapshot>,
+    /// Legal replays from the complete root, preserving original stone identity.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pv_lineages: Vec<crate::CandidatePvLineage>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -103,6 +109,8 @@ pub struct MoveComparison {
     pub evidence: ComparisonEvidence,
     /// Per-color statuses from explicit branch/root pass pairs, when available.
     pub group_tempo: Vec<ComparisonGroupTempo>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sacrifice_assessment: Option<crate::SacrificeAssessment>,
 }
 
 /// Validate enough candidate evidence to make comparison claims.
@@ -119,7 +127,7 @@ pub fn candidate_has_comparison_evidence(candidate: &CandidateSnapshot, size: u8
             .is_some_and(|map| valid_map(map, size))
 }
 
-fn valid_map(map: &[f64], size: u8) -> bool {
+pub(crate) fn valid_map(map: &[f64], size: u8) -> bool {
     (2..=25).contains(&size)
         && map.len() == usize::from(size).pow(2)
         && map
@@ -173,7 +181,7 @@ pub fn compute_move_comparison(
     if !score_loss.is_finite() {
         return None;
     }
-    Some(MoveComparison {
+    let mut comparison = MoveComparison {
         ply,
         root_ply: context.root_ply,
         mover: context.mover,
@@ -196,7 +204,10 @@ pub fn compute_move_comparison(
         group_tempo,
         context,
         evidence,
-    })
+        sacrifice_assessment: None,
+    };
+    comparison.sacrifice_assessment = Some(crate::compute_sacrifices(&comparison));
+    Some(comparison)
 }
 
 fn compute_branch_tempo(context: &ComparisonContext) -> Vec<ComparisonGroupTempo> {

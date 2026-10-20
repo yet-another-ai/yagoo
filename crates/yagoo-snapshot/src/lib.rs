@@ -14,6 +14,8 @@ mod convert;
 mod events;
 mod groups;
 mod ledger;
+mod pv_lineage;
+mod sacrifice;
 mod schema;
 
 pub use comparison::{
@@ -32,6 +34,12 @@ pub use ledger::{
     compute_tempo_changes, GainLossLedger, GainLossLine, GroupTempoChange, LedgerBaseline,
     LedgerInconsistency, LedgerLineKind, LedgerScaling, LedgerStrengthChange, LedgerTempo,
     LEDGER_CONSISTENCY_TOLERANCE, LEDGER_STRENGTH_THRESHOLD,
+};
+pub use pv_lineage::{trace_candidate_pv, CandidatePvLineage, RootStoneCapture};
+pub use sacrifice::{
+    compute_sacrifices, compute_sacrifices_with_params, SacrificeAnnotation, SacrificeAssessment,
+    SacrificeAssessmentStatus, SacrificeCheck, SacrificeEvidence, SacrificeExchange,
+    SacrificeParams, SacrificeReason,
 };
 pub use schema::{
     BoardSnapshot, CandidateSnapshot, ChainSnapshot, ColorToken, EngineAnalysis, GameSnapshot,

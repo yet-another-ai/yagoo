@@ -6,9 +6,9 @@ use yagoo_katago::{AnalysisQuery, AnalysisQueryBuilder, AnalysisResponse};
 use yagoo_sgf::{move_to_gtp, GameRecord, ReplayedPosition};
 use yagoo_snapshot::{
     best_candidate, board_from_game, candidate_has_comparison_evidence, candidates_from_response,
-    chains_from_game, compute_groups, compute_move_comparison, engine_from_response, ColorToken,
-    ComparisonBranch, ComparisonCandidateSource, ComparisonContext, ComparisonEvidence,
-    MoveComparison, PositionSnapshot, PvEndSnapshot,
+    chains_from_game, compute_groups, compute_move_comparison, engine_from_response,
+    trace_candidate_pv, ColorToken, ComparisonBranch, ComparisonCandidateSource, ComparisonContext,
+    ComparisonEvidence, MoveComparison, PositionSnapshot, PvEndSnapshot,
 };
 
 /// Analyze the move that produced `position`, never the next player's move.
@@ -189,6 +189,19 @@ pub async fn analyze_move_comparison(
         actual_root_hash,
         limitations,
     };
+    let mut lineage_candidates = snapshot.candidates.clone();
+    if let Some(candidate) = lineage_candidates
+        .iter_mut()
+        .find(|candidate| candidate.move_ == actual.move_)
+    {
+        *candidate = actual.clone();
+    } else {
+        lineage_candidates.push(actual.clone());
+    }
+    let pv_lineages = lineage_candidates
+        .iter()
+        .filter_map(|candidate| trace_candidate_pv(root_ply, &root_state, candidate))
+        .collect();
     Ok(compute_move_comparison(
         position.ply,
         ComparisonContext {
@@ -205,6 +218,8 @@ pub async fn analyze_move_comparison(
             preferred_branch,
             preferred_pv_end,
             preferred_pv_query_id,
+            root_candidates: lineage_candidates,
+            pv_lineages,
         },
         evidence,
     ))

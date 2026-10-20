@@ -311,7 +311,7 @@ const alignedComparison = computed(() =>
     ? props.comparison : null,
 );
 const activeComparison = computed(() =>
-  inspectorPerspective.value === "why" ? alignedComparison.value : null,
+  ["why", "sacrifice"].includes(inspectorPerspective.value) ? alignedComparison.value : null,
 );
 const displayedGroups = computed(() => activeComparison.value?.context.groups ?? props.groups);
 
@@ -427,7 +427,7 @@ const boardHeat = computed(() =>
 );
 const boardPaint = computed(() => {
   if (suspendAnalysis.value) return [];
-  if (activeComparison.value) return comparisonDifference.value
+  if (activeComparison.value) return inspectorPerspective.value === "why" && comparisonDifference.value
     ? ownershipToPaintMap(activeComparison.value.ownershipDelta.map((value) => value / 2), boardSize.value, 0.04)
     : [];
   return props.paintMap ?? [];

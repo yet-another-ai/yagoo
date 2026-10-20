@@ -1,3 +1,4 @@
+import { parsePipelineEventLine } from "../reduce";
 import type {
   AnalysisEventSource,
   AnalysisSourceHandle,
@@ -5,45 +6,119 @@ import type {
 } from "./types";
 
 export interface LiveNativeSourceOptions {
-  /**
-   * WebSocket or SSE URL for a future `yagoo analyze --serve` endpoint.
-   * Default targets a local docs/dev server convention.
-   */
+  /** Local `yagoo analyze --serve` SSE endpoint. */
   url?: string;
+  /** Send the currently loaded SGF. Omit to use the CLI's startup SGF. */
+  sgf?: string;
+  /** Root-only interactive analysis, separate from batch review state. */
+  position?: { ply: number; moves?: string[]; visits?: number };
   id?: string;
   label?: string;
+  /** Injectable HTTP transport for model-free tests. */
+  fetch?: typeof globalThis.fetch;
 }
 
-/**
- * (b) Live connection to a locally running native engine.
- *
- * **Not implemented yet** — `yagoo analyze` currently only writes NDJSON to a
- * file/stdout. This adapter is the seam: when a server exists, replace `start()`
- * with a real stream consumer that parses the same `PipelineEvent` lines.
- *
- * TODO(#19): implement against `yagoo analyze --serve` (WebSocket/SSE).
- */
+/** Fetch SSE once. Explicit stop/disconnect never reconnects or restarts work. */
 export function createLiveNativeSource(
   options: LiveNativeSourceOptions = {},
 ): AnalysisEventSource {
-  const url = options.url ?? "ws://127.0.0.1:8710/analyze";
   return {
     id: options.id ?? "live-native",
-    label: options.label ?? "Local native engine (not available yet)",
+    label: options.label ?? "Local native engine",
     start(handlers: AnalysisSourceHandlers): AnalysisSourceHandle {
-      // TODO(#19): connect to `url` and forward PipelineEvent lines.
-      const err = new Error(
-        `Live native analysis is not wired yet (see #19: yagoo analyze --serve). ` +
-          `Expected stream endpoint: ${url}. Import an NDJSON file for now.`,
-      );
-      queueMicrotask(() => handlers.onError?.(err));
-      return { stop() {} };
+      const abort = new AbortController();
+      let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+      let stopped = false;
+      const stop = () => {
+        stopped = true;
+        abort.abort();
+        void reader?.cancel().catch(() => {});
+      };
+      void (async () => {
+        try {
+          const url = new URL(options.url ?? "http://127.0.0.1:8710/analyze");
+          if (
+            !["http:", "https:"].includes(url.protocol) ||
+            !["127.0.0.1", "localhost", "[::1]"].includes(url.hostname) ||
+            url.username || url.password
+          ) throw new Error("Native engine URL must use HTTP(S) on localhost.");
+          if (options.position) {
+            url.pathname = "/analyze-position";
+            url.search = "";
+            if (options.sgf == null) throw new Error("Position analysis requires an SGF.");
+          }
+          const transport = options.fetch ?? globalThis.fetch;
+          const response = await transport(url.href, {
+            method: options.sgf == null ? "GET" : "POST",
+            headers: options.sgf == null ? undefined : { "Content-Type": "application/json" },
+            body: options.sgf == null ? undefined : JSON.stringify({
+              sgf: options.sgf, ...options.position,
+            }),
+            signal: abort.signal,
+            credentials: "omit",
+            redirect: "error",
+            cache: "no-store",
+          });
+          if (stopped) { await response.body?.cancel(); return; }
+          if (!response.ok) throw new Error(`Native engine HTTP ${response.status}: ${await response.text()}`);
+          if (!response.headers.get("content-type")?.startsWith("text/event-stream")) {
+            throw new Error("Native engine did not return an SSE event stream.");
+          }
+          if (!response.body) throw new Error("Native engine response has no body.");
+          reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          let data: string[] = [];
+          let eventLength = 0;
+          let terminal = false;
+          const line = (value: string) => {
+            if (value === "") {
+              if (data.length === 0) return;
+              const event = parsePipelineEventLine(data.join("\n"));
+              data = [];
+              eventLength = 0;
+              if (event && !stopped) {
+                handlers.onEvent(event);
+                if (event.type === "error") throw new Error(event.message);
+                if (event.type === "gameCompleted" ||
+                    (options.position && event.type === "positionCompleted")) terminal = true;
+              }
+            } else if (value.startsWith("data:")) {
+              eventLength += value.length;
+              if (eventLength > 16 * 1024 * 1024) throw new Error("Native engine event exceeds 16 MiB.");
+              data.push(value.slice(5).replace(/^ /, ""));
+            }
+          };
+          while (!stopped && !terminal) {
+            const chunk = await reader.read();
+            if (stopped) return;
+            buffer += decoder.decode(chunk.value, { stream: !chunk.done });
+            if (buffer.length > 16 * 1024 * 1024) throw new Error("Native engine event exceeds 16 MiB.");
+            let newline: number;
+            while ((newline = buffer.indexOf("\n")) >= 0) {
+              line(buffer.slice(0, newline).replace(/\r$/, ""));
+              buffer = buffer.slice(newline + 1);
+              if (stopped || terminal) break;
+            }
+            if (chunk.done) {
+              if (!terminal) throw new Error("Native engine disconnected before analysis completed.");
+              break;
+            }
+          }
+          if (!stopped) handlers.onDone?.();
+        } catch (error) {
+          if (!stopped) handlers.onError?.(error instanceof Error ? error : new Error(String(error)));
+        } finally {
+          await reader?.cancel().catch(() => {});
+          reader?.releaseLock();
+        }
+      })();
+      return { stop };
     },
   };
 }
 
-/** Capability probe for UI chrome — always false until `--serve` ships. */
+/** Browser support; reachability is established by an explicit connect. */
 export function isLiveNativeAvailable(): boolean {
-  // TODO(#19): return true when a local serve endpoint is reachable / configured.
-  return false;
+  return typeof globalThis.fetch === "function" && typeof AbortController !== "undefined";
 }

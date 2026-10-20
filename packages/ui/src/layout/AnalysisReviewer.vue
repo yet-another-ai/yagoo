@@ -68,6 +68,8 @@ const rulesLabel = computed(() => resolveSgfRules(sgfText.value));
 const boardSizeFromSgf = computed(() => parseBoardSize(sgfText.value));
 const dragOver = ref(false);
 const sourceOpen = ref(false);
+const nativeUrl = ref("http://127.0.0.1:8710/analyze");
+const activeNative = ref(false);
 const statusMessage = ref("");
 const selectedCandidate = ref(0);
 const currentPly = ref(0);
@@ -87,6 +89,7 @@ const {
   isStreaming,
   reset,
   attachSource,
+  stop,
   overlaysFor,
   commentFor,
 } = useAnalysisStream();
@@ -230,11 +233,15 @@ onMounted(() => {
 watch(
   () => props.initialSgf,
   (v) => {
-    if (v) sgfText.value = v;
+    if (v !== undefined && v !== sgfText.value) {
+      reset();
+      sgfText.value = v;
+    }
   },
 );
 
 function loadNdjsonText(text: string, label: string) {
+  activeNative.value = false;
   reset();
   statusMessage.value = `Loading ${label}…`;
   attachSource(
@@ -249,6 +256,7 @@ function loadNdjsonText(text: string, label: string) {
 
 async function onSgfFile(file: File) {
   const text = await file.text();
+  reset();
   sgfText.value = text;
   statusMessage.value = `Loaded SGF ${file.name} (rules: ${resolveSgfRules(text)})`;
 }
@@ -286,10 +294,12 @@ function onDrop(ev: DragEvent) {
   }
 }
 
-function tryLiveNative() {
+function tryLiveNative(url: string) {
   reset();
+  nativeUrl.value = url;
+  activeNative.value = true;
   statusMessage.value = "Connecting to local native engine…";
-  attachSource(createLiveNativeSource());
+  attachSource(createLiveNativeSource({ url, sgf: sgfText.value }));
 }
 
 function tryBrowserEngine() {
@@ -298,6 +308,7 @@ function tryBrowserEngine() {
       "Load a local model bundle first. Recorded analysis stays on the board.";
     return;
   }
+  activeNative.value = false;
   reset();
   statusMessage.value = "Starting experimental browser engine…";
   attachSource(
@@ -422,6 +433,13 @@ const phaseBadge = computed(() => {
         <span>· {{ phaseBadge }}</span>
       </div>
       <div class="yagoo-analysis-app__controls">
+        <button
+          v-if="isStreaming"
+          type="button"
+          class="yagoo-analysis-app__btn"
+          data-testid="stop-analysis"
+          @click="stop"
+        >Stop analysis</button>
         <label class="yagoo-analysis-app__btn">
           Open SGF
           <input
@@ -452,6 +470,7 @@ const phaseBadge = computed(() => {
       :thread-hint="threadHint"
       :remote-manifest-url="remoteManifestUrl"
       :model-status="modelStatus"
+      :native-url="nativeUrl"
       @close="sourceOpen = false"
       @sgf-file="onSgfFile"
       @ndjson-file="onNdjsonFile"

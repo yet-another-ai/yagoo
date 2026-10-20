@@ -70,3 +70,93 @@ Useful flags: `--from` / `--to`, `--deepen-all`, `--partials`, `--swing-wr` / `-
 ## Concurrency
 
 One KataGo `analysis` process per `AnalysisClient`. In-flight queries are **demuxed by response `id`** — do not spawn multiple processes for parallelism. Concurrent `analyze_streaming` calls on the same client are supported.
+
+## Local live server
+
+Start the same CLI with `--serve`; it starts one KataGo process and accepts
+requests on `127.0.0.1:8710`. The usual engine paths/environment variables,
+strategy, visits, ply range, and `--partials` options still apply.
+
+```sh
+cargo run -p yagoo-cli -- analyze --serve
+# Or provide an SGF for GET clients:
+cargo run -p yagoo-cli -- analyze game.sgf --serve --port 8710
+```
+
+In the reviewer, open **Engine → Live native**, leave the local URL as
+`http://127.0.0.1:8710/analyze`, and click **Connect to local engine**.
+The current SGF is sent with the request. **Stop analysis**, changing the SGF,
+selecting another source, and leaving the reviewer cancel the current stream.
+Connecting again starts a fresh analysis. There is no automatic reconnect.
+
+| Request | Result |
+| --- | --- |
+| `POST /analyze` with JSON `{"sgf":"(;SZ[19];B[pd])"}` | Scan/deepen SSE stream using CLI pipeline options |
+| `GET /analyze` | Analyze the optional startup SGF; HTTP 400 if none was provided |
+| `POST /analyze-position` | One root-only interactive result (contract below) |
+| `GET /health` | `yagoo-native/1`; does not submit an engine query |
+
+Responses use `Content-Type: text/event-stream`. Each SSE message has one `data:`
+line containing **the exact JSON object emitted by the NDJSON CLI**, followed by
+a blank line. SSE comments are keepalives. There is no event envelope or
+transport-specific change to `PipelineEvent`. Batch success ends with
+`gameCompleted`; analysis failure emits `error`. The connection then ends.
+Malformed HTTP/JSON or interactive input is rejected with an HTTP error before
+streaming. No `stagePartial` is forwarded unless `--partials` was requested.
+
+Each request gets a private query-ID namespace while sharing the one process.
+At most four analyses run concurrently; excess requests receive HTTP 429.
+Event delivery is bounded, and dropping the response body drops the pipeline
+future, which removes the query route and queues its single-query termination.
+Late engine replies cannot enter a later request. Engine exit fails active and
+subsequent queries; restart the CLI to start another engine.
+
+### Browser origins
+
+Only `http://localhost:5173` and `http://127.0.0.1:5173` are allowed by default.
+For another reviewer origin, supply it explicitly; repeated options form the
+allowlist and replace those defaults:
+
+```sh
+cargo run -p yagoo-cli -- analyze --serve \
+  --allow-origin https://yet-another-ai.github.io
+```
+
+Origins must be exact `http://host:port` or `https://host` values, without a path
+or trailing slash. The listener remains loopback-only. The server rejects
+unapproved browser origins and non-local Host headers, supports JSON preflight,
+and never uses wildcard CORS or credentials. The request body limit is 2 MiB.
+Browsers may require permission to access a local network service. If hosted
+browser policy blocks the connection, run the reviewer with `mise run docs`.
+
+### Interactive position contract
+
+`POST /analyze-position` accepts:
+
+```json
+{"sgf":"(;SZ[19]KM[7.5];B[pd];W[dd])","ply":1,"moves":["D4","pass"],"visits":200}
+```
+
+`ply` is the anchor position after that many SGF main-line moves (0 means setup).
+`moves` is an optional sequence of GTP branch moves, including `pass`, alternating
+from the anchor's actual side to play. `visits` defaults to 200 and accepts
+1–100000; a branch may contain up to 1000 moves. An illegal move or out-of-range
+anchor is HTTP 400.
+
+This mode issues **one root query**, preserving root setup, `PL`, komi, rules,
+every prefix move, passes, and the branch history. Missing `RU` means Chinese.
+It emits one `positionCompleted` event whose `snapshot.ply` is `ply + moves.length`,
+with black-positive root results, candidates/PVs, and ownership. Its phase is
+`deep`; pass probe is marked `disabled_in_phase`. It does not run a batch scan,
+pass probe, PV-end queries, or group computation. Errors emit `error` instead.
+Interactive results belong in a separate variation store, never in the main-line
+batch reducer.
+
+The shared `yagoo-pipeline` helpers `prepare_position`, `complete_position`, and
+`analyze_position` provide the same history/query/snapshot semantics to browser
+and native engines. Non-root `AB`/`AW`/`AE`/`PL`/`RU`/`KM`/`SZ` edits and root `AE`
+are rejected because the replay engine cannot represent them faithfully. Root
+compressed setup ranges must be expanded before submission.
+
+CI uses committed KataGo response recordings, a pending fake engine, and local
+HTTP transport tests. It downloads no models and runs no KataGo process.

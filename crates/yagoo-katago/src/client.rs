@@ -9,7 +9,7 @@ use crate::error::{KatagoError, KatagoResult};
 use crate::types::{AnalysisQuery, AnalysisResponse, AnalysisUpdate};
 use std::collections::{HashMap, VecDeque};
 use std::process::Stdio;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex as SyncMutex, Weak};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
@@ -61,6 +61,7 @@ struct Inner {
     orphans: SyncMutex<VecDeque<AnalysisResponse>>,
     scripted: bool,
     next_id: AtomicU64,
+    failed: AtomicBool,
     stdout: Mutex<StdoutTransport>,
 }
 
@@ -173,6 +174,7 @@ impl AnalysisClient {
             orphans: SyncMutex::new(VecDeque::new()),
             scripted,
             next_id: AtomicU64::new(1),
+            failed: AtomicBool::new(false),
             stdout: Mutex::new(stdout),
         });
         Self::start_writer(Arc::downgrade(&inner), stdin, commands);
@@ -204,9 +206,7 @@ impl AnalysisClient {
                     StdinTransport::Test(stdin) => write_line(stdin, &line).await,
                 };
                 if result.is_err() {
-                    for (_, route) in inner.routes.lock().expect("routes lock").drain() {
-                        let _ = route.tx.send(RouteMsg::Failed(KatagoError::ProcessExited));
-                    }
+                    fail_process(&inner);
                     break;
                 }
                 if let Some(written) = command.written {
@@ -240,10 +240,7 @@ impl AnalysisClient {
                             continue;
                         }
                         Err(_) => {
-                            let mut routes = inner.routes.lock().expect("routes lock");
-                            for (_, route) in routes.drain() {
-                                let _ = route.tx.send(RouteMsg::Failed(KatagoError::ProcessExited));
-                            }
+                            fail_process(&inner);
                             break;
                         }
                     }
@@ -261,6 +258,7 @@ impl AnalysisClient {
                     Ok(r) => r,
                     Err(e) => {
                         let mut routes = inner.routes.lock().expect("routes lock");
+                        inner.failed.store(true, Ordering::Relaxed);
                         for (_, route) in routes.drain() {
                             let _ = route.tx.send(RouteMsg::Failed(KatagoError::Io(
                                 std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()),
@@ -333,6 +331,9 @@ impl AnalysisClient {
         let (tx, mut rx) = mpsc::unbounded_channel();
         {
             let mut routes = self.inner.routes.lock().expect("routes lock");
+            if self.inner.failed.load(Ordering::Relaxed) {
+                return Err(KatagoError::ProcessExited);
+            }
             if routes.values().any(|route| route.logical_id == query.id) {
                 return Err(KatagoError::Io(std::io::Error::other(format!(
                     "duplicate in-flight query id `{}`",
@@ -400,6 +401,15 @@ impl AnalysisClient {
     /// Parse a response JSON string (fixture helper).
     pub fn parse_response(json: &str) -> KatagoResult<AnalysisResponse> {
         Ok(serde_json::from_str(json)?)
+    }
+}
+
+fn fail_process(inner: &Inner) {
+    let mut routes = inner.routes.lock().expect("routes lock");
+    // The route lock orders failure against new registration.
+    inner.failed.store(true, Ordering::Relaxed);
+    for (_, route) in routes.drain() {
+        let _ = route.tx.send(RouteMsg::Failed(KatagoError::ProcessExited));
     }
 }
 
@@ -472,7 +482,7 @@ async fn read_line(stdout: &mut StdoutTransport) -> KatagoResult<Option<String>>
             let mut buf = String::new();
             let n = stdout.read_line(&mut buf).await?;
             if n == 0 {
-                return Ok(None);
+                return Err(KatagoError::ProcessExited);
             }
             if buf.ends_with('\n') {
                 buf.pop();
@@ -521,6 +531,29 @@ mod cancellation_tests {
 
     fn respond(client: &AnalysisClient, value: serde_json::Value) {
         dispatch_response(&client.inner, serde_json::from_value(value).unwrap());
+    }
+
+    #[tokio::test]
+    async fn process_failure_fails_active_and_future_queries() {
+        let (client, mut peer) = controlled_client(4096);
+        let running_client = client.clone();
+        let running = tokio::spawn(async move {
+            running_client
+                .analyze(&AnalysisQueryBuilder::new("active").build())
+                .await
+        });
+        next_line(&mut peer).await;
+        fail_process(&client.inner);
+        assert!(matches!(
+            running.await.unwrap(),
+            Err(KatagoError::ProcessExited)
+        ));
+        assert!(matches!(
+            client
+                .analyze(&AnalysisQueryBuilder::new("after-exit").build())
+                .await,
+            Err(KatagoError::ProcessExited)
+        ));
     }
 
     #[tokio::test]

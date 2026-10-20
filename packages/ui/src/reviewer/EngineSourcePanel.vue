@@ -125,8 +125,9 @@ function onFile(kind: "sgf" | "ndjson", ev: Event) {
         class="yagoo-model-island"
         data-testid="model-island-slot"
         data-slot="model-island"
-        @dragover.prevent
-        @drop.prevent="onModelDrop"
+        @dragenter.stop.prevent
+        @dragover.stop.prevent
+        @drop.stop.prevent="onModelDrop"
       >
         <p class="yagoo-model-island__title">Local model</p>
         <p>

@@ -14,6 +14,26 @@ async function drainProgressiveBatches(rounds = 350) {
 }
 
 describe("AnalysisReviewer", () => {
+  it("does not replace recorded analysis when a model bundle is dropped on the engine panel", async () => {
+    const wrapper = mount(AnalysisReviewer, {
+      props: {
+        initialSgf: "(;SZ[9])",
+        initialNdjson: '{"type":"gameStarted"}\n',
+      },
+    });
+    await flushPromises();
+    await wrapper.get('[data-testid="engine-source-button"]').trigger("click");
+    const file = new File(["{}"], "manifest.json", { type: "application/json" });
+    await wrapper.get('[data-testid="model-island-slot"]').trigger("drop", {
+      dataTransfer: { files: [file] },
+    });
+    await flushPromises();
+    const emitted = wrapper.emitted("local-model-files");
+    expect(emitted?.[0]?.[0]).toEqual([file]);
+    expect(wrapper.text()).toMatch(/bundled sample analysis/);
+    expect(wrapper.text()).not.toMatch(/Streaming from manifest\.json|Loading manifest\.json/);
+  });
+
   // Progressive NDJSON (~400+ events @ 4/frame) needs headroom under CI load.
   const timeout = 45_000;
 

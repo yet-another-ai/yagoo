@@ -74,9 +74,12 @@ run = [
 ]
 
 [tasks.docs]
-description = "Start the documentation site"
-depends = ["install"]
-run = "pnpm --filter @yagoo/docs dev"
+description = "Start the documentation site (Wasm glue and ORT runtime staged for the demo engine)"
+depends = ["install", "browser:wasm"]
+run = [
+  "node scripts/stage-ort.mjs",
+  "pnpm --filter @yagoo/docs dev",
+]
 
 [tasks."docs-build"]
 description = "Build the documentation site (includes the Wasm glue the demo engine imports)"

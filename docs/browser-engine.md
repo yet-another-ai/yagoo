@@ -115,7 +115,8 @@ pnpm --filter @yagoo/browser-engine preview
 
 Open the preview URL printed by Vite, normally
 `http://localhost:4173/yagoo-engine/`. That page is the package harness used by
-local smoke checks. The published experience is the docs reviewer: `mise run docs`,
+local smoke checks. The published experience is the docs reviewer: `mise run docs`
+(builds the Wasm glue and stages ORT under `docs/public/ort`),
 then **Demo** at `/yagoo/demo/` or **Reviewer** at `/yagoo/app/`. Both mount
 `BrowserEngineAdapter` through `ReviewerBrowserEngine`. Weights are not shipped
 in git. The harness does not fetch a manifest until **Load model**, and only when

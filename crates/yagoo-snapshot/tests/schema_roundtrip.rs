@@ -6,6 +6,7 @@ use yagoo_snapshot::{
 #[test]
 fn position_snapshot_json_roundtrip_and_convention() {
     let snap = PositionSnapshot {
+        ledger: None,
         schema_version: SCHEMA_VERSION,
         ply: 3,
         to_play: ColorToken::W,

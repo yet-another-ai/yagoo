@@ -12,6 +12,7 @@ fn empty_own(n: usize) -> Vec<f64> {
 
 fn snap_shell(size: u8, to_play: ColorToken) -> PositionSnapshot {
     PositionSnapshot {
+        ledger: None,
         schema_version: SCHEMA_VERSION,
         ply: 1,
         to_play,

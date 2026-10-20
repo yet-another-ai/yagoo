@@ -1,5 +1,5 @@
 /**
- * Data contracts for review modules the pipeline does not emit yet.
+ * Data contracts for review teaching modules.
  *
  * The reviewer renders a value when the reducer has one, and a labelled empty
  * state when the field is null. Nothing in the UI invents these objects.
@@ -16,18 +16,32 @@ export type LedgerLineKind =
   | "reduce_opponent"
   | "other";
 
-/** Sente / gote change for one group between the move and its reference. */
-export type TempoChange = "sente" | "gote" | "double_sente" | "unchanged";
+/** Branch pass probes are required before a tempo transition can be assessed. */
+export type TempoChange = "unassessed";
+
+export interface LedgerStrengthChange {
+  color: "B" | "W";
+  reference: number;
+  candidate: number;
+  delta: number;
+}
 
 /** One attributed line of a per-move gain/loss ledger (#23). */
 export interface GainLossLine {
   kind: LedgerLineKind;
   /** Teaching-group id when `kind` is `"group"`. */
   id?: string;
-  /** Status transition, for example `"weak->settled"`. */
+  /** Current producer emits `"strength_changed"`; not a life-status claim. */
   change?: string;
-  /** Signed points in the mover's favor. Negative is a loss. */
-  points: number;
+  /** Signed scaled points; null when book/search consistency fails. */
+  points: number | null;
+  /** Raw ownership contribution, never labelled as calibrated points. */
+  bookValue: number;
+  /** Signed share of the sum of absolute line contributions. */
+  proportion: number;
+  /** Exact root-board coordinates attributed to this line. */
+  intersections: string[];
+  strengthChanges?: LedgerStrengthChange[];
   tempo?: TempoChange | null;
 }
 
@@ -36,12 +50,18 @@ export interface GainLossLine {
  * `vs` is the baseline the points are measured against.
  */
 export interface GainLossLedger {
+  rootPly: number;
+  mover: "B" | "W";
   move: string;
-  vs: LedgerBaseline | string;
+  vs: LedgerBaseline;
+  referenceMove: string;
   value: number;
   ledger: GainLossLine[];
   /** False when book ownership and score-lead disagree beyond tolerance. */
   consistent: boolean;
+  bookTotal: number;
+  scaling: "score" | "proportions";
+  inconsistency?: "zero_book" | "book_search_mismatch";
 }
 
 /**

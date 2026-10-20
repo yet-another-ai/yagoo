@@ -2,6 +2,7 @@
 import { ref, watch } from "vue";
 import type {
   GainLossLedger,
+  GainLossLine,
   LlmCommentary,
   MoveComparison,
   SacrificeAnnotation,
@@ -9,6 +10,7 @@ import type {
 import type { CandidateSnapshot, EngineAnalysis } from "../analysis/types";
 import CandidatesPanel from "../layout/CandidatesPanel.vue";
 import StubPane from "./StubPane.vue";
+import LedgerPanel from "./LedgerPanel.vue";
 
 export type InspectorPerspective =
   | "ai"
@@ -56,6 +58,8 @@ const emit = defineEmits<{
   (e: "toggle", index: number): void;
   (e: "select", index: number): void;
   (e: "preview-group", groupId: string): void;
+  (e: "preview-ledger", line: GainLossLine): void;
+  (e: "clear-ledger-preview"): void;
   (e: "prev-key"): void;
   (e: "next-key"): void;
 }>();
@@ -69,6 +73,7 @@ const tabs: { id: InspectorPerspective; label: string }[] = [
 ];
 
 const perspective = ref<InspectorPerspective>(props.initialPerspective);
+watch(perspective, () => emit("clear-ledger-preview"));
 
 watch(
   () => props.initialPerspective,
@@ -260,38 +265,17 @@ defineExpose({ perspective });
       aria-labelledby="yagoo-tab-ledger"
       class="yagoo-inspector__panel"
     >
-      <div v-if="ledger" class="yagoo-ledger-wrap" data-testid="ledger-body">
-        <p class="yagoo-inspector__wait">
-          {{ ledger.move }} vs {{ ledger.vs }} ·
-          {{ points(ledger.value) }}
-          <template v-if="!ledger.consistent">
-            · book and search disagree
-          </template>
-        </p>
-        <ul class="yagoo-ledger">
-          <li v-for="(line, i) in ledger.ledger" :key="i">
-            <button
-              v-if="line.kind === 'group' && line.id"
-              type="button"
-              class="yagoo-ledger__link"
-              :data-ledger-group="line.id"
-              @mouseenter="emit('preview-group', line.id)"
-              @focus="emit('preview-group', line.id)"
-            >
-              {{ line.id }}
-            </button>
-            <span v-else>{{ line.kind.replace(/_/g, " ") }}</span>
-            <span v-if="line.change">{{ line.change }}</span>
-            <span v-if="line.tempo">{{ line.tempo }}</span>
-            <span class="yagoo-ledger__pts">{{ points(line.points) }}</span>
-          </li>
-        </ul>
-      </div>
+      <LedgerPanel
+        v-if="ledger"
+        :ledger="ledger"
+        @preview="emit('preview-ledger', $event)"
+        @clear-preview="emit('clear-ledger-preview')"
+      />
       <StubPane
         v-else
         :issue="23"
         title="Gain / loss by group"
-        summary="Each move will attribute ownership and score change to the groups (块) on the board, including sente and gote. Hovering a row will highlight that group. The ledger is not computed in the browser."
+        summary="No ledger is available at this position. Deep analysis needs matching candidate ownership, score, and a pass probe; scan-only or older recordings may omit them. Tempo transitions require additional branch probes."
       />
     </div>
 

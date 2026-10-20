@@ -125,6 +125,8 @@ export interface PositionSnapshot {
    * scenario ownership is available; usually absent/empty after scan.
    */
   groups?: GroupSnapshot[];
+  /** Deep root's best retained candidate versus its explicit pass probe. */
+  ledger?: GainLossLedger | null;
   root?: EngineAnalysis | null;
   passProbe?: EngineAnalysis | null;
   passProbeSkipped?: string | null;

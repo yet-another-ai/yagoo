@@ -6,6 +6,7 @@ export type {
   GainLossLine,
   LedgerBaseline,
   LedgerLineKind,
+  LedgerStrengthChange,
   LlmCommentary,
   MoveComparison,
   OpeningMatch,

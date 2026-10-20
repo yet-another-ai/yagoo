@@ -220,6 +220,9 @@ pub struct PositionSnapshot {
     /// Teaching groups (块). Empty / omitted until the deep phase fills them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub groups: Vec<GroupSnapshot>,
+    /// Best root candidate versus the explicit pass probe; deep phase only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ledger: Option<crate::ledger::GainLossLedger>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub root: Option<EngineAnalysis>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -252,6 +255,7 @@ impl PositionSnapshot {
             board,
             chains,
             groups: Vec::new(),
+            ledger: None,
             root: None,
             pass_probe: None,
             pass_probe_skipped: None,

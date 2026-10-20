@@ -11,6 +11,7 @@
 mod convert;
 mod events;
 mod groups;
+mod ledger;
 mod schema;
 
 pub use convert::{
@@ -19,6 +20,12 @@ pub use convert::{
 };
 pub use events::{AnalysisPhase, AnalysisStage, DeepPlySelection, PipelineEvent};
 pub use groups::{compute_groups, compute_groups_with_params, GroupParams};
+pub use ledger::{
+    best_candidate, compute_ledger, compute_ledger_against, compute_tempo_changes, GainLossLedger,
+    GainLossLine, GroupTempoChange, LedgerBaseline, LedgerInconsistency, LedgerLineKind,
+    LedgerScaling, LedgerStrengthChange, LedgerTempo, LEDGER_CONSISTENCY_TOLERANCE,
+    LEDGER_STRENGTH_THRESHOLD,
+};
 pub use schema::{
     BoardSnapshot, CandidateSnapshot, ChainSnapshot, ColorToken, EngineAnalysis, GameSnapshot,
     GroupKind, GroupMembers, GroupPart, GroupSnapshot, GroupSource, GroupStatus, GroupStrength,

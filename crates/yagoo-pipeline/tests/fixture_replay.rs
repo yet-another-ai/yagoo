@@ -9,7 +9,10 @@ use std::sync::Arc;
 
 use yagoo_katago::AnalysisClient;
 use yagoo_pipeline::{analyze_game_collected, DeepSelectConfig, PipelineConfig, PipelineStrategy};
-use yagoo_snapshot::{AnalysisPhase, GroupSnapshot, GroupStatus, PipelineEvent};
+use yagoo_snapshot::{
+    best_candidate, AnalysisPhase, GroupSnapshot, GroupStatus, LedgerBaseline, LedgerScaling,
+    PipelineEvent,
+};
 
 fn fixture_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/sample-19x19")
@@ -101,6 +104,8 @@ async fn replay_recorded_fixture_groups_snapshot_and_sanity() {
         .await
         .expect("replay analyze_game");
 
+    assert_recorded_ledgers(&events);
+
     let deep = deep_groups_by_ply(&events);
     assert!(
         !deep.is_empty(),
@@ -144,6 +149,63 @@ async fn replay_recorded_fixture_groups_snapshot_and_sanity() {
     }
 
     assert_group_judgments_sane(&deep);
+}
+
+fn assert_recorded_ledgers(events: &[PipelineEvent]) {
+    let mut count = 0;
+    let mut has_negative = false;
+    for event in events {
+        let PipelineEvent::PositionCompleted {
+            phase, snapshot, ..
+        } = event
+        else {
+            continue;
+        };
+        if *phase == AnalysisPhase::Scan {
+            assert!(
+                snapshot.ledger.is_none(),
+                "scan has no candidate/pass evidence"
+            );
+            continue;
+        }
+        let ledger = snapshot.ledger.as_ref().expect("recorded deep ledger");
+        count += 1;
+        assert_eq!(ledger.vs, LedgerBaseline::Pass);
+        assert_eq!(ledger.move_, best_candidate(snapshot).unwrap().move_);
+        let sign = if snapshot.to_play == yagoo_snapshot::ColorToken::B {
+            1.0
+        } else {
+            -1.0
+        };
+        let expected = sign
+            * (best_candidate(snapshot).unwrap().score_lead.unwrap()
+                - snapshot.pass_probe.as_ref().unwrap().score_lead.unwrap());
+        assert!((ledger.value - expected).abs() < 1e-9);
+        let all: Vec<_> = ledger
+            .ledger
+            .iter()
+            .flat_map(|line| &line.intersections)
+            .collect();
+        assert_eq!(all.len(), 361);
+        assert_eq!(
+            all.into_iter()
+                .collect::<std::collections::HashSet<_>>()
+                .len(),
+            361
+        );
+        has_negative |= ledger.ledger.iter().any(|line| line.book_value < 0.0);
+        if ledger.consistent {
+            assert_eq!(ledger.scaling, LedgerScaling::Score);
+            let sum: f64 = ledger.ledger.iter().map(|line| line.points.unwrap()).sum();
+            assert!((sum - ledger.value).abs() < 1e-9);
+        } else {
+            assert_eq!(ledger.scaling, LedgerScaling::Proportions);
+            assert!(ledger.ledger.iter().all(|line| line.points.is_none()));
+            assert!(ledger.inconsistency.is_some());
+        }
+    }
+    assert_eq!(count, 8);
+    assert!(has_negative, "real recording includes negative attribution");
 }
 
 fn assert_group_judgments_sane(deep: &[(u32, Vec<GroupSnapshot>)]) {

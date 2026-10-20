@@ -83,17 +83,25 @@ describe("MoveInspector contracts", () => {
         candidates: [],
         initialPerspective: "ledger",
         ledger: {
+          rootPly: 0,
+          mover: "B",
           move: "Q16",
           vs: "pass",
+          referenceMove: "pass",
           value: 4.5,
           consistent: true,
+          bookTotal: 4.5,
+          scaling: "score",
           ledger: [
             {
               kind: "group",
               id: "D4",
               change: "weak->settled",
               points: 3.2,
-              tempo: "sente",
+              bookValue: 3.2,
+              proportion: 1,
+              intersections: ["D4"],
+              tempo: "unassessed",
             },
           ],
         },
@@ -101,7 +109,7 @@ describe("MoveInspector contracts", () => {
       },
     });
     expect(wrapper.get('[data-testid="ledger-body"]').text()).toMatch(/D4/);
-    expect(wrapper.get('[data-testid="ledger-body"]').text()).toMatch(/sente/);
+    expect(wrapper.get('[data-testid="ledger-body"]').text()).toMatch(/Tempo transitions are unassessed/);
     expect(wrapper.text()).not.toMatch(/Coming in #23/);
 
     return wrapper

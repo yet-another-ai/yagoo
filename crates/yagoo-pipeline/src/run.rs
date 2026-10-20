@@ -17,7 +17,7 @@ use yagoo_sgf::{
 };
 use yagoo_snapshot::{
     best_candidate, board_from_game, candidates_from_response, chains_from_game, compute_groups,
-    compute_ledger, engine_from_response, AnalysisPhase, AnalysisStage, ColorToken, GameSnapshot,
+    compute_ledger, engine_from_response, match_opening, AnalysisPhase, AnalysisStage, ColorToken, GameSnapshot,
     LedgerBaseline, OwnershipConvention, PassProbeSkipReason, PipelineEvent, PositionSnapshot,
     PvEndSnapshot, SCHEMA_VERSION,
 };
@@ -102,6 +102,25 @@ async fn drive<E: AnalysisEngine>(
         },
     )?;
 
+    let opening = match_opening(
+        record.size,
+        !record.setup.black.is_empty()
+            || !record.setup.white.is_empty()
+            || record.handicap.is_some_and(|handicap| handicap > 0),
+        &record
+            .moves
+            .iter()
+            .map(|m| (m.color, m.point))
+            .collect::<Vec<_>>(),
+    );
+    send(
+        &tx,
+        PipelineEvent::OpeningMatched {
+            v: SCHEMA_VERSION,
+            match_: opening.clone(),
+        },
+    )?;
+
     let mut snapshots: BTreeMap<u32, PositionSnapshot> = BTreeMap::new();
     let position_refs: Vec<&ReplayedPosition> = positions.iter().collect();
 
@@ -171,6 +190,7 @@ async fn drive<E: AnalysisEngine>(
             komi: record.komi,
             rules: record.rules.clone(),
             ownership_convention: OwnershipConvention::BlackPositive,
+            opening,
             positions: snapshots.into_values().collect(),
         }))
     } else {

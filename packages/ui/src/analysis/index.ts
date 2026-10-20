@@ -1,6 +1,8 @@
 export {
   REVIEW_MODULE_ISSUES,
 } from "./modules";
+export { matchOpening, matchSgfOpening } from "./openings";
+export type { OpeningMove } from "./openings";
 export type {
   ComparisonBranch,
   ComparisonContext,

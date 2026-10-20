@@ -69,6 +69,8 @@ export function reducePipelineEvent(
 
   switch (event.type) {
     case "gameStarted": {
+      // A source can deliver another game without rebuilding the composable.
+      Object.assign(state, createInitialAnalysisState(), { eventCount: 1 });
       state.schemaVersion = event.v;
       state.size = event.size;
       state.komi = event.komi;
@@ -77,6 +79,10 @@ export function reducePipelineEvent(
       state.positionCount = event.positionCount;
       state.strategy = event.strategy;
       state.status = "streaming";
+      break;
+    }
+    case "openingMatched": {
+      state.opening = event.match;
       break;
     }
     case "phaseStarted": {
@@ -160,7 +166,11 @@ export function reducePipelineEvent(
       state.activePly = null;
       state.currentPhase = null;
       state.phaseVisits = null;
-      if (event.game) state.game = event.game;
+      if (event.game) {
+        state.game = event.game;
+        // Older aggregates omit opening; preserve an earlier recognition event.
+        if ("opening" in event.game) state.opening = event.game.opening ?? null;
+      }
       break;
     }
     case "warning": {

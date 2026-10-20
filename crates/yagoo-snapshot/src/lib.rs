@@ -16,6 +16,7 @@ mod groups;
 mod ledger;
 mod pv_lineage;
 mod sacrifice;
+mod openings;
 mod schema;
 
 pub use comparison::{
@@ -41,10 +42,12 @@ pub use sacrifice::{
     SacrificeAssessmentStatus, SacrificeCheck, SacrificeEvidence, SacrificeExchange,
     SacrificeParams, SacrificeReason, SacrificeReferenceSource,
 };
+pub use openings::match_opening;
 pub use schema::{
     BoardSnapshot, CandidateSnapshot, ChainSnapshot, ColorToken, EngineAnalysis, GameSnapshot,
     GroupKind, GroupMembers, GroupPart, GroupSnapshot, GroupSource, GroupStatus, GroupStrength,
-    OwnershipConvention, PassProbeSkipReason, PositionSnapshot, PvEndSnapshot, SCHEMA_VERSION,
+    OpeningMatch, OwnershipConvention, PassProbeSkipReason, PositionSnapshot, PvEndSnapshot,
+    SCHEMA_VERSION,
 };
 
 /// Crate version string from Cargo.

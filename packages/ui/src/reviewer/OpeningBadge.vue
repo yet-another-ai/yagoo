@@ -13,7 +13,7 @@ defineProps<{
     :data-ready="match ? '1' : '0'"
   >
     <template v-if="match">
-      <span class="yagoo-opening__kicker">Opening</span>
+      <span class="yagoo-opening__kicker">{{ match.joseki ? "Joseki start" : "Opening" }}</span>
       <span class="yagoo-opening__name">{{ match.name }}</span>
       <span v-if="match.joseki" class="yagoo-opening__joseki">
         {{ match.joseki }}
@@ -22,13 +22,13 @@ defineProps<{
         v-if="match.deviationPly != null"
         class="yagoo-opening__dev"
       >
-        leaves the line at move {{ match.deviationPly }}
+        outside the stored line at move {{ match.deviationPly }}
       </span>
       <span class="yagoo-opening__source">{{ match.source }}</span>
     </template>
     <template v-else>
       <span class="yagoo-opening__kicker">Opening</span>
-      <span class="yagoo-opening__pending">Coming in #27</span>
+      <span class="yagoo-opening__pending">No unique match in starter catalogue</span>
     </template>
   </div>
 </template>

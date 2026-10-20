@@ -15,6 +15,10 @@ Versioned, typed JSON consumed by teaching modules (groups, tempo, zoning, ledge
 
 ## Documents
 
+`GameSnapshot.opening` optionally stores an [`OpeningMatch`](../modules/openings.md).
+The `openingMatched` event carries the same object (or `null`) immediately after
+`gameStarted`. Older documents may omit this additive schema-v1 field.
+
 - **`PositionSnapshot`** — one ply: board, chains, optional `groups`, root analysis, optional pass probe, top-K candidates (`movesOwnership` when present), optional PV ends.
 - **`GameSnapshot`** — `{ size, komi, rules, positions[] }` aggregate written by the CLI `--final-json` flag after the stream completes.
 - **`deepPliesSelected`** (stream event) — after scan, lists which plies will deepen (`mode`: `swing` | `all` | `range`) plus swing `reasons` for the UI.

@@ -33,6 +33,44 @@ describe("AnalysisReviewer", () => {
     expect(emitted?.[0]?.[0]).toEqual([file]);
     expect(wrapper.text()).toMatch(/bundled sample analysis/);
     expect(wrapper.text()).not.toMatch(/Streaming from manifest\.json|Loading manifest\.json/);
+    wrapper.unmount();
+  });
+
+  it("recognizes SGF without an engine and clears the label on another loaded game", async () => {
+    const wrapper = mount(AnalysisReviewer, {
+      props: {
+        initialSgf: "(;SZ[19];B[dd];W[cc];B[dc];W[ce])",
+        vertexSize: 16,
+      },
+    });
+    const badge = () => wrapper.get('[data-testid="opening-badge"]');
+    expect(badge().text()).toContain("3-3 invasion: block and extend");
+    expect(badge().text()).toContain("outside the stored line at move 4");
+    await wrapper.setProps({ initialSgf: "(;SZ[19];B[jj])" });
+    expect(badge().text()).toContain("No unique match");
+    expect(badge().text()).not.toContain("3-3 invasion");
+    expect(badge().text()).not.toContain("move 4");
+    await wrapper.setProps({ initialSgf: "(;SZ[19];B[pd];W[dd];B[pp];W[dp];B[pj])" });
+    expect(badge().text()).toContain("Sanrensei");
+    await wrapper.setProps({ initialSgf: "" });
+    expect(badge().text()).toContain("No unique match");
+    wrapper.unmount();
+  });
+
+  it("does not show an unrelated NDJSON opening over the loaded SGF", async () => {
+    const wrapper = mount(AnalysisReviewer, {
+      props: {
+        initialSgf: "(;SZ[19];B[jj])",
+        initialNdjson: JSON.stringify({
+          type: "openingMatched", v: 1,
+          match: { name: "Unrelated game", joseki: null, deviationPly: 9, source: "test" },
+        }),
+        vertexSize: 16,
+      },
+    });
+    await drainProgressiveBatches(3);
+    expect(wrapper.get('[data-testid="opening-badge"]').text()).not.toContain("Unrelated game");
+    wrapper.unmount();
   });
 
   // Progressive NDJSON (~400+ events @ 4/frame) needs headroom under CI load.
@@ -131,9 +169,7 @@ describe("AnalysisReviewer", () => {
       // Goban should be sized for 19×19.
       expect(wrapper.findAll(".shudan-vertex")).toHaveLength(19 * 19);
 
-      expect(wrapper.get('[data-testid="opening-badge"]').text()).toMatch(
-        /Coming in #27/,
-      );
+      expect(wrapper.get('[data-testid="opening-badge"]').text()).not.toMatch(/Coming in #27/);
       wrapper.get('[data-testid="move-inspector"]');
 
       for (const [tab, issue] of [

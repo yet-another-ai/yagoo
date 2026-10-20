@@ -12,6 +12,7 @@ import {
   groupMemberVertices,
   isBrowserEngineAvailable,
   isLiveNativeAvailable,
+  matchSgfOpening,
   parseGtpVertex,
   resolveSgfRules,
   useAnalysisStream,
@@ -68,6 +69,9 @@ function parseBoardSize(sgf: string): number {
 const sgfLoadError = ref(getSgfRootError(props.initialSgf?.trim() ? props.initialSgf : "(;)"));
 const hasAcceptedSgf = ref(sgfLoadError.value == null);
 const sgfText = ref(hasAcceptedSgf.value ? props.initialSgf ?? "" : "");
+// Local SGF recognition is independent of engine/model availability and cannot
+// inherit a label from an analysis file belonging to a different loaded game.
+const sgfOpening = computed(() => matchSgfOpening(sgfText.value));
 const rulesLabel = computed(() => resolveSgfRules(sgfText.value));
 const boardSizeFromSgf = computed(() => parseBoardSize(sgfText.value));
 const dragOver = ref(false);
@@ -125,6 +129,11 @@ function stopAnalysis() {
   stoppedByUser.value = true;
   statusMessage.value = "Analysis stopped.";
 }
+
+watch(sgfText, () => {
+  reset();
+  currentPly.value = 0;
+});
 
 const emptyHeat = computed<BoardMap<HeatVertex | null>>(() => []);
 const heatMap = ref<BoardMap<HeatVertex | null>>([]);
@@ -279,9 +288,10 @@ watch(
   (v) => {
     gameReadGeneration++;
     sourceReadGeneration++;
-    if (v !== undefined && v !== sgfText.value) {
-      replaceSgf(v);
-    } else if (v !== undefined) {
+    const nextSgf = v ?? "";
+    if (nextSgf !== sgfText.value) {
+      replaceSgf(nextSgf);
+    } else {
       sgfLoadError.value = null;
       hasAcceptedSgf.value = true;
     }
@@ -495,7 +505,7 @@ const phaseBadge = computed(() => {
   >
     <header class="yagoo-analysis-app__toolbar">
       <div class="yagoo-analysis-app__brand">Yagoo</div>
-      <OpeningBadge :match="state.opening" />
+      <OpeningBadge :match="sgfText ? sgfOpening : state.opening" />
       <div class="yagoo-analysis-app__meta">
         <span>RU {{ rulesLabel }}</span>
         <span v-if="sourceLabel">· {{ sourceLabel }}</span>

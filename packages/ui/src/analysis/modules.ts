@@ -262,7 +262,7 @@ export interface OpeningMatch {
   name: string;
   /** Corner-line name when the match is a joseki. */
   joseki: string | null;
-  /** First ply that leaves the matched line, if the game deviates. */
+  /** First global ply outside the stored continuation; not a move-quality verdict. */
   deviationPly: number | null;
   /** Data-source id. The matcher documents the licence; the UI only displays it. */
   source: string;

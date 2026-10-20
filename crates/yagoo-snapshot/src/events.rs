@@ -1,6 +1,6 @@
 //! NDJSON / in-process streaming event types.
 
-use crate::schema::{EngineAnalysis, GameSnapshot, PositionSnapshot, SCHEMA_VERSION};
+use crate::schema::{EngineAnalysis, GameSnapshot, OpeningMatch, PositionSnapshot, SCHEMA_VERSION};
 use serde::{Deserialize, Serialize};
 
 /// Pipeline prioritization phase.
@@ -60,6 +60,14 @@ pub enum PipelineEvent {
         move_count: u32,
         position_count: u32,
         strategy: String,
+    },
+    /// Computed from the full SGF before the selected analysis range runs.
+    #[serde(rename_all = "camelCase")]
+    OpeningMatched {
+        v: u32,
+        /// Null means no unique match in the small bundled catalogue.
+        #[serde(rename = "match")]
+        match_: Option<OpeningMatch>,
     },
     #[serde(rename_all = "camelCase")]
     PhaseStarted {

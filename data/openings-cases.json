@@ -1,0 +1,90 @@
+[
+  {
+    "description": "3-3 invasion with block and extension",
+    "moves": [["B", [3, 3]], ["W", [2, 2]], ["B", [3, 2]], ["W", [2, 3]]],
+    "name": "4-4 point",
+    "joseki": "3-3 invasion: block and extend",
+    "deviation": null
+  },
+  {
+    "description": "tenuki preserves the local order",
+    "moves": [["B", [3, 3]], ["W", [15, 15]], ["B", [15, 16]], ["W", [2, 2]], ["B", [3, 2]], ["W", [3, 15]], ["B", [9, 9]], ["W", [2, 3]]],
+    "name": "4-4 point",
+    "joseki": "3-3 invasion: block and extend",
+    "deviation": null
+  },
+  {
+    "description": "deviation uses the global ply after tenuki",
+    "moves": [["B", [3, 3]], ["W", [15, 15]], ["B", [15, 16]], ["W", [2, 2]], ["B", [3, 2]], ["W", [2, 4]]],
+    "name": "4-4 point",
+    "joseki": "3-3 invasion: block and extend",
+    "deviation": 6
+  },
+  {
+    "description": "one stone is insufficient",
+    "moves": [["B", [3, 3]]],
+    "name": null
+  },
+  {
+    "description": "shared low-approach prefix is ambiguous",
+    "moves": [["B", [3, 3]], ["W", [5, 2]]],
+    "name": null
+  },
+  {
+    "description": "unknown response does not choose an arbitrary tied line",
+    "moves": [["B", [3, 3]], ["W", [5, 2]], ["B", [4, 2]]],
+    "name": null
+  },
+  {
+    "description": "response resolves the shared low-approach prefix",
+    "moves": [["B", [3, 3]], ["W", [5, 2]], ["B", [3, 5]]],
+    "name": "4-4 point",
+    "joseki": "Low approach: one-space jump",
+    "deviation": null
+  },
+  {
+    "description": "same stones in a transposed order do not establish a sequence",
+    "moves": [["B", [3, 2]], ["W", [2, 2]], ["B", [3, 3]], ["W", [2, 3]]],
+    "name": null
+  },
+  {
+    "description": "whole-board parallel stars",
+    "moves": [["B", [15, 3]], ["W", [3, 3]], ["B", [15, 15]], ["W", [3, 15]]],
+    "name": "Parallel 4-4 opening",
+    "joseki": null,
+    "deviation": null
+  },
+  {
+    "description": "a longer whole-board match takes precedence",
+    "moves": [["B", [15, 3]], ["W", [3, 3]], ["B", [15, 15]], ["W", [3, 15]], ["B", [15, 9]]],
+    "name": "Sanrensei",
+    "joseki": null,
+    "deviation": null
+  },
+  {
+    "description": "whole-board diagonal stars",
+    "moves": [["B", [15, 3]], ["W", [3, 3]], ["B", [3, 15]], ["W", [15, 15]]],
+    "name": "Diagonal 4-4 opening",
+    "joseki": null,
+    "deviation": null
+  },
+  {
+    "description": "reaching a stored leaf does not judge the next move",
+    "moves": [["B", [3, 3]], ["W", [2, 2]], ["B", [3, 2]], ["W", [2, 3]], ["B", [6, 6]]],
+    "name": "4-4 point",
+    "joseki": "3-3 invasion: block and extend",
+    "deviation": null
+  },
+  {
+    "description": "a pass does not invent a local deviation",
+    "moves": [["B", [3, 3]], ["W", [2, 2]], ["B", [3, 2]], ["W", null]],
+    "name": "4-4 point",
+    "joseki": "3-3 invasion: block and extend",
+    "deviation": null
+  },
+  {
+    "description": "unmatched white reply prevents whole-board skipping",
+    "moves": [["B", [15, 3]], ["W", [9, 9]], ["B", [15, 15]], ["W", [3, 15]], ["B", [15, 9]]],
+    "name": null
+  }
+]

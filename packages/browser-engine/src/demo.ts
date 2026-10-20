@@ -176,9 +176,13 @@ async function loadModel(): Promise<void> {
         error instanceof DOMException && error.name === 'AbortError' ? 'Download cancelled' : message);
     }
   } finally {
-    if (request === lifecycle) loadingModel = false;
-    cancelBtn.disabled = true;
-    loadBtn.disabled = Boolean(selected.disabled);
+    // Only the active generation may touch Load/Cancel — a cancelled/stale
+    // load finishing later must not clobber a newer download's controls.
+    if (request === lifecycle) {
+      loadingModel = false;
+      cancelBtn.disabled = true;
+      loadBtn.disabled = Boolean(selected.disabled);
+    }
   }
 }
 

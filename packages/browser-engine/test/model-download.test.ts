@@ -96,3 +96,95 @@ it('stages local files into a blob manifest without network fetch', async () => 
   bundle.revoke();
   expect(URL.revokeObjectURL).toHaveBeenCalled();
 });
+
+it('drops a corrupt OPFS hit and refetches instead of failing forever', async () => {
+  const payload = new Uint8Array([1, 2, 3, 4, 5, 6]);
+  const meta = await artifact(payload);
+  const files = new Map<string, Uint8Array>([[meta.sha256, new Uint8Array([9, 9])]]);
+  const directory = {
+    async getFileHandle(name: string, options?: { create?: boolean }) {
+      if (!files.has(name) && !options?.create) throw new DOMException('missing', 'NotFoundError');
+      if (!files.has(name)) files.set(name, new Uint8Array());
+      return {
+        async getFile() {
+          const data = files.get(name)!;
+          return {
+            size: data.byteLength,
+            arrayBuffer: async () => data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength),
+          };
+        },
+        async createWritable() {
+          const chunks: Uint8Array[] = [];
+          return {
+            async write(bytes: Uint8Array) { chunks.push(bytes); },
+            async close() {
+              const total = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+              const out = new Uint8Array(total);
+              let offset = 0;
+              for (const chunk of chunks) { out.set(chunk, offset); offset += chunk.byteLength; }
+              files.set(name, out);
+            },
+            async abort() {},
+          };
+        },
+      };
+    },
+    async removeEntry(name: string) { files.delete(name); },
+  };
+  vi.stubGlobal('navigator', { storage: { getDirectory: async () => directory } });
+  let fetches = 0;
+  vi.stubGlobal('fetch', vi.fn(async () => {
+    fetches++;
+    let sent = false;
+    return {
+      ok: true,
+      body: {
+        getReader: () => ({
+          read: async () => {
+            if (sent) return { done: true, value: undefined };
+            sent = true;
+            return { done: false, value: payload };
+          },
+          cancel: async () => {},
+        }),
+      },
+    };
+  }));
+  const bytes = await loadArtifact('https://example.test/', meta);
+  expect(fetches).toBe(1);
+  expect(Array.from(bytes)).toEqual([1, 2, 3, 4, 5, 6]);
+  expect(Array.from(files.get(meta.sha256)!)).toEqual([1, 2, 3, 4, 5, 6]);
+});
+
+it('revokes partial object URLs when a later local file is missing', async () => {
+  const onnx = new Uint8Array([1, 2, 3, 4]);
+  const warmup = new Uint8Array([5, 6]);
+  const fp16 = new Uint8Array([7, 8]);
+  const fp32Meta = await artifact(onnx, 'model.onnx');
+  const warmMeta = await artifact(warmup, 'warmup.json');
+  const fp16Meta = await artifact(fp16, 'model.fp16.onnx');
+  const manifest = {
+    ...manifestFor(fp32Meta, warmMeta),
+    variants: { fp32: fp32Meta, fp16: fp16Meta },
+  };
+  validateManifest(manifest);
+  vi.stubGlobal('navigator', { storage: { getDirectory: async () => { throw new Error('no opfs'); } } });
+  const created: string[] = [];
+  const revoked: string[] = [];
+  vi.stubGlobal('URL', {
+    ...URL,
+    createObjectURL: () => {
+      const url = `blob:partial/${created.length}`;
+      created.push(url);
+      return url;
+    },
+    revokeObjectURL: (url: string) => { revoked.push(url); },
+  });
+  await expect(bundleFromLocalFiles([
+    new File([JSON.stringify(manifest)], 'manifest.json', { type: 'application/json' }),
+    new File([onnx], 'model.onnx'),
+    // warmup missing after fp32 was staged — must revoke fp32 blob
+  ])).rejects.toThrow(/Missing local file/);
+  expect(created.length).toBeGreaterThan(0);
+  expect(revoked).toEqual(created);
+});

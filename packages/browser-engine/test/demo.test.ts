@@ -136,3 +136,30 @@ it('cancel download disposes the engine during load', async () => {
   expect(mockEngine.dispose).toHaveBeenCalled();
   expect(node('model-status').textContent).toMatch(/cancelled|stopped/i);
 });
+
+it('a stale cancelled load does not disable Cancel for a newer load', async () => {
+  const node = await setup();
+  let resolveFirst!: (value: unknown) => void;
+  let resolveSecond!: (value: unknown) => void;
+  mockEngine.initialize
+    .mockImplementationOnce(() => new Promise(resolve => { resolveFirst = resolve; }))
+    .mockImplementationOnce(() => new Promise(resolve => { resolveSecond = resolve; }));
+  const first = node('load').listeners.click!();
+  await Promise.resolve();
+  await Promise.resolve();
+  node('cancel-download').listeners.click!();
+  // Cancel cleared loadingModel; start a second load while the first init is pending.
+  const second = node('load').listeners.click!();
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(typeof resolveSecond).toBe('function');
+  expect(node('cancel-download').disabled).toBe(false);
+  // Stale first resolve must not clobber the active generation's Cancel button.
+  resolveFirst({ backend: 'wasm', precision: 'fp32', ortThreads: 1, maxBatch: 1, messages: [] });
+  await first;
+  expect(node('cancel-download').disabled).toBe(false);
+  resolveSecond({ backend: 'wasm', precision: 'fp32', ortThreads: 1, maxBatch: 1, messages: [] });
+  await second;
+  expect(node('cancel-download').disabled).toBe(true);
+  expect(node('model-status').textContent).toMatch(/ready/i);
+});

@@ -1,4 +1,4 @@
-import { cacheHas, cachePut, cacheRead } from './cache';
+import { cacheDelete, cacheHas, cachePut, cacheRead } from './cache';
 
 export interface Artifact { url: string; bytes: number; sha256: string; integrity: string }
 export interface Manifest {
@@ -68,9 +68,14 @@ export async function loadArtifact(
 
   const cached = await cacheRead(a.sha256);
   if (cached) {
-    await verify(cached, a);
-    progress(a.bytes, a.bytes);
-    return cached;
+    try {
+      await verify(cached, a);
+      progress(a.bytes, a.bytes);
+      return cached;
+    } catch {
+      // Truncated / interrupted OPFS writes must not block forever — drop and refetch.
+      await cacheDelete(a.sha256);
+    }
   }
 
   throwIfAborted(signal);
@@ -124,30 +129,37 @@ export async function bundleFromLocalFiles(files: Iterable<File>): Promise<Local
   if (!manifestFile) throw new Error('Select files including manifest.json (plus the .onnx and warmup.json it names).');
   const manifest = validateManifest(JSON.parse(await manifestFile.text()));
   const objectUrls: string[] = [];
-  const rewrite = async (artifact: Artifact): Promise<Artifact> => {
-    const name = artifact.url.split('/').pop()!;
-    const file = byName.get(name);
-    if (!file) throw new Error(`Missing local file for ${name} (listed in the manifest as ${artifact.url}).`);
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    await verify(bytes, artifact);
-    try { await cachePut(artifact.sha256, bytes); } catch { /* optional */ }
-    const url = URL.createObjectURL(new Blob([bytes as Uint8Array<ArrayBuffer>]));
-    objectUrls.push(url);
-    return { ...artifact, url };
-  };
-  const rewritten: Manifest = {
-    ...manifest,
-    variants: {
-      fp32: await rewrite(manifest.variants.fp32),
-      ...(manifest.variants.fp16 ? { fp16: await rewrite(manifest.variants.fp16) } : {}),
-    },
-    warmup: await rewrite(manifest.warmup),
-  };
-  const manifestUrl = URL.createObjectURL(new Blob([JSON.stringify(rewritten)], { type: 'application/json' }));
-  objectUrls.push(manifestUrl);
-  return {
-    manifestUrl,
-    manifest: rewritten,
-    revoke: () => { for (const url of objectUrls) URL.revokeObjectURL(url); },
-  };
+  const revokeAll = () => { for (const url of objectUrls) URL.revokeObjectURL(url); objectUrls.length = 0; };
+  try {
+    const rewrite = async (artifact: Artifact): Promise<Artifact> => {
+      const name = artifact.url.split('/').pop()!;
+      const file = byName.get(name);
+      if (!file) throw new Error(`Missing local file for ${name} (listed in the manifest as ${artifact.url}).`);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      await verify(bytes, artifact);
+      try { await cachePut(artifact.sha256, bytes); } catch { /* optional */ }
+      const url = URL.createObjectURL(new Blob([bytes as Uint8Array<ArrayBuffer>]));
+      objectUrls.push(url);
+      return { ...artifact, url };
+    };
+    const rewritten: Manifest = {
+      ...manifest,
+      variants: {
+        fp32: await rewrite(manifest.variants.fp32),
+        ...(manifest.variants.fp16 ? { fp16: await rewrite(manifest.variants.fp16) } : {}),
+      },
+      warmup: await rewrite(manifest.warmup),
+    };
+    const manifestUrl = URL.createObjectURL(new Blob([JSON.stringify(rewritten)], { type: 'application/json' }));
+    objectUrls.push(manifestUrl);
+    const urls = [...objectUrls];
+    return {
+      manifestUrl,
+      manifest: rewritten,
+      revoke: () => { for (const url of urls) URL.revokeObjectURL(url); },
+    };
+  } catch (error) {
+    revokeAll();
+    throw error;
+  }
 }

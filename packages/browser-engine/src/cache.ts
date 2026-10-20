@@ -21,6 +21,16 @@ export async function cacheHas(sha256: string): Promise<boolean> {
   }
 }
 
+export async function cacheDelete(sha256: string): Promise<void> {
+  const directory = await openModelDirectory();
+  if (!directory) return;
+  try {
+    await directory.removeEntry(sha256);
+  } catch {
+    /* missing or busy */
+  }
+}
+
 export async function cachePut(sha256: string, bytes: Uint8Array): Promise<void> {
   const directory = await openModelDirectory();
   if (!directory) return;
@@ -30,16 +40,20 @@ export async function cachePut(sha256: string, bytes: Uint8Array): Promise<void>
     await writer.close();
   } catch (error) {
     try { await writer.abort(); } catch { /* ignore */ }
+    try { await directory.removeEntry(sha256); } catch { /* ignore partial */ }
     throw error;
   }
 }
 
+/** Returns undefined for missing, empty, or unreadable entries (treat as cache miss). */
 export async function cacheRead(sha256: string): Promise<Uint8Array | undefined> {
   const directory = await openModelDirectory();
   if (!directory) return undefined;
   try {
     const file = await (await directory.getFileHandle(sha256)).getFile();
-    return new Uint8Array(await file.arrayBuffer());
+    if (file.size <= 0) return undefined;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    return bytes.byteLength > 0 ? bytes : undefined;
   } catch {
     return undefined;
   }

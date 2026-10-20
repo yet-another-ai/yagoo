@@ -112,7 +112,7 @@ async fn concurrent_sse_runs_equal_recorded_ndjson_and_use_unique_queries() {
         .run_until(async {
             let engine = Arc::new(Recording::load());
             let sgf = include_str!("../../../../docs/public/app/sample.sgf");
-            let expected = analyze_game_collected(sgf, Arc::clone(&engine), config())
+            let expected = Box::pin(analyze_game_collected(sgf, Arc::clone(&engine), config()))
                 .await
                 .unwrap()
                 .iter()

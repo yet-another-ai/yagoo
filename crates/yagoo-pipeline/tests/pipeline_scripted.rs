@@ -35,6 +35,7 @@ async fn opening_precedes_analysis_and_uses_full_game_outside_requested_range() 
         from_ply: 4,
         to_ply: Some(4),
         include_pv_ends: false,
+        include_comparison: false,
         emit_game_aggregate: true,
         ..PipelineConfig::default()
     };

@@ -181,7 +181,7 @@ describe("AnalysisReviewer", () => {
 
       await wrapper.get('[data-testid="try-move-toggle"]').trigger("click");
       expect(wrapper.get('[data-testid="variation-tree"]').text()).toMatch(
-        /Coming in #26/,
+        /Load a browser model or connect a native engine/,
       );
 
       wrapper.unmount();

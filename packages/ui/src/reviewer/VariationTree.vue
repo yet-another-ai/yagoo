@@ -1,18 +1,25 @@
 <script setup lang="ts">
 import type { GameChildInfo } from "../composables/useGame";
 import type { TryNode } from "./tryBranch";
-import { tryPath } from "./tryBranch";
+import { tryPath, orderedTryNodes } from "./tryBranch";
 
 const props = defineProps<{
   tryMode: boolean;
+  variationActive?: boolean;
   cursorId: string | null;
   nodes: TryNode[];
   sgfChildren: GameChildInfo[];
+  analysisStatus?: string;
+  canAnalyze?: boolean;
+  analyzing?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "select-try", id: string | null): void;
   (e: "select-variation", index: number): void;
+  (e: "pass"): void;
+  (e: "analyze"): void;
+  (e: "stop"): void;
 }>();
 
 function depthOf(id: string): number {
@@ -25,15 +32,19 @@ function depthOf(id: string): number {
     <div class="yagoo-tree__title">Tree</div>
 
     <p v-if="tryMode" class="yagoo-tree__note">
-      Try mode records moves on a local branch. AI suggestions for that
-      branch are not available.
-      <strong>Coming in #26.</strong>
+      Try moves remain on their own branch. {{ analysisStatus }}
+    </p>
+    <p v-else-if="variationActive" class="yagoo-tree__note">
+      {{ analysisStatus }}
     </p>
     <p v-else class="yagoo-tree__note">
-      Main-line navigation stays on the game. Play an alternative from the
-      Try button — suggestions for it are
-      <strong>Coming in #26</strong>.
+      Use Try to explore an alternative. Select a node to revisit its position.
     </p>
+    <div v-if="tryMode || variationActive" class="yagoo-tree__note">
+      <button v-if="tryMode" type="button" data-testid="try-pass" @click="emit('pass')">Pass</button>
+      <button v-if="analyzing" type="button" data-testid="stop-variation" @click="emit('stop')">Stop analysis</button>
+      <button v-else-if="canAnalyze" type="button" data-testid="analyze-variation" @click="emit('analyze')">Analyze position</button>
+    </div>
 
     <ol v-if="tryMode" class="yagoo-tree__list">
       <li>
@@ -47,7 +58,7 @@ function depthOf(id: string): number {
           Anchor
         </button>
       </li>
-      <li v-for="node in nodes" :key="node.id">
+      <li v-for="node in orderedTryNodes(nodes)" :key="node.id" :data-parent-id="node.parentId ?? 'anchor'">
         <button
           type="button"
           class="yagoo-tree__node"

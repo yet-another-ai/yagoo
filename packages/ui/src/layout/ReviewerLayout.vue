@@ -5,6 +5,7 @@ import {
   onBeforeUnmount,
   onMounted,
   ref,
+  shallowRef,
   watch,
 } from "vue";
 import type {
@@ -19,7 +20,11 @@ import type { CandidateSnapshot, EngineAnalysis, GroupSnapshot } from "../analys
 import { formatGtpVertex, parseGtpVertex, ownershipToPaintMap } from "../analysis/coords";
 import { comparisonBoard, comparisonMarkers, isAlignedComparison } from "../analysis/comparison";
 import { buildGroupOutlines, groupMemberVertices } from "../analysis/groups";
+import { buildBoardOverlays, formatAnalysisComment } from "../analysis/display";
+import type { PositionSourceFactory } from "../analysis/sources/types";
+import { useVariationAnalysis } from "../analysis/useVariationAnalysis";
 import { useGame, type GamePlayerInfo } from "../composables/useGame";
+import type { GamePosition } from "../composables/gamePosition";
 import Goban from "../goban/Goban.vue";
 import OverlayLayer from "../overlays/OverlayLayer.vue";
 import type { OverlayData } from "../overlays/OverlayRenderer";
@@ -108,6 +113,8 @@ const props = withDefaults(
     commentary?: LlmCommentary | null;
     reportDocument?: ReviewReportDocument | null;
     initialPerspective?: InspectorPerspective;
+    /** Live source for the selected variation, separate from main-line results. */
+    positionSource?: PositionSourceFactory | null;
   }>(),
   {
     showCoordinates: true,
@@ -137,6 +144,7 @@ const props = withDefaults(
     commentary: null,
     reportDocument: null,
     initialPerspective: "ai",
+    positionSource: null,
   },
 );
 
@@ -153,10 +161,15 @@ const emit = defineEmits<{
   (e: "preview-group", groupId: string): void;
   (e: "clear-group-preview"): void;
   (e: "select-group", groupId: string): void;
+  (e: "variation-analysis"): void;
+  (e: "variation-change", active: boolean): void;
 }>();
 
 const {
   signMap,
+  position,
+  positionSgf,
+  currentId,
   boardSize,
   currentPlayer,
   players,
@@ -191,6 +204,12 @@ const tryNodes = ref<TryNode[]>([]);
 const tryCursor = ref<string | null>(null);
 const anchorSign = ref<BoardMap<Sign>>([]);
 const anchorPlayer = ref<Sign>(1);
+const anchorPosition = shallowRef<GamePosition | null>(null);
+const anchorSgf = ref("");
+const variation = useVariationAnalysis();
+const variationPreview = ref<number | null>(null);
+const variationPinned = ref<number | null>(null);
+const variationSelected = ref(0);
 let trySeq = 0;
 let resizeObserver: ResizeObserver | null = null;
 
@@ -203,12 +222,13 @@ const sections: { id: CompactSection; label: string }[] = [
 ];
 
 function load(contents: string | undefined) {
-  if (!contents) return;
   ledgerPreview.value = null;
   tryMode.value = false;
   clearTry();
-  loadSgf(contents);
-  loaded.value = true;
+  // A cleared file must invalidate its old game and any pending variation too.
+  loaded.value = false;
+  loadSgf(contents?.trim() ? contents : "(;)");
+  loaded.value = Boolean(contents?.trim());
   emit("ply-change", moveNumber.value);
   void nextTick(() => updateAutoVertexSize());
 }
@@ -267,23 +287,23 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  variation.stop();
+  onSplitterUp();
   resizeObserver?.disconnect();
   resizeObserver = null;
 });
 
 watch(
   () => props.sgf,
-  (next) => {
-    if (next) load(next);
-  },
+  (next) => load(next),
 );
 
 watch(boardSize, () => updateAutoVertexSize());
 watch(moveNumber, (n) => {
   ledgerPreview.value = null;
   emit("ply-change", n);
-  if (tryMode.value) captureAnchor();
 });
+watch(currentId, () => { if (tryMode.value) captureAnchor(); });
 
 const sortedKeys = computed(() =>
   [...props.keyMoves].sort((a, b) => a.ply - b.ply),
@@ -298,7 +318,7 @@ const tryDepth = computed(() =>
 );
 
 const suspendAnalysis = computed(
-  () => tryDepth.value > 0 || (loaded.value && !onMainLine.value),
+  () => tryMode.value || (loaded.value && !onMainLine.value),
 );
 watch([() => props.ledger, () => props.comparison, suspendAnalysis, inspectorPerspective], () => {
   ledgerPreview.value = null;
@@ -324,6 +344,47 @@ function previewStones(stones: string[]) {
     .map((coordinate) => parseGtpVertex(coordinate, boardSize.value))
     .filter((vertex): vertex is Vertex => vertex != null);
 }
+watch(suspendAnalysis, (active) => emit("variation-change", active), { immediate: true });
+const variationPly = computed(() => moveNumber.value + tryDepth.value);
+const variationInfo = computed(() => variation.state.value.plies[variationPly.value] ?? null);
+const displayCandidates = computed(() => suspendAnalysis.value ? variationInfo.value?.candidates ?? [] : props.candidates);
+const displayRoot = computed(() => suspendAnalysis.value ? variationInfo.value?.root ?? null : props.rootAnalysis);
+const displayPreview = computed(() => suspendAnalysis.value ? variationPinned.value ?? variationPreview.value : props.previewCandidateIndex);
+const displaySelected = computed(() => suspendAnalysis.value ? variationSelected.value : props.selectedCandidateIndex);
+const variationOverlays = computed(() => buildBoardOverlays(variation.state.value, variationPly.value, {
+  size: boardSize.value,
+  selectedCandidate: variationSelected.value,
+  previewCandidate: variationPinned.value ?? variationPreview.value,
+}));
+const variationStatus = computed(() => {
+  if (!props.positionSource) return "Load a browser model or connect a native engine to analyze this variation.";
+  const state = variation.state.value;
+  if (state.status === "streaming") return "Analyzing this variation…";
+  if (state.status === "error") return state.lastError ?? "Variation analysis failed.";
+  if (state.status === "completed") return "Live analysis for this variation.";
+  return "Variation analysis stopped.";
+});
+const variationKey = computed(() => suspendAnalysis.value
+  ? `${tryMode.value ? anchorSgf.value : positionSgf.value}|${tryMode.value ? tryCursor.value ?? "anchor" : "sgf"}`
+  : null);
+
+function analyzeVariation(force = false) {
+  const key = variationKey.value;
+  variationPreview.value = null;
+  variationPinned.value = null;
+  variationSelected.value = 0;
+  if (key == null) { variation.stop(); return; }
+  if (props.positionSource) emit("variation-analysis");
+  variation.select(key, {
+    sgf: tryMode.value ? anchorSgf.value : positionSgf.value,
+    ply: moveNumber.value,
+    moves: tryMode.value ? tryPath(tryNodes.value, tryCursor.value).map((node) => node.label) : [],
+    visits: 200,
+  }, props.positionSource, force);
+}
+
+watch(() => props.positionSource, () => { variation.clear(); analyzeVariation(); });
+watch(variationKey, () => analyzeVariation());
 
 function previewDisplayedGroup(id: string) {
   if (!activeComparison.value) { emit("preview-group", id); return; }
@@ -372,6 +433,7 @@ const tryPosition = computed(() => {
     anchorSign.value,
     anchorPlayer.value,
     path.map((node) => node.vertex),
+    anchorPosition.value,
   );
 });
 
@@ -413,34 +475,34 @@ const displayComment = computed(() => {
     const comparison = activeComparison.value;
     return `Move ${comparison.ply}: ${comparison.actualMove} versus ${comparison.aiMove}, evaluated at root ply ${comparison.rootPly}. The board shows the position before this move.`;
   }
-  if (tryDepth.value > 0) {
-    return "This variation is not analyzed.\nAI suggestions for tried moves — Coming in #26.";
-  }
-  if (loaded.value && !onMainLine.value) {
-    return "This SGF variation is not on the analyzed main line.\nAI suggestions for tried moves — Coming in #26.";
-  }
+  if (suspendAnalysis.value) return variationInfo.value
+    ? formatAnalysisComment(variation.state.value, variationPly.value, "")
+    : variationStatus.value;
   return props.commentOverride ?? comment.value;
 });
 
 const boardHeat = computed(() =>
-  suspendAnalysis.value || activeComparison.value ? [] : (props.heatMap ?? []),
+  suspendAnalysis.value ? variationOverlays.value.heatMap
+    : activeComparison.value ? [] : (props.heatMap ?? []),
 );
 const boardPaint = computed(() => {
-  if (suspendAnalysis.value) return [];
+  if (suspendAnalysis.value) return variationOverlays.value.paintMap;
   if (activeComparison.value) return inspectorPerspective.value === "why" && comparisonDifference.value
     ? ownershipToPaintMap(activeComparison.value.ownershipDelta.map((value) => value / 2), boardSize.value, 0.04)
     : [];
   return props.paintMap ?? [];
 });
 const boardGhosts = computed(() =>
-  suspendAnalysis.value || activeComparison.value ? [] : (props.ghostStoneMap ?? []),
+  suspendAnalysis.value ? variationOverlays.value.ghostStoneMap
+    : activeComparison.value ? [] : (props.ghostStoneMap ?? []),
 );
 const boardMarkers = computed(() =>
-  suspendAnalysis.value ? []
+  suspendAnalysis.value ? variationOverlays.value.markerMap
     : activeComparison.value ? comparisonMarkers(activeComparison.value) : (props.markerMap ?? []),
 );
 const boardLines = computed(() =>
-  suspendAnalysis.value || activeComparison.value ? [] : props.lines,
+  suspendAnalysis.value ? variationOverlays.value.lines
+    : activeComparison.value ? [] : props.lines,
 );
 const boardDimmed = computed(() => {
   if (suspendAnalysis.value) return [];
@@ -459,6 +521,7 @@ const boardSelected = computed(() =>
 );
 
 function clearTry() {
+  variation.clear();
   tryNodes.value = [];
   tryCursor.value = null;
 }
@@ -466,6 +529,8 @@ function clearTry() {
 function captureAnchor() {
   anchorSign.value = signMap.value.map((row) => [...row]);
   anchorPlayer.value = currentPlayer.value;
+  anchorPosition.value = position.value;
+  anchorSgf.value = positionSgf.value;
   clearTry();
 }
 
@@ -489,8 +554,12 @@ function playAt(vertex: Vertex): boolean {
     anchorSign.value,
     anchorPlayer.value,
     [...path.map((node) => node.vertex), vertex],
+    anchorPosition.value,
   );
   if (played == null) return false;
+  const existing = tryNodes.value.find((node) => node.parentId === tryCursor.value &&
+    node.vertex[0] === vertex[0] && node.vertex[1] === vertex[1]);
+  if (existing) { tryCursor.value = existing.id; return true; }
   const sign: Sign =
     path.length % 2 === 0
       ? anchorPlayer.value
@@ -589,7 +658,47 @@ function onVertexClick(evt: MouseEvent, vertex: Vertex) {
     playAt(vertex);
     return;
   }
+  if (suspendAnalysis.value) {
+    const index = variationCandidateAt(vertex);
+    if (index >= 0) toggleCandidate(index);
+    return;
+  }
   emit("vertex-click", evt, vertex);
+}
+
+function previewCandidate(index: number) {
+  if (suspendAnalysis.value) variationPreview.value = index;
+  else emit("preview-candidate", index);
+}
+function clearCandidatePreview() {
+  if (suspendAnalysis.value) variationPreview.value = null;
+  else emit("clear-preview");
+}
+function selectCandidate(index: number) {
+  if (suspendAnalysis.value) variationSelected.value = index;
+  else emit("select-candidate", index);
+}
+function toggleCandidate(index: number) {
+  if (suspendAnalysis.value) {
+    variationPinned.value = variationPinned.value === index ? null : index;
+    variationPreview.value = variationPinned.value;
+    variationSelected.value = index;
+  } else emit("toggle-candidate", index);
+}
+function variationCandidateAt(vertex: Vertex) {
+  return displayCandidates.value.findIndex((candidate) => {
+    const point = parseGtpVertex(candidate.move, boardSize.value);
+    return point?.[0] === vertex[0] && point[1] === vertex[1];
+  });
+}
+function onVertexEnter(evt: MouseEvent, vertex: Vertex) {
+  if (!suspendAnalysis.value) { emit("vertex-mouseenter", evt, vertex); return; }
+  const index = variationCandidateAt(vertex);
+  variationPreview.value = index < 0 ? null : index;
+}
+function onVertexLeave(evt: MouseEvent, vertex: Vertex) {
+  if (suspendAnalysis.value) variationPreview.value = null;
+  else emit("vertex-mouseleave", evt, vertex);
 }
 
 function panelVisible(id: CompactSection): boolean {
@@ -692,7 +801,7 @@ defineExpose({
           class="yagoo-try-banner"
           data-testid="try-banner"
         >
-          Variation is not analyzed. AI suggestions — Coming in #26.
+          {{ variationStatus }}
         </p>
         <div class="yagoo-reviewer__board-wrap">
           <Goban
@@ -709,8 +818,8 @@ defineExpose({
             :fuzzy-stone-placement="fuzzyStonePlacement"
             :animate-stone-placement="animateStonePlacement"
             :fuzzy-seed="fuzzySeed"
-            @vertex-mouseenter="(evt, v) => emit('vertex-mouseenter', evt, v)"
-            @vertex-mouseleave="(evt, v) => emit('vertex-mouseleave', evt, v)"
+            @vertex-mouseenter="onVertexEnter"
+            @vertex-mouseleave="onVertexLeave"
             @vertex-click="onVertexClick"
           >
             <OverlayLayer
@@ -769,24 +878,24 @@ defineExpose({
         <MoveInspector
           v-show="panelVisible('inspector')"
           class="yagoo-reviewer__inspector"
-          :candidates="candidates"
-          :root="rootAnalysis"
-          :root-visits="rootVisits"
-          :preview-index="previewCandidateIndex"
-          :selected-index="selectedCandidateIndex"
-          :ledger="ledger"
+          :candidates="displayCandidates"
+          :root="displayRoot"
+          :root-visits="suspendAnalysis ? displayRoot?.visits : rootVisits"
+          :preview-index="displayPreview"
+          :selected-index="displaySelected"
+          :ledger="suspendAnalysis ? null : ledger"
           :comparison="alignedComparison"
           :show-comparison-difference="comparisonDifference"
-          :sacrifices="sacrifices"
-          :commentary="commentary"
+          :sacrifices="suspendAnalysis ? null : sacrifices"
+          :commentary="suspendAnalysis ? null : commentary"
           :initial-perspective="initialPerspective"
-          :ply="moveNumber"
+          :ply="variationPly"
           :key-index="keyIndex"
           :key-count="sortedKeys.length"
-          @preview="(i) => emit('preview-candidate', i)"
-          @clear-preview="emit('clear-preview')"
-          @toggle="(i) => emit('toggle-candidate', i)"
-          @select="(i) => emit('select-candidate', i)"
+          @preview="previewCandidate"
+          @clear-preview="clearCandidatePreview"
+          @toggle="toggleCandidate"
+          @select="selectCandidate"
           @preview-group="(id) => emit('preview-group', id)"
           @preview-ledger="previewLedger"
           @preview-stones="previewStones"
@@ -826,7 +935,7 @@ defineExpose({
           <GroupsPanel
             v-show="showGroups()"
             embedded
-            :groups="displayedGroups"
+            :groups="suspendAnalysis ? [] : displayedGroups"
             :preview-id="activeComparison ? null : previewGroupId"
             :selected-id="activeComparison ? null : selectedGroupId"
             @preview="previewDisplayedGroup"
@@ -836,11 +945,18 @@ defineExpose({
           <VariationTree
             v-show="showTree()"
             :try-mode="tryMode"
+              :variation-active="suspendAnalysis"
             :cursor-id="tryCursor"
             :nodes="tryNodes"
             :sgf-children="children"
+            :analysis-status="variationStatus"
+            :can-analyze="!!positionSource"
+            :analyzing="variation.state.value.status === 'streaming'"
             @select-try="(id) => (tryCursor = id)"
             @select-variation="(index) => goToVariation(index)"
+            @pass="playAt([-1, -1])"
+            @analyze="analyzeVariation(true)"
+            @stop="variation.stop"
           />
         </div>
 
@@ -859,7 +975,7 @@ defineExpose({
       :current-player="displayPlayer"
       :can-go-back="canStepBack"
       :can-go-forward="canStepForward"
-      :move-number="moveNumber"
+      :move-number="variationPly"
       :try-mode="tryMode"
       :report-mode="view === 'report'"
       @back="onBack"

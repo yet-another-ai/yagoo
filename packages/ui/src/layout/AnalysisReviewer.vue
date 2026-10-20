@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   type BrowserEngineAdapter,
+  type PositionSourceFactory,
   buildGroupOutlines,
   buildGroupVertexIndex,
   createBrowserEngineSource,
@@ -70,6 +71,11 @@ const dragOver = ref(false);
 const sourceOpen = ref(false);
 const nativeUrl = ref("http://127.0.0.1:8710/analyze");
 const activeNative = ref(false);
+const variationActive = ref(false);
+const sourceGeneration = ref(0);
+let gameReadGeneration = 0;
+let sourceReadGeneration = 0;
+onBeforeUnmount(() => { gameReadGeneration++; sourceReadGeneration++; });
 const statusMessage = ref("");
 const stoppedByUser = ref(false);
 const selectedCandidate = ref(0);
@@ -234,6 +240,17 @@ const liveAvailable = isLiveNativeAvailable();
 const browserAvailable = computed(() =>
   isBrowserEngineAvailable(props.browserEngine),
 );
+const positionSource = computed<PositionSourceFactory | null>(() => {
+  // Explicit reconnects must restart the selected position even for the same engine.
+  void sourceGeneration.value;
+  if (activeNative.value) {
+    const url = nativeUrl.value;
+    return ({ sgf, ...position }) => createLiveNativeSource({ url, sgf, position });
+  }
+  const engine = props.browserEngine;
+  if (!engine?.analyzePosition) return null;
+  return ({ sgf, ...position }) => createBrowserEngineSource({ engine, sgf, position });
+});
 
 onMounted(() => {
   if (props.initialNdjson) {
@@ -246,6 +263,8 @@ onMounted(() => {
 watch(
   () => props.initialSgf,
   (v) => {
+    gameReadGeneration++;
+    sourceReadGeneration++;
     if (v !== undefined && v !== sgfText.value) {
       reset();
       sgfText.value = v;
@@ -254,6 +273,7 @@ watch(
 );
 
 function loadNdjsonText(text: string, label: string) {
+  sourceReadGeneration++;
   activeNative.value = false;
   reset();
   statusMessage.value = `Loading ${label}…`;
@@ -268,14 +288,19 @@ function loadNdjsonText(text: string, label: string) {
 }
 
 async function onSgfFile(file: File) {
+  const generation = ++gameReadGeneration;
+  sourceReadGeneration++;
   const text = await file.text();
+  if (generation !== gameReadGeneration) return;
   reset();
   sgfText.value = text;
   statusMessage.value = `Loaded SGF ${file.name} (rules: ${resolveSgfRules(text)})`;
 }
 
 async function onNdjsonFile(file: File) {
+  const generation = ++sourceReadGeneration;
   const text = await file.text();
+  if (generation !== sourceReadGeneration) return;
   loadNdjsonText(text, file.name);
 }
 
@@ -288,29 +313,33 @@ function onFileInput(kind: "sgf" | "ndjson", ev: Event) {
   input.value = "";
 }
 
-function onDrop(ev: DragEvent) {
+async function onDrop(ev: DragEvent) {
   ev.preventDefault();
   dragOver.value = false;
   const files = ev.dataTransfer?.files;
   if (!files?.length) return;
-  for (const file of Array.from(files)) {
-    const name = file.name.toLowerCase();
-    if (name.endsWith(".sgf") || name.endsWith(".sgf.txt")) {
-      void onSgfFile(file);
-    } else if (
-      name.endsWith(".ndjson") ||
-      name.endsWith(".jsonl") ||
-      name.endsWith(".json")
-    ) {
-      void onNdjsonFile(file);
-    }
+  const picked = Array.from(files);
+  const game = picked.find((file) => /\.sgf(?:\.txt)?$/i.test(file.name));
+  const analysis = picked.find((file) => /\.(ndjson|jsonl|json)$/i.test(file.name));
+  // Load paired files in order so the SGF reset cannot erase its analysis.
+  if (game) {
+    const generation = gameReadGeneration + 1;
+    await onSgfFile(game);
+    if (generation !== gameReadGeneration) return;
   }
+  if (analysis) await onNdjsonFile(analysis);
 }
 
 function tryLiveNative(url: string) {
+  sourceReadGeneration++;
+  sourceGeneration.value++;
   reset();
   nativeUrl.value = url;
   activeNative.value = true;
+  if (variationActive.value) {
+    statusMessage.value = "Analyzing the selected variation with the native engine…";
+    return;
+  }
   statusMessage.value = "Connecting to local native engine…";
   attachSource(createLiveNativeSource({ url, sgf: sgfText.value }));
 }
@@ -321,8 +350,14 @@ function tryBrowserEngine() {
       "Load a local model bundle first. Recorded analysis stays on the board.";
     return;
   }
+  sourceReadGeneration++;
+  sourceGeneration.value++;
   activeNative.value = false;
   reset();
+  if (variationActive.value && props.browserEngine.analyzePosition) {
+    statusMessage.value = "Analyzing the selected variation with the browser engine…";
+    return;
+  }
   statusMessage.value = "Starting experimental browser engine…";
   attachSource(
     createBrowserEngineSource({
@@ -513,6 +548,9 @@ const phaseBadge = computed(() => {
     <div class="yagoo-analysis-app__board">
       <ReviewerLayout
         :sgf="sgfText"
+        :position-source="positionSource"
+        @variation-analysis="stop"
+        @variation-change="variationActive = $event"
         :winrate-data="series"
         :heat-map="heatMap.length ? heatMap : emptyHeat"
         :paint-map="paintMap"

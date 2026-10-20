@@ -103,6 +103,40 @@ pub async fn analyze(
     Ok(())
 }
 
+/// A tried position uses the same full-history request as the native endpoint.
+#[wasm_bindgen]
+pub async fn analyze_position(
+    request_json: String,
+    postprocess_json: String,
+    search_options_json: String,
+    evaluator: js_sys::Function,
+    emit: js_sys::Function,
+    on_root: js_sys::Function,
+) -> Result<(), JsValue> {
+    let request =
+        serde_json::from_str(&request_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let postprocess =
+        serde_json::from_str(&postprocess_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let options = serde_json::from_str(&search_options_json)
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    #[allow(clippy::arc_with_non_send_sync)]
+    let engine = Arc::new(SearchEngine {
+        evaluator: WebEvaluator {
+            callback: evaluator,
+            on_root,
+        },
+        postprocess,
+        options,
+    });
+    let mut stream = yagoo_pipeline::analyze_position(request, engine, 8);
+    while let Some(event) = stream.next().await {
+        let json = serde_json::to_string(&event.map_err(|e| JsValue::from_str(&e.to_string()))?)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        emit.call1(&JsValue::NULL, &JsValue::from_str(&json))?;
+    }
+    Ok(())
+}
+
 #[wasm_bindgen]
 pub fn default_config() -> Result<String, JsValue> {
     let mut config = yagoo_pipeline::PipelineConfig {

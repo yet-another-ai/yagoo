@@ -13,6 +13,7 @@ export type { KeyMoveRow } from "./reviewer/keyMoves";
 export { keyMovesFromState } from "./reviewer/keyMoves";
 
 export { useGame } from "./composables/useGame";
+export type { GamePosition } from "./composables/gamePosition";
 export type {
   GameChildInfo,
   GamePlayerInfo,
@@ -95,6 +96,8 @@ export type {
   PipelineEvent,
   PlyAnalysis,
   PositionSnapshot,
+  PositionAnalysisRequest,
+  PositionSourceFactory,
   ReviewSeriesPoint,
   StreamStatus,
 } from "./analysis";

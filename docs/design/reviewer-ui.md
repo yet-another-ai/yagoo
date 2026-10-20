@@ -48,7 +48,7 @@ Keyboard: Left / Right move through the game, or through the try branch when one
 | `StubPane` | `reviewer/StubPane.vue` | Empty state labelled with an issue |
 | Contracts | `analysis/modules.ts` | Types the pipeline will emit |
 | Key moves | `reviewer/keyMoves.ts` | Reads `deepPlies` / `deepReasons` / candidate `order` |
-| Try branch | `reviewer/tryBranch.ts` | Local stones only, via `@sabaki/go-board` |
+| Try branch | `reviewer/tryBranch.ts` | Replayed anchor history, legal moves, and node ancestry |
 
 `useAnalysisStream` still reduces NDJSON into `AnalysisState`. Per-ply `ledger`, `comparison`, `sacrifices`, and `commentary`, plus `opening` and `report` on the state, stay `null` until a future event fills them.
 
@@ -61,9 +61,9 @@ Keyboard: Left / Right move through the game, or through the try branch when one
 - Ownership paint and group (块) outlines / list. Chains (串) are not drawn as groups.
 - Bottom bar: players, captures, previous / next move.
 - Key-move previous / next, from `deepPliesSelected` only.
-- Try mode: click an empty point to grow a local branch and walk it in the tree. The bottom bar's side to move and capture counts follow that branch. Analysis overlays hide off the main line. No engine call.
+- Try mode: click an empty point or Pass to grow a branch and walk its tree. Side to move and captures follow the selected node. A staged browser model or connected native source analyzes just that position; candidates, PV and ownership come from its snapshot. Stop, retry, navigation and new SGFs cancel stale requests.
 - Report view: lists those same key moves and the deltas already on `deepReasons`, across the full width of the page.
-- Engine menu: NDJSON is the default. The browser engine stays disabled until a local bundle (or a configured manifest URL) is staged, then **Use browser engine** runs it. Live native stays disabled.
+- Engine menu: NDJSON is the default. The browser engine stays disabled until a local bundle (or a configured manifest URL) is staged, then **Use browser engine** runs it. Live native connects to the local `yagoo analyze --serve` endpoint.
 
 ## Stubs and the issue that fills them
 
@@ -74,9 +74,7 @@ Keyboard: Left / Right move through the game, or through the try branch when one
 | Ledger | `PlyAnalysis.ledger == null` | [#23](https://github.com/yet-another-ai/yagoo/issues/23) |
 | Sacrifice (弃子) | `PlyAnalysis.sacrifices == null` | [#25](https://github.com/yet-another-ai/yagoo/issues/25) |
 | Notes | `PlyAnalysis.commentary == null` | [#28](https://github.com/yet-another-ai/yagoo/issues/28) |
-| Try-mode AI suggestions | Always, for now. Local moves still work. | [#26](https://github.com/yet-another-ai/yagoo/issues/26) |
 | Report prose and export | `AnalysisState.report == null` | [#29](https://github.com/yet-another-ai/yagoo/issues/29) |
-| Live native connect | `isLiveNativeAvailable()` is false | [#19](https://github.com/yet-another-ai/yagoo/issues/19) |
 | Live catalog download, cancel, OPFS clear | Package harness only (`packages/browser-engine`). The published panel loads local files and does not host weights. | [#22](https://github.com/yet-another-ai/yagoo/pull/22) |
 
 An empty array is different from `null` where the type allows it. `sacrifices: []` means the pipeline looked and found none. `null` means it has not spoken.
@@ -93,14 +91,14 @@ Defined in `packages/ui/src/analysis/modules.ts` and stored on `PlyAnalysis` / `
 - **Opening (#27).** `OpeningMatch`: `name`, `joseki`, `deviationPly`, `source`. The matcher owns licensing; the badge only displays `source`.
 - **Notes (#28).** `LlmCommentary`: `text`, `citedFactIds`, `provider`, `verified`. The checkbox stays disabled. Nothing is sent to a model.
 - **Report (#29).** `ReviewReportDocument`: `markdown`, `moves[]` of the structured pieces above. The view already lists key moves from `deepPlies` so the shell is usable before the document exists. Export stays disabled.
-- **Try (#26).** No analysis type yet. `tryBranch.ts` only replays stones. A future source can attach the same `PlyAnalysis` fields to a variation id.
+- **Try (#26).** `PositionAnalysisRequest` contains the SGF ancestry, anchor `ply`, GTP `moves` including pass, and an optional visit budget. `useVariationAnalysis` keeps `AnalysisState` per variation node, separate from the main-line graph. The shared root-only pipeline emits one `positionCompleted` snapshot. See [live variations](../pipeline/live-variations).
 
 ## Engine and model island
 
 `EngineSourcePanel` is the one selector:
 
 1. **NDJSON** — SGF and event file, same as drop on the board.
-2. **Live native** — button disabled, points at `yagoo analyze --serve` (#19).
+2. **Live native** connects to the configured local `yagoo analyze --serve` endpoint.
 3. **Browser engine** — experimental. `[data-slot="model-island"]` is the empty state: this site does not host weights, **Load local model**, and the single-thread hint beside **Enable threads**. **Use browser engine** stays disabled until a bundle is verified. Recorded analysis stays on the board until that button runs `BrowserEngineAdapter`.
 
 The package page (`packages/browser-engine/index.html`) remains the local harness: catalog, size, **Load model**, cancel, OPFS clear, and local files, in `#model-island`. It does not fetch a manifest on startup. The published site does not copy that page. Its element ids (`#load`, `#manifest`, `#model-select`, `#cancel-download`, `#scan`, `#status`, …) stay on the harness.

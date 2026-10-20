@@ -3,6 +3,7 @@ import type {
   AnalysisEventSource,
   AnalysisSourceHandle,
   AnalysisSourceHandlers,
+  PositionAnalysisRequest,
 } from "./types";
 
 export interface BrowserEngineSourceOptions {
@@ -12,11 +13,13 @@ export interface BrowserEngineSourceOptions {
   sgf?: string;
   id?: string;
   label?: string;
+  position?: Omit<PositionAnalysisRequest, "sgf">;
 }
 
 /** In-browser engine that yields the same NDJSON lines as `yagoo analyze`. */
 export interface BrowserEngineAdapter {
   analyzeSgf(sgf: string): AsyncIterable<string> | ReadableStream<string>;
+  analyzePosition?: (request: PositionAnalysisRequest) => AsyncIterable<string> | ReadableStream<string>;
   stop?: () => void;
 }
 
@@ -43,17 +46,23 @@ export function createBrowserEngineSource(
       }
 
       let stopped = false;
+      let reader: ReadableStreamDefaultReader<string> | undefined;
       void (async () => {
         try {
-          const stream = engine.analyzeSgf(options.sgf ?? "");
-          if (Symbol.asyncIterator in stream) {
+          if (options.position && !engine.analyzePosition) {
+            throw new Error("This browser engine does not support single-position analysis.");
+          }
+          const stream = options.position
+            ? engine.analyzePosition!({ sgf: options.sgf ?? "", ...options.position })
+            : engine.analyzeSgf(options.sgf ?? "");
+          if (!("getReader" in stream)) {
             for await (const line of stream as AsyncIterable<string>) {
               if (stopped) return;
               const event = parsePipelineEventLine(line);
               if (event) handlers.onEvent(event);
             }
           } else {
-            const reader = stream.getReader();
+            reader = stream.getReader();
             try {
               for (;;) {
                 const next = await reader.read();
@@ -63,6 +72,7 @@ export function createBrowserEngineSource(
               }
             } finally {
               reader.releaseLock();
+              reader = undefined;
             }
           }
           if (!stopped) handlers.onDone?.();
@@ -78,6 +88,7 @@ export function createBrowserEngineSource(
       return {
         stop() {
           stopped = true;
+          void reader?.cancel().catch(() => {});
           engine.stop?.();
         },
       };

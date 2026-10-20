@@ -7,12 +7,17 @@
 mod config;
 mod engine;
 mod error;
+mod interactive;
 mod run;
 mod select;
 
 pub use config::{PipelineConfig, PipelineStrategy};
 pub use engine::{AnalysisEngine, UpdateCallback};
 pub use error::{PipelineError, PipelineResult};
+pub use interactive::{
+    analyze_position, complete_position, prepare_position, InteractivePositionRequest,
+    PreparedPosition,
+};
 pub use run::{analyze_game, analyze_game_collected};
 pub use select::{select_deep_plies, DeepPlyReason, DeepSelectConfig};
 

@@ -1,0 +1,173 @@
+{
+  "preparedAt": "2026-10-20T17:53:58.189Z",
+  "archive": "https://homepages.cwi.nl/~aeb/go/games/",
+  "archiveRightsStatement": "The archive states that its games are in the public domain and the collector claims no rights on the collection.",
+  "scope": "Research-only source records and candidate selection. No position has been labelled an expert-confirmed positive sacrifice.",
+  "candidateReferences": [
+    {
+      "url": "https://www.inaf-go.org/2021/09/new-lectures-by-michael-redmond-9p-and-tsuruyama-atsushi-8p-sponsored-by-inaf/",
+      "kind": "Primary lecture sponsor announcement",
+      "relevance": "INAF identifies a Nihon Kiin lecture by Michael Redmond 9p about sacrifice in a Dosaku–Yasui Santetsu game. This verifies the topic and players, not the precise move numbers.",
+      "video": "https://www.youtube.com/watch?v=C-nS2xpqfQ4"
+    },
+    {
+      "url": "https://gomagic.org/dosaku-the-go-saint/",
+      "kind": "Secondary candidate-selection lead, not positive ground truth",
+      "relevance": "Connects the lecture to 1669-09-16 and also discusses sacrifice in the 1668-07-10 Chitetsu game. Exact positions still require replay and independent evidence."
+    },
+    {
+      "url": "https://raw.githubusercontent.com/lightvector/KataGo/master/docs/Analysis_Engine.md",
+      "kind": "Primary engine protocol documentation",
+      "relevance": "Root and move ownership are predictions. Therefore an ownership flip alone does not establish sacrifice intent, and a healthy-root requirement can miss an already-foreseen sacrifice."
+    }
+  ],
+  "records": [
+    {
+      "originalFile": "shusaku-gennan-1846.original.sgf",
+      "originalSha256": "9fb4f8827f3cf9ffc00fa3c8aacf928f3f424343ad4497a0615fddf2d37b53f7",
+      "originalBytes": 2096,
+      "sourceUrl": "https://homepages.cwi.nl/~aeb/go/games/games/Shusaku/126.sgf",
+      "moveCount": 325,
+      "sourceMetadata": {
+        "PB": [
+          "Yasuda Shusaku"
+        ],
+        "BR": [
+          "4d"
+        ],
+        "PW": [
+          "Inoue Gennan Inseki"
+        ],
+        "WR": [
+          "8d"
+        ],
+        "RE": [
+          "B+2"
+        ],
+        "JD": [
+          "Koka 3-7-21,24,25"
+        ],
+        "DT": [
+          "1846-09-11,14,15"
+        ]
+      },
+      "analysisFile": "shusaku-gennan-1846.chinese.sgf",
+      "analysisSha256": "d0cf7a9068760c8d41bee3d34eec6c0a3076ee749334dc004821b52bdadd9365",
+      "changesForAnalysis": "Preserve exact mainline move order, colors and coordinates; make SZ[19], KM[0] and RU[Chinese] explicit. These are chosen analysis settings consistent with the existing corpus, not a claim about historical rules. No commentary or variations added."
+    },
+    {
+      "originalFile": "akaboshi-jowa-1835.original.sgf",
+      "originalSha256": "895dc266d079c422ecb4e7c6008528e73661d2dec97ab8abe3694bf736af8ad8",
+      "originalBytes": 1753,
+      "sourceUrl": "https://homepages.cwi.nl/~aeb/go/games/games/ancient/Honinbo_Jowa/276.sgf",
+      "moveCount": 246,
+      "sourceMetadata": {
+        "EV": [
+          "Blood-vomiting game"
+        ],
+        "PB": [
+          "Akaboshi Intetsu"
+        ],
+        "BR": [
+          "7d"
+        ],
+        "PW": [
+          "Honinbo Jowa"
+        ],
+        "WR": [
+          "Meijin"
+        ],
+        "KM": [
+          "0"
+        ],
+        "RE": [
+          "W+R"
+        ],
+        "DT": [
+          "1835-08-13,15,18,21"
+        ],
+        "JD": [
+          "Tenpō 6-7-19,21,24,27"
+        ],
+        "PC": [
+          "Home of Lord Matsudaira of Suo"
+        ],
+        "GC": [
+          "Last move played: day 1: 59, day 2: 99, day 3: 172, day 4: 246"
+        ]
+      },
+      "analysisFile": "akaboshi-jowa-1835.chinese.sgf",
+      "analysisSha256": "3f9e0541387225ddb4dfdef0c58ffc6b7a36553e94c7e6bdb64230ef9537ee89",
+      "changesForAnalysis": "Preserve exact mainline move order, colors and coordinates; make SZ[19], KM[0] and RU[Chinese] explicit. These are chosen analysis settings consistent with the existing corpus, not a claim about historical rules. No commentary or variations added."
+    },
+    {
+      "originalFile": "dosaku-santetsu-1669.original.sgf",
+      "originalSha256": "2efb4176249ac53919f9a62768670f41a55b43b870faecb3e5d54f3ea89292e2",
+      "originalBytes": 1086,
+      "sourceUrl": "https://homepages.cwi.nl/~aeb/go/games/games/Dosaku/047.sgf",
+      "moveCount": 155,
+      "sourceMetadata": {
+        "PB": [
+          "Honinbo Dosaku"
+        ],
+        "PW": [
+          "Yasui Santetsu II"
+        ],
+        "WR": [
+          "7p"
+        ],
+        "KM": [
+          "0"
+        ],
+        "RE": [
+          "B+10"
+        ],
+        "DT": [
+          "1669-09-16"
+        ],
+        "JD": [
+          "Kanbun 9-8-21"
+        ],
+        "PC": [
+          "Residence of War Minister Masuyama"
+        ]
+      },
+      "analysisFile": "dosaku-santetsu-1669.chinese.sgf",
+      "analysisSha256": "31daac2d86683f9eb089e884851eb024afcbba619f21605b3f971fc3032a5217",
+      "changesForAnalysis": "Preserve exact mainline move order, colors and coordinates; make SZ[19], KM[0] and RU[Chinese] explicit. These are chosen analysis settings consistent with the existing corpus, not a claim about historical rules. No commentary or variations added."
+    },
+    {
+      "originalFile": "chitetsu-dosaku-1668.original.sgf",
+      "originalSha256": "0a91c6fd6a8d43a047e3001ce23e68f4711f90a8cf7b1092313e8b571dd3ac37",
+      "originalBytes": 1395,
+      "sourceUrl": "https://homepages.cwi.nl/~aeb/go/games/games/Dosaku/024.sgf",
+      "moveCount": 204,
+      "sourceMetadata": {
+        "PB": [
+          "Yasui Chitetsu"
+        ],
+        "PW": [
+          "Honinbo Dosaku"
+        ],
+        "KM": [
+          "0"
+        ],
+        "RE": [
+          "W+2"
+        ],
+        "DT": [
+          "1668-07-10"
+        ],
+        "JD": [
+          "Kanbun 8-6-2"
+        ],
+        "GC": [
+          "Other sources interchange PB and PW and have result B+10"
+        ]
+      },
+      "analysisFile": "chitetsu-dosaku-1668.chinese.sgf",
+      "analysisSha256": "974b406100ad5e1f5ec834ff05d10d28f80919d5bfef9d3126fdf936f0a5e808",
+      "changesForAnalysis": "Preserve exact mainline move order, colors and coordinates; make SZ[19], KM[0] and RU[Chinese] explicit. These are chosen analysis settings consistent with the existing corpus, not a claim about historical rules. No commentary or variations added."
+    }
+  ]
+}

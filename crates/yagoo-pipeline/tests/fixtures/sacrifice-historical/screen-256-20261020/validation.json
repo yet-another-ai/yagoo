@@ -1,0 +1,124 @@
+{
+  "valid": true,
+  "engineShutdownConfirmed": true,
+  "queries": 3,
+  "finalResponses": 3,
+  "warningEnvelopes": 0,
+  "sourceCount": 1,
+  "cases": [
+    {
+      "id": "chitetsu1668-p131",
+      "actualMove": "J6",
+      "preferredMove": "J6",
+      "preferredVisits": 254,
+      "rootScoreBlack": -2.57855383,
+      "preferredScoreBlack": -2.59639044,
+      "preferredWinrateBlack": 0.29674898,
+      "endpointScoreBlack": -7.58216519,
+      "endpointWinrateBlack": 0.13700212,
+      "pv": [
+        "J6",
+        "F7",
+        "G7",
+        "G8",
+        "M7",
+        "G3",
+        "G2",
+        "F2",
+        "H2",
+        "N7",
+        "N8",
+        "O7",
+        "L7",
+        "O6",
+        "O3"
+      ],
+      "pvVisits": [
+        254,
+        252,
+        62,
+        52,
+        50,
+        47,
+        44,
+        42,
+        19,
+        18,
+        6,
+        5,
+        3,
+        2,
+        1
+      ],
+      "capturedRootGroups": [
+        {
+          "stones": [
+            "F8",
+            "G8",
+            "G7"
+          ],
+          "rootMean": -0.9834546666666667,
+          "preferredMean": -0.9834996666666665,
+          "endpointMean": -0.9968136666666667,
+          "captured": [
+            {
+              "point": "F8",
+              "pvPly": 2,
+              "capturingMove": "F7",
+              "rootOwn": -0.983138,
+              "preferredOwn": -0.983155,
+              "endpointOwn": -0.995431
+            },
+            {
+              "point": "G8",
+              "pvPly": 2,
+              "capturingMove": "F7",
+              "rootOwn": -0.984685,
+              "preferredOwn": -0.984765,
+              "endpointOwn": -0.998498
+            },
+            {
+              "point": "G7",
+              "pvPly": 2,
+              "capturingMove": "F7",
+              "rootOwn": -0.982541,
+              "preferredOwn": -0.982579,
+              "endpointOwn": -0.996512
+            }
+          ],
+          "minimumPvVisitsThroughCapture": 252,
+          "alternatives": [
+            {
+              "move": "N1",
+              "order": 1,
+              "visits": 1,
+              "ownMean": -0.9559946666666667,
+              "pv": [
+                "N1"
+              ],
+              "pvVisits": [
+                1
+              ],
+              "retainedThroughCaptureHorizon": null,
+              "preferredMinusAlternativeScoreMover": 2.84967356,
+              "preferredMinusAlternativeWinrateMover": 0.113585255,
+              "elsewhereOwnershipDeltaSum": 2.5110849999999947,
+              "sacrificedGroupOwnershipCost": 0.08251499999999967,
+              "ownershipGateOnlyAtFixedThresholds": false
+            }
+          ]
+        }
+      ],
+      "capturedMoverNewStones": [
+        {
+          "point": "G7",
+          "bornAtPvPly": 3,
+          "capturedAtPvPly": 4,
+          "capturingMove": "G8",
+          "endpointOwn": -0.996512
+        }
+      ],
+      "assessment": "Unlabelled candidate evidence; threshold contrast is not expert ground truth or a confirmed sacrifice."
+    }
+  ]
+}

@@ -167,6 +167,17 @@ still produce false positives despite the guards. Threshold iteration requires
 new recorded evidence and documented review outcomes. This calibration
 acceptance item remains open.
 
+An additional committed `sacrifice-historical` corpus records six historical
+screens at 64 visits, one preregistered 256-visit sensitivity screen, and two
+forced actual-move queries: **23 genuine responses, zero supported positives**.
+It verifies original C17 capture followed by same-color replacement, mixed-group
+rejection, undersampled preferred branches and unstable endpoint values. The
+three-stone F8/G8/G7 capture at Chitetsu–Dosaku move 131 belongs to a mixed
+teaching group; it must not be narrowed silently to manufacture a positive.
+The deeper screen also exceeds both global stability limits. Source licensing,
+full-history queries, model/engine hashes, plans and all raw transcripts are
+preserved alongside model-free CI replay tests.
+
 ## Replaying additional historical screens
 
 The offline example checks completed recording requests against queries made by

@@ -1,0 +1,17 @@
+{
+  "registeredAt": "2026-10-20T23:33:25.7037106Z",
+  "sourceScreen": "screen-64-20261020",
+  "caseId": "chitetsu1668-p131",
+  "visits": 256,
+  "queryKinds": [
+    "root",
+    "pv-end",
+    "pass"
+  ],
+  "rules": "chinese",
+  "komi": 0,
+  "analysisPVLen": 15,
+  "configuration": "same bytes as prior screen analysis.cfg",
+  "reason": "64-visit preferred line physically captures F8/G8/G7 at offset 2, but endpoint winrate falls from 0.351719263 to 0.0878926586 and fails the fixed stability gate. One deeper sensitivity tests search uncertainty.",
+  "interpretation": "Preserve both budgets. Do not change thresholds or PV length. Do not repeat at another budget to manufacture a positive."
+}

@@ -1,0 +1,481 @@
+{
+  "generatedAt": "2026-10-20T23:43:48.866Z",
+  "valid": true,
+  "recordings": [
+    {
+      "directory": "screen-64-20261020",
+      "manifestSha256": "7e6909c1c7b04ac4613567fce68047989ff0b7196ba62ff61cde52128e2bac0c",
+      "startedAt": "2026-10-20T23:25:02.626Z",
+      "finishedAt": "2026-10-20T23:33:21.564Z",
+      "queryCount": 18,
+      "finalResponses": 18,
+      "warningEnvelopes": 0,
+      "processShutdown": {
+        "timestamp": "2026-10-20T23:34:08.4164504Z",
+        "remainingCount": 0,
+        "priorOwnedPid": 17568,
+        "engines": []
+      },
+      "engine": {
+        "path": "C:\\Users\\dsh04\\Documents\\Codex\\2026-10-18\\task\\yagoo-issue5\\.yagoo-data\\native-katago\\katago.exe",
+        "sha256": "bad55cf31ec42f58dec821a2e428c8d45d9e4697f9e2741b8aa644d03a37acfc",
+        "version": "KataGo v1.16.4\r\nGit revision: 4b8de63bea2bd8790db96cd6f8daf86dc87be6f7\r\nCompile Time: Oct 20 2025 09:47:37\r\nUsing Eigen(CPU) backend\r\nCompiled with AVX2 and FMA instructions\r\nCompiled to support contributing to online distributed selfplay"
+      },
+      "model": {
+        "path": "C:\\Users\\dsh04\\Documents\\Codex\\2026-10-18\\task\\yagoo-issue5\\.yagoo-data\\native-katago\\official-swa.bin",
+        "sha256": "46a623a366ef6ef423fa2055f1b094fd8f64c518c065e7d254a9e0829c192c5c"
+      },
+      "rules": "chinese",
+      "komi": 0,
+      "fullHistory": true,
+      "perspective": "BLACK",
+      "cases": [
+        {
+          "id": "jowa1835-p59",
+          "sgf": "akaboshi-jowa-1835.chinese.sgf",
+          "sourceSha256": "3f9e0541387225ddb4dfdef0c58ffc6b7a36553e94c7e6bdb64230ef9537ee89",
+          "actualPly": 59,
+          "rootPly": 58,
+          "actualMove": "J8",
+          "mover": "B",
+          "preferredMove": "O3",
+          "preferredVisits": 15,
+          "pv": [
+            "O3",
+            "K7",
+            "Q9"
+          ],
+          "pvVisits": [
+            15,
+            3,
+            1
+          ],
+          "capturedMoverRootStones": [],
+          "capturedMoverNewStones": [],
+          "rootScoreBlack": 8.01684476,
+          "preferredScoreBlack": 8.24420516,
+          "endpointScoreBlack": 8.41894625,
+          "preferredVsPassScoreMover": 12.468525190000001,
+          "healthyRootCaptureCount": 0,
+          "caveat": "Score/ownership diagnostics are not sacrifice labels. Endpoint search is later-root evidence, not same-root move loss."
+        },
+        {
+          "id": "chitetsu1668-p131",
+          "sgf": "chitetsu-dosaku-1668.chinese.sgf",
+          "sourceSha256": "974b406100ad5e1f5ec834ff05d10d28f80919d5bfef9d3126fdf936f0a5e808",
+          "actualPly": 131,
+          "rootPly": 130,
+          "actualMove": "J6",
+          "mover": "B",
+          "preferredMove": "J6",
+          "preferredVisits": 63,
+          "pv": [
+            "J6",
+            "F7",
+            "M7",
+            "G3",
+            "G2",
+            "F2",
+            "H2",
+            "N7",
+            "M8",
+            "O6",
+            "O3",
+            "G4",
+            "K2",
+            "J12",
+            "J10"
+          ],
+          "pvVisits": [
+            63,
+            62,
+            60,
+            58,
+            55,
+            54,
+            30,
+            25,
+            9,
+            7,
+            6,
+            4,
+            3,
+            2,
+            1
+          ],
+          "capturedMoverRootStones": [
+            {
+              "point": "F8",
+              "pvPly": 2,
+              "capturingMove": "F7",
+              "rootOwn": -0.982752,
+              "preferredOwn": -0.982813,
+              "endpointOwn": -0.987492
+            },
+            {
+              "point": "G8",
+              "pvPly": 2,
+              "capturingMove": "F7",
+              "rootOwn": -0.984192,
+              "preferredOwn": -0.984509,
+              "endpointOwn": -0.988676
+            },
+            {
+              "point": "G7",
+              "pvPly": 2,
+              "capturingMove": "F7",
+              "rootOwn": -0.982475,
+              "preferredOwn": -0.98263,
+              "endpointOwn": -0.987559
+            }
+          ],
+          "capturedMoverNewStones": [],
+          "rootScoreBlack": -1.47667984,
+          "preferredScoreBlack": -1.5310186,
+          "endpointScoreBlack": -3.36786829,
+          "preferredVsPassScoreMover": 39.244307799999994,
+          "healthyRootCaptureCount": 0,
+          "caveat": "Score/ownership diagnostics are not sacrifice labels. Endpoint search is later-root evidence, not same-root move loss."
+        },
+        {
+          "id": "dosaku1669-p113",
+          "sgf": "dosaku-santetsu-1669.chinese.sgf",
+          "sourceSha256": "31daac2d86683f9eb089e884851eb024afcbba619f21605b3f971fc3032a5217",
+          "actualPly": 113,
+          "rootPly": 112,
+          "actualMove": "G8",
+          "mover": "B",
+          "preferredMove": "G8",
+          "preferredVisits": 36,
+          "pv": [
+            "G8",
+            "G9",
+            "F6",
+            "E7",
+            "L10",
+            "J9",
+            "N9",
+            "N10",
+            "M9",
+            "L9"
+          ],
+          "pvVisits": [
+            36,
+            35,
+            34,
+            32,
+            17,
+            8,
+            4,
+            3,
+            2,
+            1
+          ],
+          "capturedMoverRootStones": [],
+          "capturedMoverNewStones": [],
+          "rootScoreBlack": 1.41098798,
+          "preferredScoreBlack": 1.5580615,
+          "endpointScoreBlack": 15.7434695,
+          "preferredVsPassScoreMover": 21.436745000000002,
+          "healthyRootCaptureCount": 0,
+          "caveat": "Score/ownership diagnostics are not sacrifice labels. Endpoint search is later-root evidence, not same-root move loss."
+        },
+        {
+          "id": "dosaku1669-p35",
+          "sgf": "dosaku-santetsu-1669.chinese.sgf",
+          "sourceSha256": "31daac2d86683f9eb089e884851eb024afcbba619f21605b3f971fc3032a5217",
+          "actualPly": 35,
+          "rootPly": 34,
+          "actualMove": "D18",
+          "mover": "B",
+          "preferredMove": "D18",
+          "preferredVisits": 49,
+          "pv": [
+            "D18",
+            "D17",
+            "H16",
+            "D15",
+            "C17",
+            "D3"
+          ],
+          "pvVisits": [
+            49,
+            48,
+            9,
+            4,
+            3,
+            1
+          ],
+          "capturedMoverRootStones": [
+            {
+              "point": "C17",
+              "pvPly": 2,
+              "capturingMove": "D17",
+              "rootOwn": -0.832446,
+              "preferredOwn": -0.85578,
+              "endpointOwn": -0.457453
+            }
+          ],
+          "capturedMoverNewStones": [],
+          "rootScoreBlack": 3.49080281,
+          "preferredScoreBlack": 3.46094956,
+          "endpointScoreBlack": 1.02402809,
+          "preferredVsPassScoreMover": 15.361228559999999,
+          "healthyRootCaptureCount": 0,
+          "caveat": "Score/ownership diagnostics are not sacrifice labels. Endpoint search is later-root evidence, not same-root move loss."
+        },
+        {
+          "id": "dosaku1669-p71",
+          "sgf": "dosaku-santetsu-1669.chinese.sgf",
+          "sourceSha256": "31daac2d86683f9eb089e884851eb024afcbba619f21605b3f971fc3032a5217",
+          "actualPly": 71,
+          "rootPly": 70,
+          "actualMove": "E13",
+          "mover": "B",
+          "preferredMove": "G6",
+          "preferredVisits": 13,
+          "pv": [
+            "G6",
+            "H7",
+            "C8",
+            "Q6",
+            "Q7"
+          ],
+          "pvVisits": [
+            13,
+            5,
+            3,
+            2,
+            1
+          ],
+          "capturedMoverRootStones": [],
+          "capturedMoverNewStones": [],
+          "rootScoreBlack": 9.57480957,
+          "preferredScoreBlack": 10.5479439,
+          "endpointScoreBlack": 10.4977449,
+          "preferredVsPassScoreMover": 14.24516091,
+          "healthyRootCaptureCount": 0,
+          "caveat": "Score/ownership diagnostics are not sacrifice labels. Endpoint search is later-root evidence, not same-root move loss."
+        },
+        {
+          "id": "dosaku1669-p137",
+          "sgf": "dosaku-santetsu-1669.chinese.sgf",
+          "sourceSha256": "31daac2d86683f9eb089e884851eb024afcbba619f21605b3f971fc3032a5217",
+          "actualPly": 137,
+          "rootPly": 136,
+          "actualMove": "M7",
+          "mover": "B",
+          "preferredMove": "M7",
+          "preferredVisits": 61,
+          "pv": [
+            "M7",
+            "N7",
+            "N8",
+            "M7",
+            "N5",
+            "N6",
+            "L5",
+            "M4",
+            "L4",
+            "P8",
+            "K14",
+            "L13",
+            "L14",
+            "M13",
+            "M14"
+          ],
+          "pvVisits": [
+            61,
+            60,
+            58,
+            56,
+            54,
+            49,
+            48,
+            42,
+            41,
+            29,
+            11,
+            5,
+            4,
+            2,
+            1
+          ],
+          "capturedMoverRootStones": [],
+          "capturedMoverNewStones": [
+            {
+              "point": "M7",
+              "bornAtPvPly": 1,
+              "capturedAtPvPly": 2,
+              "capturingMove": "N7",
+              "endpointOwn": -0.98579
+            }
+          ],
+          "rootScoreBlack": 13.7609453,
+          "preferredScoreBlack": 14.1854605,
+          "endpointScoreBlack": 15.5335489,
+          "preferredVsPassScoreMover": 38.9013086,
+          "healthyRootCaptureCount": 0,
+          "caveat": "Score/ownership diagnostics are not sacrifice labels. Endpoint search is later-root evidence, not same-root move loss."
+        }
+      ]
+    },
+    {
+      "directory": "screen-256-20261020",
+      "manifestSha256": "81a0ce26364b42ec9a55fb6b2f7b1b44abbe9f1f9a992589cbb5aa1b2899f5fe",
+      "startedAt": "2026-10-20T23:34:20.373Z",
+      "finishedAt": "2026-10-20T23:39:01.910Z",
+      "queryCount": 3,
+      "finalResponses": 3,
+      "warningEnvelopes": 0,
+      "processShutdown": {
+        "timestamp": "2026-10-20T23:39:31.6445119Z",
+        "remainingCount": 0,
+        "priorOwnedPid": 22388,
+        "engines": []
+      },
+      "engine": {
+        "path": "C:\\Users\\dsh04\\Documents\\Codex\\2026-10-18\\task\\yagoo-issue5\\.yagoo-data\\native-katago\\katago.exe",
+        "sha256": "bad55cf31ec42f58dec821a2e428c8d45d9e4697f9e2741b8aa644d03a37acfc",
+        "version": "KataGo v1.16.4\r\nGit revision: 4b8de63bea2bd8790db96cd6f8daf86dc87be6f7\r\nCompile Time: Oct 20 2025 09:47:37\r\nUsing Eigen(CPU) backend\r\nCompiled with AVX2 and FMA instructions\r\nCompiled to support contributing to online distributed selfplay"
+      },
+      "model": {
+        "path": "C:\\Users\\dsh04\\Documents\\Codex\\2026-10-18\\task\\yagoo-issue5\\.yagoo-data\\native-katago\\official-swa.bin",
+        "sha256": "46a623a366ef6ef423fa2055f1b094fd8f64c518c065e7d254a9e0829c192c5c"
+      },
+      "rules": "chinese",
+      "komi": 0,
+      "fullHistory": true,
+      "perspective": "BLACK",
+      "cases": [
+        {
+          "id": "chitetsu1668-p131",
+          "sgf": "chitetsu-dosaku-1668.chinese.sgf",
+          "sourceSha256": "974b406100ad5e1f5ec834ff05d10d28f80919d5bfef9d3126fdf936f0a5e808",
+          "actualPly": 131,
+          "rootPly": 130,
+          "actualMove": "J6",
+          "mover": "B",
+          "preferredMove": "J6",
+          "preferredVisits": 254,
+          "pv": [
+            "J6",
+            "F7",
+            "G7",
+            "G8",
+            "M7",
+            "G3",
+            "G2",
+            "F2",
+            "H2",
+            "N7",
+            "N8",
+            "O7",
+            "L7",
+            "O6",
+            "O3"
+          ],
+          "pvVisits": [
+            254,
+            252,
+            62,
+            52,
+            50,
+            47,
+            44,
+            42,
+            19,
+            18,
+            6,
+            5,
+            3,
+            2,
+            1
+          ],
+          "capturedMoverRootStones": [
+            {
+              "point": "F8",
+              "pvPly": 2,
+              "capturingMove": "F7",
+              "rootOwn": -0.983138,
+              "preferredOwn": -0.983155,
+              "endpointOwn": -0.995431
+            },
+            {
+              "point": "G8",
+              "pvPly": 2,
+              "capturingMove": "F7",
+              "rootOwn": -0.984685,
+              "preferredOwn": -0.984765,
+              "endpointOwn": -0.998498
+            },
+            {
+              "point": "G7",
+              "pvPly": 2,
+              "capturingMove": "F7",
+              "rootOwn": -0.982541,
+              "preferredOwn": -0.982579,
+              "endpointOwn": -0.996512
+            }
+          ],
+          "capturedMoverNewStones": [
+            {
+              "point": "G7",
+              "bornAtPvPly": 3,
+              "capturedAtPvPly": 4,
+              "capturingMove": "G8",
+              "endpointOwn": -0.996512
+            }
+          ],
+          "rootScoreBlack": -2.57855383,
+          "preferredScoreBlack": -2.59639044,
+          "endpointScoreBlack": -7.58216519,
+          "preferredVsPassScoreMover": 38.42216196,
+          "healthyRootCaptureCount": 0,
+          "caveat": "Score/ownership diagnostics are not sacrifice labels. Endpoint search is later-root evidence, not same-root move loss."
+        }
+      ]
+    },
+    {
+      "directory": "supplement-64-20261020",
+      "manifestSha256": "e43c26a742e2c0025ccf103f2e96a3527a4a6337b913b21c36d7c6e77badd8f5",
+      "startedAt": "2026-10-20T23:39:39.571Z",
+      "finishedAt": "2026-10-20T23:40:35.318Z",
+      "queryCount": 2,
+      "finalResponses": 2,
+      "warningEnvelopes": 0,
+      "processShutdown": {
+        "timestamp": "2026-10-20T23:40:55.6881855Z",
+        "remainingCount": 0,
+        "priorOwnedPid": 30960,
+        "engines": []
+      },
+      "engine": {
+        "path": "C:\\Users\\dsh04\\Documents\\Codex\\2026-10-18\\task\\yagoo-issue5\\.yagoo-data\\native-katago\\katago.exe",
+        "sha256": "bad55cf31ec42f58dec821a2e428c8d45d9e4697f9e2741b8aa644d03a37acfc",
+        "version": "KataGo v1.16.4\r\nGit revision: 4b8de63bea2bd8790db96cd6f8daf86dc87be6f7\r\nCompile Time: Oct 20 2025 09:47:37\r\nUsing Eigen(CPU) backend\r\nCompiled with AVX2 and FMA instructions\r\nCompiled to support contributing to online distributed selfplay"
+      },
+      "model": {
+        "path": "C:\\Users\\dsh04\\Documents\\Codex\\2026-10-18\\task\\yagoo-issue5\\.yagoo-data\\native-katago\\official-swa.bin",
+        "sha256": "46a623a366ef6ef423fa2055f1b094fd8f64c518c065e7d254a9e0829c192c5c"
+      },
+      "rules": "chinese",
+      "komi": 0,
+      "fullHistory": true,
+      "perspective": "BLACK",
+      "cases": [
+        "jowa1835-p59-actual-forced",
+        "dosaku1669-p71-actual-forced"
+      ]
+    }
+  ],
+  "verifierRuntime": {
+    "node": "v22.23.3",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "sourceProvenance": "source-provenance.json",
+  "sensitivityPlan": "sensitivity-plan.json",
+  "positiveCalibration": "Unverified. Legal capture and native provenance do not establish a supported sacrifice or expert intent; use the fixed-default production replay assessment.",
+  "sourceCaveats": "CWI source collector states public domain. Chitetsu/Dosaku source warns that other records reverse player names and disagree about result. Chinese rules, zero komi are explicit analysis settings, not historical reconstruction."
+}

@@ -141,6 +141,13 @@ export interface ComparisonContext {
   preferredPvQueryId: string | null;
   rootCandidates?: CandidateSnapshot[];
   pvLineages?: CandidatePvLineage[];
+  savingProbes?: SavingCandidateProbe[];
+}
+
+export interface SavingCandidateProbe {
+  queryId: string;
+  rootHash: string | null;
+  candidate: CandidateSnapshot;
 }
 
 export interface CandidatePvLineage {
@@ -203,6 +210,9 @@ export interface SacrificeExchange {
 export interface SacrificeEvidence {
   rootQueryId: string;
   referenceQueryId: string;
+  /** Omitted by legacy producers, where the reference was a retained root candidate. */
+  referenceSource?: "root_candidate" | "actual_forced" | "saving_forced";
+  referenceRootHash?: string | null;
   preferredPvQueryId: string;
   rootHash: string | null;
   preferredVisits: number;

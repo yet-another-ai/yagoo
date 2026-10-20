@@ -7,8 +7,14 @@ import type { MoveComparison, SacrificeAnnotation } from "../modules";
 export const constructedSgf = "(;SZ[5]AB[bd][cd]AW[ad][be][ce][cc][dd];B[bc])";
 export function constructedSacrifice(): MoveComparison {
   const board = { size: 5, black: ["B2", "C2"], white: ["A2", "B1", "C1", "C3", "D2"] };
-  const actual = { move: "B3", visits: 64, winrate: .5, scoreLead: 0, pv: ["B3", "E1"] };
-  const preferred = { move: "E5", visits: 64, winrate: .6, scoreLead: 1.4, pv: ["E5", "B3"] };
+  const referenceOwnership: number[] = Array(25).fill(0);
+  const preferredOwnership: number[] = Array(25).fill(0);
+  for (const index of [16, 17]) { referenceOwnership[index] = .9; preferredOwnership[index] = -.9; }
+  for (const index of [0, 1, 2, 3, 5]) preferredOwnership[index] = 1;
+  const actual = { move: "B3", visits: 64, winrate: .5, scoreLead: 0,
+    pv: ["B3", "E1"], ownership: referenceOwnership };
+  const preferred = { move: "E5", visits: 64, winrate: .6, scoreLead: 1.4,
+    pv: ["E5", "B3"], ownership: preferredOwnership };
   const item: SacrificeAnnotation = {
     rootPly: 0, mover: "B", groupId: "B2", stones: ["B2", "C2"], capturedStones: ["B2", "C2"],
     preferredMove: "E5", referenceMove: "B3", ownershipFlip: 1.8,
@@ -30,10 +36,17 @@ export function constructedSacrifice(): MoveComparison {
     winrateLoss: .1, scoreLoss: 1.4, ownershipDelta: Array(25).fill(0), ledgerDiff: null, groupTempo: [],
     context: { rootPly: 0, mover: "B", board,
       groups: [{ groupId: "B2", kind: "simple", members: { blackStones: ["B2", "C2"], whiteStones: [], empty: [] } }],
-      root: { visits: 64 }, passProbe: null, passQueryId: null, actual, preferred,
+      root: { ...preferred }, passProbe: null, passQueryId: null, actual, preferred,
       actualBranch: null, preferredBranch: null,
-      preferredPvEnd: { fromMove: "E5", pv: preferred.pv, analysis: { visits: 64 } },
-      preferredPvQueryId: "constructed-pv" },
+      preferredPvEnd: { fromMove: "E5", pv: [...preferred.pv], analysis: { ...preferred } },
+      preferredPvQueryId: "constructed-pv", rootCandidates: [preferred, actual],
+      pvLineages: [
+        { rootPly: 0, move: "E5", pv: [...preferred.pv],
+          board: { size: 5, black: ["E5"], white: [...board.white, "B3"] },
+          captures: [{ color: "B", stone: "B2", plyOffset: 2 }, { color: "B", stone: "C2", plyOffset: 2 }] },
+        { rootPly: 0, move: "B3", pv: [...actual.pv],
+          board: { size: 5, black: [...board.black, "B3"], white: [...board.white, "E1"] }, captures: [] },
+      ] },
     evidence: { rootQueryId: "constructed-root", actualQueryId: "constructed-root", actualSource: "root_candidate",
       requestedVisits: 64, minimumCandidateVisits: 16, rootVisits: 64, actualVisits: 64, aiVisits: 64,
       rootHash: "constructed", actualRootHash: "constructed", limitations: ["Constructed test, not engine evidence."] },

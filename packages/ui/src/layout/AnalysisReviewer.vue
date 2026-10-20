@@ -71,6 +71,7 @@ const sourceOpen = ref(false);
 const nativeUrl = ref("http://127.0.0.1:8710/analyze");
 const activeNative = ref(false);
 const statusMessage = ref("");
+const stoppedByUser = ref(false);
 const selectedCandidate = ref(0);
 const currentPly = ref(0);
 /** Hover / panel preview index (cleared on leave unless touch-pinned). */
@@ -87,12 +88,24 @@ const {
   series,
   sourceLabel,
   isStreaming,
-  reset,
+  reset: resetStream,
   attachSource,
   stop,
   overlaysFor,
   commentFor,
 } = useAnalysisStream();
+
+function reset() {
+  stoppedByUser.value = false;
+  statusMessage.value = "";
+  resetStream();
+}
+
+function stopAnalysis() {
+  stop();
+  stoppedByUser.value = true;
+  statusMessage.value = "Analysis stopped.";
+}
 
 const emptyHeat = computed<BoardMap<HeatVertex | null>>(() => []);
 const heatMap = ref<BoardMap<HeatVertex | null>>([]);
@@ -404,6 +417,7 @@ function onVertexClick(evt: MouseEvent, vertex: Vertex) {
 const phaseBadge = computed(() => {
   const s = state.value;
   if (s.status === "error") return `error: ${s.lastError ?? "?"}`;
+  if (stoppedByUser.value) return `stopped · ${s.eventCount} events`;
   if (s.currentPhase) {
     return `${s.currentPhase} @ ply ${s.activePly ?? "—"} (${s.eventCount} events)`;
   }
@@ -438,7 +452,7 @@ const phaseBadge = computed(() => {
           type="button"
           class="yagoo-analysis-app__btn"
           data-testid="stop-analysis"
-          @click="stop"
+          @click="stopAnalysis"
         >Stop analysis</button>
         <label class="yagoo-analysis-app__btn">
           Open SGF

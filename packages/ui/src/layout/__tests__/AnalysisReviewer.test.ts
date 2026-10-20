@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import fixtureText from "../../analysis/__fixtures__/sample-scan-deep.ndjson?raw";
 import sampleSgf from "../../analysis/__fixtures__/sample.sgf?raw";
+import type { PipelineEvent } from "../../analysis/types";
 import AnalysisReviewer from "../AnalysisReviewer.vue";
 
 async function drainProgressiveBatches(rounds = 350) {
@@ -37,10 +38,25 @@ describe("AnalysisReviewer", () => {
   // Progressive NDJSON (~400+ events @ 4/frame) needs headroom under CI load.
   const timeout = 45_000;
 
-  it("posts the loaded SGF to the configured local endpoint and cancels on Stop", async () => {
+  it.each([false, true])("posts the loaded SGF and shows Stop correctly (received events: %s)", async (receivedEvents) => {
     const cancel = vi.fn();
-    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(
-      new ReadableStream({ cancel }),
+    const events: PipelineEvent[] = [
+      { type: "gameStarted", v: 1, size: 9, komi: 7.5, moveCount: 1, positionCount: 2, strategy: "scan_then_deep" },
+      { type: "phaseStarted", v: 1, phase: "scan", visits: 200 },
+      { type: "positionStarted", v: 1, ply: 0, toPlay: "B", phase: "scan" },
+      { type: "stagePartial", v: 1, ply: 0, phase: "scan", stage: "root", root: { visits: 25, winrate: 0.6 } },
+    ];
+    const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async () => new Response(
+      new ReadableStream({
+        start(controller) {
+          if (receivedEvents) {
+            controller.enqueue(new TextEncoder().encode(
+              events.map(event => `data: ${JSON.stringify(event)}\n\n`).join(""),
+            ));
+          }
+        },
+        cancel,
+      }),
       { headers: { "content-type": "text/event-stream" } },
     ));
     vi.stubGlobal("fetch", fetch);
@@ -53,11 +69,33 @@ describe("AnalysisReviewer", () => {
       await flushPromises();
       expect(fetch.mock.calls[0]![0]).toBe("http://127.0.0.1:9000/analyze");
       expect(JSON.parse(fetch.mock.calls[0]![1]!.body as string)).toEqual({ sgf });
+      if (receivedEvents) {
+        expect(wrapper.get(".yagoo-analysis-app__meta").text()).toContain("scan @ ply 0");
+      }
       await wrapper.get('[data-testid="stop-analysis"]').trigger("click");
       await flushPromises();
       expect(fetch.mock.calls[0]![1]!.signal?.aborted).toBe(true);
       expect(cancel).toHaveBeenCalledOnce();
       expect(wrapper.find('[data-testid="stop-analysis"]').exists()).toBe(false);
+      expect(wrapper.get(".yagoo-analysis-app__status").text()).toBe("Analysis stopped.");
+      expect(wrapper.get(".yagoo-analysis-app__meta").text()).toContain(`stopped · ${receivedEvents ? 4 : 0} events`);
+      expect(wrapper.get(".yagoo-analysis-app__meta").text()).not.toContain("scan @ ply");
+      expect(wrapper.text()).not.toContain("Connecting");
+      if (receivedEvents) {
+        expect(wrapper.findComponent({ name: "ReviewerLayout" }).props("rootAnalysis"))
+          .toEqual({ visits: 25, winrate: 0.6 });
+      }
+
+      // Starting another source clears the explicit Stop display state.
+      await wrapper.get('[data-source="live-native"] button').trigger("click");
+      await flushPromises();
+      expect(wrapper.text()).not.toContain("stopped");
+      expect(wrapper.find('[data-testid="stop-analysis"]').exists()).toBe(true);
+      await wrapper.get('[data-testid="stop-analysis"]').trigger("click");
+      // Loading a new game must not label an internal reset as a user Stop.
+      await wrapper.setProps({ initialSgf: "(;SZ[9];B[dd])" });
+      expect(wrapper.get(".yagoo-analysis-app__meta").text()).toContain("idle");
+      expect(wrapper.text()).not.toContain("stopped");
     } finally {
       wrapper.unmount();
       vi.unstubAllGlobals();

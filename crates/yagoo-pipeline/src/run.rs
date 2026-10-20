@@ -186,6 +186,17 @@ async fn drive<E: AnalysisEngine>(
         }
     }
 
+    send(
+        &tx,
+        PipelineEvent::ReportCompleted {
+            v: SCHEMA_VERSION,
+            report: Box::new(yagoo_snapshot::summarize_review(
+                u32::try_from(record.moves.len()).unwrap_or(u32::MAX),
+                snapshots.values(),
+            )),
+        },
+    )?;
+
     let game = if config.emit_game_aggregate {
         Some(Box::new(GameSnapshot {
             schema_version: SCHEMA_VERSION,

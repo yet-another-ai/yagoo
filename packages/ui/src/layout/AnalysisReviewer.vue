@@ -24,6 +24,7 @@ import type { InspectorPerspective } from "../reviewer/MoveInspector.vue";
 import OpeningBadge from "../reviewer/OpeningBadge.vue";
 import { buildCommentaryFacts, resolveCommentary, type CommentaryInput, type CommentaryOrigin, type GroundedCommentary } from "../commentary/facts";
 import type { CommentaryProvider } from "../commentary/session";
+import { buildReviewReport } from "../report";
 import type {
   BoardMap,
   GhostStone,
@@ -84,13 +85,12 @@ const nativeUrl = ref("http://127.0.0.1:8710/analyze");
 const activeNative = ref(false);
 const variationActive = ref(false);
 const sourceGeneration = ref(0);
-let gameReadGeneration = 0;
-let sourceReadGeneration = 0;
-onBeforeUnmount(() => { gameReadGeneration++; sourceReadGeneration++; });
 const statusMessage = ref("");
 const stoppedByUser = ref(false);
 const selectedCandidate = ref(0);
 const reviewer = ref<InstanceType<typeof ReviewerLayout> | null>(null);
+const chosenSource = ref<"recorded" | "browser" | "native" | null>(null);
+let fileGeneration = 0;
 const currentPly = ref(0);
 /** Hover / panel preview index (cleared on leave unless touch-pinned). */
 const previewCandidate = ref<number | null>(null);
@@ -138,12 +138,6 @@ function stopAnalysis() {
   stoppedByUser.value = true;
   statusMessage.value = "Analysis stopped.";
 }
-
-// Clear the old game before the importer publishes the new file confirmation.
-watch(sgfText, () => {
-  reset();
-  currentPly.value = 0;
-}, { flush: "sync" });
 
 const emptyHeat = computed<BoardMap<HeatVertex | null>>(() => []);
 const heatMap = ref<BoardMap<HeatVertex | null>>([]);
@@ -257,6 +251,9 @@ const analysisComment = computed(() =>
 );
 
 const keyMoves = computed(() => keyMovesFromState(state.value));
+const reviewReport = computed(() => buildReviewReport(state.value, {
+  sgf: sgfText.value, source: sourceLabel.value,
+}));
 const currentPlyAnalysis = computed(
   () => state.value.plies[currentPly.value] ?? null,
 );
@@ -317,12 +314,12 @@ onMounted(() => {
     refreshOverlays();
   }
 });
+onBeforeUnmount(() => { fileGeneration++; });
 
 watch(
   () => props.initialSgf,
   (v) => {
-    gameReadGeneration++;
-    sourceReadGeneration++;
+    fileGeneration++;
     const nextSgf = v ?? "";
     if (nextSgf !== sgfText.value) {
       replaceSgf(nextSgf);
@@ -333,13 +330,20 @@ watch(
   },
 );
 
+watch(sgfText, () => {
+  reset();
+  chosenSource.value = null;
+  currentPly.value = 0;
+}, { flush: "sync" });
+
 function loadNdjsonText(text: string, label: string) {
-  sourceReadGeneration++;
+  fileGeneration++;
   // Cancel the position request before changing adapters or attaching the file.
   // Otherwise a queued source watcher can restart Try and stop the new stream.
   reviewer.value?.leaveVariation();
   activeNative.value = false;
   reset();
+  chosenSource.value = "recorded";
   statusMessage.value = `Loading ${label}…`;
   attachSource(
     createNdjsonTextSource(text, {
@@ -352,18 +356,18 @@ function loadNdjsonText(text: string, label: string) {
 }
 
 async function onSgfFile(file: File): Promise<boolean> {
-  const generation = ++gameReadGeneration;
+  const generation = ++fileGeneration;
   sourceReadGeneration++;
   const text = await file.text();
-  if (generation !== gameReadGeneration || !replaceSgf(text)) return false;
+  if (generation !== fileGeneration || !replaceSgf(text)) return false;
   statusMessage.value = `Loaded SGF ${file.name} (rules: ${resolveSgfRules(text)})`;
   return true;
 }
 
 async function onNdjsonFile(file: File) {
-  const generation = ++sourceReadGeneration;
+  const generation = ++fileGeneration;
   const text = await file.text();
-  if (generation !== sourceReadGeneration) return;
+  if (generation !== fileGeneration) return;
   loadNdjsonText(text, file.name);
 }
 
@@ -381,22 +385,26 @@ async function onDrop(ev: DragEvent) {
   dragOver.value = false;
   const files = ev.dataTransfer?.files;
   if (!files?.length) return;
-  const picked = Array.from(files);
-  const game = picked.find((file) => /\.sgf(?:\.txt)?$/i.test(file.name));
-  const analysis = picked.find((file) => /\.(ndjson|jsonl|json)$/i.test(file.name));
-  // Load paired files in order so the SGF reset cannot erase its analysis.
-  if (game) {
-    const generation = gameReadGeneration + 1;
-    const accepted = await onSgfFile(game);
-    if (!accepted || generation !== gameReadGeneration) return;
+  const dropped = Array.from(files);
+  const sgfFile = dropped.find((f) => /\.sgf(?:\.txt)?$/i.test(f.name));
+  const analysisFile = dropped.find((f) => /\.(ndjson|jsonl|json)$/i.test(f.name));
+  if (!sgfFile && !analysisFile) return;
+  const generation = ++fileGeneration;
+  const [sgfContents, analysisContents] = await Promise.all([
+    sgfFile?.text(), analysisFile?.text(),
+  ]);
+  if (generation !== fileGeneration) return;
+  if (sgfContents !== undefined) {
+    if (!replaceSgf(sgfContents)) return;
   }
-  if (analysis) await onNdjsonFile(analysis);
+  if (analysisContents !== undefined) loadNdjsonText(analysisContents, analysisFile!.name);
 }
 
-function tryLiveNative(url: string) {
+function tryLiveNative(url = nativeUrl.value) {
   if (!hasAcceptedSgf.value) return;
-  sourceReadGeneration++;
+  fileGeneration++;
   sourceGeneration.value++;
+  chosenSource.value = "native";
   nativeUrl.value = url;
   activeNative.value = true;
   if (variationActive.value) {
@@ -415,9 +423,10 @@ function tryBrowserEngine() {
       "Load a local model bundle first. Recorded analysis stays on the board.";
     return;
   }
-  sourceReadGeneration++;
   sourceGeneration.value++;
   activeNative.value = false;
+  fileGeneration++;
+  chosenSource.value = "browser";
   if (variationActive.value && props.browserEngine.analyzePosition) {
     statusMessage.value = "Analyzing the selected variation with the browser engine…";
     return;
@@ -431,6 +440,27 @@ function tryBrowserEngine() {
       label: "Browser engine (experimental)",
     }),
   );
+}
+
+function reviewGame() {
+  if (isStreaming.value || chosenSource.value === "recorded") {
+    reviewer.value?.openReport();
+    return;
+  }
+  if (!sgfText.value.trim()) {
+    statusMessage.value = "Open an SGF before starting a review.";
+    return;
+  }
+  if (chosenSource.value === "native" && liveAvailable) {
+    tryLiveNative();
+  } else if (props.browserEngine && chosenSource.value !== "native") {
+    tryBrowserEngine();
+  } else {
+    sourceOpen.value = true;
+    statusMessage.value = "Choose an available engine or load recorded analysis to review this game.";
+    return;
+  }
+  reviewer.value?.openReport();
 }
 
 function onPlyChange(ply: number) {
@@ -547,6 +577,7 @@ const phaseBadge = computed(() => {
         <span>· {{ phaseBadge }}</span>
       </div>
       <div class="yagoo-analysis-app__controls">
+        <button type="button" class="yagoo-analysis-app__btn" data-testid="review-game" @click="reviewGame">Review</button>
         <button
           v-if="isStreaming"
           type="button"
@@ -648,7 +679,7 @@ const phaseBadge = computed(() => {
         :commentary-input="commentaryInput"
         :commentary-context-key="commentaryContextKey"
         :commentary-provider="commentaryProvider"
-        :report-document="state.report"
+        :report-document="reviewReport"
         :initial-perspective="initialPerspective"
         :vertex-size="vertexSize"
         :show-coordinates="true"
@@ -667,6 +698,7 @@ const phaseBadge = computed(() => {
         @clear-group-preview="clearGroupPreview"
         @select-group="selectGroup"
         @commentary="saveCommentary"
+        @cancel-review="stop"
       />
     </div>
   </div>

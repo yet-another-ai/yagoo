@@ -46,7 +46,8 @@ pub struct DeepPlySelection {
 /// 6. `phase_started` (deep)
 /// 7. per selected ply: root (partials + completed) → pass_probe → optional pv_end* → `position_completed`
 /// 8. `phase_completed` (deep)
-/// 9. `game_completed`
+/// 9. `report_completed` (root-aligned coverage and ranked move references)
+/// 10. `game_completed`
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum PipelineEvent {
@@ -121,6 +122,13 @@ pub enum PipelineEvent {
         v: u32,
         phase: AnalysisPhase,
         snapshot: Box<PositionSnapshot>,
+    },
+    /// Deterministic full-game coverage and ranked played-move references.
+    /// Emitted even when the optional aggregate game snapshot is disabled.
+    #[serde(rename_all = "camelCase")]
+    ReportCompleted {
+        v: u32,
+        report: Box<crate::ReviewSummary>,
     },
     #[serde(rename_all = "camelCase")]
     GameCompleted {

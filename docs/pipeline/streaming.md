@@ -24,7 +24,13 @@ The pipeline is an **async stream** of [`PipelineEvent`](./snapshots.md) values.
    - optional `stageCompleted` (`pvEnd`) × N
    - `positionCompleted` (full snapshot)
 8. `phaseCompleted` (`deep`)
-9. `gameCompleted` (optional embedded `GameSnapshot`)
+9. `reportCompleted` (deterministic coverage and ranked played-move comparison references)
+10. `gameCompleted` (optional embedded `GameSnapshot`)
+
+The [automatic review report](../modules/review-report.md) distinguishes full position
+coverage from played-move comparison coverage. Scan swings are prioritization
+signals, never played-move loss. The compact report event is emitted even when
+the optional aggregate `GameSnapshot` is disabled.
 
 `deep_only` skips steps 2–4; it emits `deepPliesSelected` with `mode: "range"` then deepens every ply in the filter.
 

@@ -16,6 +16,7 @@ mod groups;
 mod ledger;
 mod openings;
 mod pv_lineage;
+mod report;
 mod sacrifice;
 mod schema;
 
@@ -38,6 +39,7 @@ pub use ledger::{
 };
 pub use openings::{match_opening, opening_max_ply};
 pub use pv_lineage::{trace_candidate_pv, CandidatePvLineage, RootStoneCapture};
+pub use report::{summarize_review, ReviewMoveReference, ReviewSummary};
 pub use sacrifice::{
     compute_sacrifices, compute_sacrifices_with_params, SacrificeAnnotation, SacrificeAssessment,
     SacrificeAssessmentStatus, SacrificeCheck, SacrificeEvidence, SacrificeExchange,

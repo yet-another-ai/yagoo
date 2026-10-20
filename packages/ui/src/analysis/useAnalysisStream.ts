@@ -63,7 +63,7 @@ export function useAnalysisStream(): UseAnalysisStreamResult {
     handle?.stop();
     handle = null;
     if (state.value.status === "streaming") {
-      state.value = { ...state.value, status: "idle" };
+      state.value = { ...state.value, status: "idle", activePly: null, currentPhase: null };
     }
   }
 
@@ -96,6 +96,8 @@ export function useAnalysisStream(): UseAnalysisStreamResult {
     if (current === generation) handle = next;
     else next.stop();
   }
+
+  if (getCurrentScope()) onScopeDispose(stop);
 
   const series = computed(() => buildReviewSeries(state.value));
   const deepPlySet = computed(() => new Set(state.value.deepPlies));

@@ -64,8 +64,8 @@ Keyboard: Left / Right move through the game, or through the try branch when one
 - Bottom bar: players, captures, previous / next move.
 - Key-move previous / next, from `deepPliesSelected` only.
 - Try mode: click an empty point or Pass to grow a branch and walk its tree. Side to move and captures follow the selected node. A staged browser model or connected native source analyzes just that position; candidates, PV and ownership come from its snapshot. Stop, retry, navigation and new SGFs cancel stale requests.
-- Report view: lists those same key moves and the deltas already on `deepReasons`, across the full width of the page.
 - Engine menu: NDJSON is the default. The browser engine stays disabled until a local bundle (or a configured manifest URL) is staged, then **Use browser engine** runs it. Live native connects to the local `yagoo analyze --serve` endpoint.
+- Report view: the **Review** action starts a configured engine or opens recorded results. Coverage, ranked root-aligned played-move comparisons, approved explanations, and local Markdown/HTML exports remain available after stopping analysis.
 - Notes: local templates after explicit opt-in, inspectable manual prompt/selection JSON, and an optional injected provider selector. Provider responses can only select and order approved clauses. Group/zone citations highlight their source coordinates.
 
 ## Stubs and the issue that fills them
@@ -91,7 +91,7 @@ Defined in `packages/ui/src/analysis/modules.ts` and stored on `PlyAnalysis` / `
 - **Sacrifice (#25).** `SacrificeAnnotation`: `groupId`, `ownershipFlip` (positive means the mover gives the group away), `compensationPoints`, `exchangedWith`, `pv`.
 - **Opening (#27).** `OpeningMatch`: `name`, `joseki`, `deviationPly`, `source`. The matcher owns licensing; the badge only displays `source`. The loaded SGF's local match takes precedence over NDJSON, so another game's analysis cannot supply its opening. See [matching and limits](../modules/openings.md).
 - **Notes (#28).** `GroundedCommentary` extends `LlmCommentary` with selected sentences and exact evidence values. Notes is off by default; enabling it runs local templates. Sending structured facts through a host-injected provider requires a separate explicit action. No provider or credentials are bundled. See [Explanation generation](../modules/explanation-generation).
-- **Report (#29).** `ReviewReportDocument`: `markdown`, `moves[]` of the structured pieces above. The view already lists key moves from `deepPlies` so the shell is usable before the document exists. Export stays disabled.
+- **Report (#29).** The pipeline emits `reportCompleted` metadata before `gameCompleted`. `ReviewReportDocument` enriches current authoritative comparisons with the approved commentary registry, coverage, overview, supported categories, and grounded review recommendations. Scan leads remain separate from ranked comparisons. See [Automatic game review](../modules/review-report.md).
 - **Try (#26).** `PositionAnalysisRequest` contains the SGF ancestry, anchor `ply`, GTP `moves` including pass, and an optional visit budget. `useVariationAnalysis` keeps `AnalysisState` per variation node, separate from the main-line graph. The shared root-only pipeline emits one `positionCompleted` snapshot. See [live variations](../pipeline/live-variations).
 
 ## Engine and model island

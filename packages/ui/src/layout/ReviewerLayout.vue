@@ -154,6 +154,7 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
+  (e: "cancel-review"): void;
   (e: "ply-change", ply: number): void;
   (e: "select-ply", ply: number): void;
   (e: "vertex-mouseenter", evt: MouseEvent, vertex: Vertex): void;
@@ -812,6 +813,7 @@ function onSplitterKey(event: KeyboardEvent) {
 }
 
 defineExpose({
+  openReport: () => { view.value = "report"; },
   boardSize,
   moveNumber,
   goToPly,
@@ -845,6 +847,7 @@ defineExpose({
       :current-ply="moveNumber"
       @select="onReportSelect"
       @close="view = 'board'"
+      @cancel="emit('cancel-review')"
     />
 
     <template v-else>

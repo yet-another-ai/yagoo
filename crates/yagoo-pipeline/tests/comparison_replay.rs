@@ -228,6 +228,7 @@ async fn pipeline_attaches_comparison_to_played_ply_without_replacing_next_mover
         strategy: PipelineStrategy::DeepOnly,
         from_ply: 60,
         to_ply: Some(60),
+        emit_game_aggregate: false,
         ..config()
     };
     let sgf = std::fs::read_to_string(fixture_dir().join("source.sgf")).unwrap();
@@ -265,9 +266,17 @@ async fn pipeline_attaches_comparison_to_played_ply_without_replacing_next_mover
             .len(),
         59
     );
-    assert!(events
-        .iter()
-        .any(|event| matches!(event, PipelineEvent::GameCompleted { .. })));
+    let PipelineEvent::ReportCompleted { report, .. } = &events[events.len() - 2] else {
+        panic!("report metadata must precede completion");
+    };
+    assert_eq!(report.compared_move_plies, vec![60]);
+    assert_eq!(report.completed_position_plies, vec![60]);
+    assert_eq!(report.ranked_moves[0].root_ply, 59);
+    assert!((report.ranked_moves[0].score_loss - 6.681_626_325).abs() < 1e-9);
+    assert!(matches!(
+        events.last(),
+        Some(PipelineEvent::GameCompleted { game: None, .. })
+    ));
 }
 
 #[tokio::test]

@@ -280,24 +280,7 @@ export interface LlmCommentary {
   verified: boolean;
 }
 
-/** One key move inside an automatic review report (#29). */
-export interface ReviewReportMove {
-  ply: number;
-  move: string | null;
-  comparison: MoveComparison | null;
-  ledger: GainLossLedger | null;
-  sacrifices: SacrificeAnnotation[] | null;
-  commentary: LlmCommentary | null;
-}
-
-/**
- * Exportable automatic review (#29).
- * Stays null on `AnalysisState` until the pipeline emits it.
- */
-export interface ReviewReportDocument {
-  markdown: string | null;
-  moves: ReviewReportMove[];
-}
+export type { ReviewReportDocument, ReviewReportMove } from "../report/types";
 
 /** Issue numbers for the modules this UI reserves a place for. */
 export const REVIEW_MODULE_ISSUES = {

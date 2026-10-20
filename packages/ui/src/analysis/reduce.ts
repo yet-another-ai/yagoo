@@ -63,14 +63,13 @@ export function reducePipelineEvent(
   prev: AnalysisState,
   event: PipelineEvent,
 ): AnalysisState {
-  const state = cloneState(prev);
+  // A new game invalidates all previous comparisons, reports, and async context.
+  const state = event.type === "gameStarted" ? createInitialAnalysisState() : cloneState(prev);
   state.eventCount += 1;
   if (state.status === "idle") state.status = "streaming";
 
   switch (event.type) {
     case "gameStarted": {
-      // A source can deliver another game without rebuilding the composable.
-      Object.assign(state, createInitialAnalysisState(), { eventCount: 1 });
       state.schemaVersion = event.v;
       state.size = event.size;
       state.komi = event.komi;
@@ -164,8 +163,13 @@ export function reducePipelineEvent(
       ply.complete = true;
       break;
     }
+    case "reportCompleted": {
+      state.reportSummary = event.report;
+      break;
+    }
     case "gameCompleted": {
       state.status = "completed";
+      state.pipelineCompleted = true;
       state.activePly = null;
       state.currentPhase = null;
       state.phaseVisits = null;

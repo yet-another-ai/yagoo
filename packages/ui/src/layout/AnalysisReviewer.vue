@@ -79,6 +79,7 @@ onBeforeUnmount(() => { gameReadGeneration++; sourceReadGeneration++; });
 const statusMessage = ref("");
 const stoppedByUser = ref(false);
 const selectedCandidate = ref(0);
+const reviewer = ref<InstanceType<typeof ReviewerLayout> | null>(null);
 const currentPly = ref(0);
 /** Hover / panel preview index (cleared on leave unless touch-pinned). */
 const previewCandidate = ref<number | null>(null);
@@ -274,6 +275,9 @@ watch(
 
 function loadNdjsonText(text: string, label: string) {
   sourceReadGeneration++;
+  // Cancel the position request before changing adapters or attaching the file.
+  // Otherwise a queued source watcher can restart Try and stop the new stream.
+  reviewer.value?.leaveVariation();
   activeNative.value = false;
   reset();
   statusMessage.value = `Loading ${label}…`;
@@ -547,6 +551,7 @@ const phaseBadge = computed(() => {
 
     <div class="yagoo-analysis-app__board">
       <ReviewerLayout
+        ref="reviewer"
         :sgf="sgfText"
         :position-source="positionSource"
         @variation-analysis="stop"

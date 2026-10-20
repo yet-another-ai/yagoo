@@ -606,6 +606,12 @@ function onForward() {
   goForward();
 }
 
+function leaveVariation() {
+  clearTry();
+  tryMode.value = false;
+  if (!onMainLine.value) goToPly(moveNumber.value);
+}
+
 function onSelectPly(ply: number) {
   if (tryMode.value) {
     tryMode.value = false;
@@ -765,6 +771,7 @@ defineExpose({
   effectiveVertexSize,
   tryMode,
   view,
+  leaveVariation,
 });
 </script>
 

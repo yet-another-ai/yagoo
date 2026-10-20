@@ -122,13 +122,21 @@ describe("deterministic review from genuine full-history fixtures", () => {
   });
 
   it("does not import unanchored sacrifice claims and distinguishes transport EOF from pipeline completion", () => {
-    const state = reducePipelineEvents(evidenceEvents());
-    state.plies[60]!.sacrifices = [{
+    const state = reducePipelineEvents(structuredClone(evidenceEvents()));
+    state.plies[60]!.comparison!.sacrificeAssessment = null;
+    Object.assign(state.plies[60]!, { sacrifices: [{
       groupId: "S3", ownershipFlip: 1, compensationPoints: 8, exchangedWith: ["H3"], pv: ["H3"],
-    }];
+    }] }); // Deliberately malformed legacy payload at the import boundary.
     const row = buildReviewReport(state).moves[0]!;
     expect(row.categories).not.toContain("sacrifice_evidence");
     expect(row.missingEvidence).toContain("Sacrifice assessment is unassessed.");
+    Object.assign(state.plies[60]!.comparison!, { sacrificeAssessment: {
+      rootPly: 59, mover: "W", preferredMove: "H3", status: "assessed",
+      annotations: state.plies[60]!.sacrifices,
+    } });
+    const malformedAssessment = buildReviewReport(state).moves[0]!;
+    expect(malformedAssessment.categories).not.toContain("sacrifice_evidence");
+    expect(malformedAssessment.facts.some((fact) => fact.id.includes("/sacrifice-"))).toBe(false);
     const emptyGame = reducePipelineEvents([
       { ...start, moveCount: 0, positionCount: 1 },
       { type: "positionCompleted", v: 1, phase: "scan",

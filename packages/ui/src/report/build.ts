@@ -1,6 +1,6 @@
 import sgf from "@sabaki/sgf";
 import type { AnalysisState, PipelineEvent } from "../analysis/types";
-import type { SacrificeAnnotation } from "../analysis/modules";
+import { alignedSacrificeAssessment } from "../analysis/sacrifices";
 import { reducePipelineEvents } from "../analysis/reduce";
 import { matchSgfOpening } from "../analysis/openings";
 import {
@@ -87,16 +87,10 @@ export function buildReviewReport(
     if (!isReportComparison(row.comparison, reference.ply)) continue;
     // #25's additive assessment owns its root and preferred line. A legacy
     // standalone sacrifices array cannot establish that alignment.
-    const assessment = (row.comparison as typeof row.comparison & {
-      sacrificeAssessment?: {
-        rootPly: number; mover: string; preferredMove: string; status: string;
-        annotations: SacrificeAnnotation[];
-      } | null;
-    }).sacrificeAssessment;
-    const sacrifices = assessment?.status === "assessed" &&
-      assessment.rootPly === reference.rootPly && assessment.mover === reference.mover &&
-      assessment.preferredMove === reference.aiMove && Array.isArray(assessment.annotations)
-      ? assessment.annotations : null;
+    const assessment = alignedSacrificeAssessment(
+      row.comparison, reference.ply, row.comparison.context.board.size,
+    );
+    const sacrifices = assessment?.status === "assessed" ? assessment.annotations : null;
     // The comparison registry resolves p-1 context itself. In particular, do
     // not pass snapshot p's next-mover ledger/groups as reasons for move p.
     const facts = buildCommentaryFacts({

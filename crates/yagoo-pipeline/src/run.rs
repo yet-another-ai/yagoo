@@ -16,9 +16,10 @@ use yagoo_sgf::{
     filter_ply_range, move_to_gtp, parse_sgf, replay_main_line, GameRecord, ReplayedPosition,
 };
 use yagoo_snapshot::{
-    board_from_game, candidates_from_response, chains_from_game, engine_from_response,
-    AnalysisPhase, AnalysisStage, ColorToken, GameSnapshot, OwnershipConvention,
-    PassProbeSkipReason, PipelineEvent, PositionSnapshot, PvEndSnapshot, SCHEMA_VERSION,
+    board_from_game, candidates_from_response, chains_from_game, compute_groups,
+    engine_from_response, AnalysisPhase, AnalysisStage, ColorToken, GameSnapshot,
+    OwnershipConvention, PassProbeSkipReason, PipelineEvent, PositionSnapshot, PvEndSnapshot,
+    SCHEMA_VERSION,
 };
 
 /// Boxed stream of pipeline events.
@@ -390,6 +391,7 @@ async fn analyze_position(
         }
     } else {
         snap.pass_probe_skipped = Some(PassProbeSkipReason::DisabledInPhase);
+        snap.groups.clear();
         send(
             tx,
             PipelineEvent::StageCompleted {
@@ -401,6 +403,11 @@ async fn analyze_position(
                 skipped: Some("disabled_in_phase".into()),
             },
         )?;
+    }
+
+    // Teaching groups (块): deep phase only — needs multi-scenario ownership.
+    if matches!(mode, PhaseMode::Deep) {
+        snap.groups = compute_groups(&snap);
     }
 
     send(

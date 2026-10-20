@@ -6,7 +6,8 @@ Vue 3 board and reviewer UI for Yagoo.
 - **Reviewer chrome** — Sabaki-inspired dark layout (winrate graph, comment box, bottom bar).
 - **Analysis stream** — reducer/store for `yagoo analyze` NDJSON (`scan` → `deepPliesSelected` → `deep`), with NDJSON file / live-native / browser-engine source adapters.
 - **`AnalysisReviewer`** — full reviewer wired to real analysis (ownership heat, candidates/PV, winrate + score lead). Hosted on the VitePress `/app/` page (client-only).
-- **Overlays** — `OverlayRenderer` + `BoardGeometry`; SVG group-outline demo today, WebGPU later.
+- **Groups / 块** — deep-phase pipeline groups (fate clustering) with Sabaki-style outlines and a Groups panel; distinct from rules chains (串).
+- **Overlays** — `OverlayRenderer` + `BoardGeometry`; SVG group outlines today, WebGPU later.
 - **`<yagoo-board>`** — framework-agnostic custom element.
 
 ```ts

@@ -1,8 +1,13 @@
 <script setup lang="ts">
+import {
+  candidateVisibleOnBoard,
+} from "../analysis/display";
 import type { CandidateSnapshot } from "../analysis/types";
 
 const props = defineProps<{
   candidates: CandidateSnapshot[];
+  /** Root visits at this ply — used to dim sub-threshold rows. */
+  rootVisits?: number | null;
   /** Index currently previewing PV (hover / tap). */
   previewIndex?: number | null;
   /** Persistently selected / best highlight. */
@@ -34,6 +39,10 @@ function orderClass(idx: number): string {
   if (order === 2) return "yagoo-candidates__row--doubtful";
   return "yagoo-candidates__row--bad";
 }
+
+function isDimmed(c: CandidateSnapshot): boolean {
+  return !candidateVisibleOnBoard(c, props.rootVisits);
+}
 </script>
 
 <template>
@@ -49,9 +58,11 @@ function orderClass(idx: number): string {
           {
             'yagoo-candidates__row--preview': previewIndex === idx,
             'yagoo-candidates__row--selected': selectedIndex === idx,
+            'yagoo-candidates__row--dim': isDimmed(c),
           },
         ]"
         :data-candidate-index="idx"
+        :data-candidate-dim="isDimmed(c) ? '1' : '0'"
         @mouseenter="emit('preview', idx)"
         @mouseleave="emit('clear-preview')"
         @click="emit('toggle', idx); emit('select', idx)"
@@ -111,6 +122,10 @@ function orderClass(idx: number): string {
 .yagoo-candidates__row--selected {
   outline: 1px solid #0082f0;
   outline-offset: -1px;
+}
+
+.yagoo-candidates__row--dim {
+  opacity: 0.45;
 }
 
 .yagoo-candidates__dot {

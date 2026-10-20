@@ -56,7 +56,7 @@ flowchart TB
 | `yagoo-pipeline` | Async **stream** of analysis events (scan → swing-select → deep); drives KataGo; fills snapshots |
 | `yagoo-cli` | `yagoo analyze` binary — NDJSON stream + optional aggregate JSON |
 
-Teaching algorithms (groups, tempo, …) consume **snapshots only** — not implemented yet.
+Teaching algorithms consume **snapshots only**. **Groups** (块) + tempo status are implemented in `yagoo-snapshot::compute_groups` and attached on deep `positionCompleted` events; further modules (zoning, ledger, …) still pending.
 
 ## Module data flow
 

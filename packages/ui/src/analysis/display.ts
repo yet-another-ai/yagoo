@@ -267,6 +267,7 @@ export function buildBoardOverlays(
       info.candidates,
       size,
       selected,
+      root?.visits ?? null,
       ghostStoneMap,
       markerMap,
     );
@@ -275,17 +276,42 @@ export function buildBoardOverlays(
   return { heatMap, paintMap, ghostStoneMap, markerMap, lines };
 }
 
-/** Sabaki-style: only the top few candidates get winrate/visits labels. */
+/** Sabaki-style: only the top few on-threshold candidates get board labels. */
 const MAX_CANDIDATE_LABELS = 5;
+/** Floor for the visit gate when root visits are tiny. */
+const MIN_CANDIDATE_VISIT_FLOOR = 3;
+/** Hide board ghosts/labels below this fraction of root visits (Sabaki-like). */
+const CANDIDATE_VISIT_FRAC = 0.02;
+
+/** Visits required to show a candidate on the board (list may still show it). */
+export function candidateBoardVisitThreshold(
+  rootVisits: number | null | undefined,
+): number {
+  const root = rootVisits != null && rootVisits > 0 ? rootVisits : 0;
+  return Math.max(MIN_CANDIDATE_VISIT_FLOOR, Math.ceil(root * CANDIDATE_VISIT_FRAC));
+}
+
+/** Whether a candidate earns a board ghost/label (still listable when false). */
+export function candidateVisibleOnBoard(
+  candidate: CandidateSnapshot,
+  rootVisits: number | null | undefined,
+): boolean {
+  const v = candidate.visits ?? 0;
+  return v >= candidateBoardVisitThreshold(rootVisits);
+}
 
 function applyCandidates(
   candidates: CandidateSnapshot[],
   size: number,
   selected: number,
+  rootVisits: number | null,
   ghostStoneMap: BoardMap<GhostStone | null>,
   markerMap: BoardMap<Marker | null>,
 ): void {
-  const labeled = candidates.slice(0, MAX_CANDIDATE_LABELS);
+  const onBoard = candidates.filter((c) =>
+    candidateVisibleOnBoard(c, rootVisits),
+  );
+  const labeled = onBoard.slice(0, MAX_CANDIDATE_LABELS);
 
   labeled.forEach((c, idx) => {
     const v = parseGtpVertex(c.move, size);

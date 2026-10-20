@@ -52,6 +52,9 @@ enum StdoutTransport {
 struct Inner {
     writer: mpsc::UnboundedSender<WriteCommand>,
     scripted_written: SyncMutex<Vec<String>>,
+    /// Raw stdout lines (process mode only), for local fixture recording.
+    recorded_lines: SyncMutex<Vec<String>>,
+    record: bool,
     routes: SyncMutex<HashMap<String, Route>>,
     /// Static scripted fixtures may arrive before their logical query is registered.
     /// Real wire responses always follow registration; unknown wire IDs are discarded.
@@ -105,6 +108,15 @@ impl AnalysisClient {
         program: impl AsRef<std::ffi::OsStr>,
         args: &[impl AsRef<std::ffi::OsStr>],
     ) -> KatagoResult<Self> {
+        Self::spawn_with_recording(program, args, false)
+    }
+
+    /// Like [`Self::spawn`], optionally recording every stdout JSON line for fixtures.
+    pub fn spawn_with_recording(
+        program: impl AsRef<std::ffi::OsStr>,
+        args: &[impl AsRef<std::ffi::OsStr>],
+        record: bool,
+    ) -> KatagoResult<Self> {
         let mut child = Command::new(program)
             .args(args)
             .stdin(Stdio::piped())
@@ -127,6 +139,7 @@ impl AnalysisClient {
                 _child: Box::new(child),
             },
             false,
+            record,
         ))
     }
 
@@ -140,14 +153,22 @@ impl AnalysisClient {
                 cursor: 0,
             },
             true,
+            false,
         )
     }
 
-    fn from_transports(stdin: StdinTransport, stdout: StdoutTransport, scripted: bool) -> Self {
+    fn from_transports(
+        stdin: StdinTransport,
+        stdout: StdoutTransport,
+        scripted: bool,
+        record: bool,
+    ) -> Self {
         let (writer, commands) = mpsc::unbounded_channel();
         let inner = Arc::new(Inner {
             writer,
             scripted_written: SyncMutex::new(Vec::new()),
+            recorded_lines: SyncMutex::new(Vec::new()),
+            record,
             routes: SyncMutex::new(HashMap::new()),
             orphans: SyncMutex::new(VecDeque::new()),
             scripted,
@@ -228,6 +249,14 @@ impl AnalysisClient {
                     }
                 };
 
+                if inner.record {
+                    inner
+                        .recorded_lines
+                        .lock()
+                        .expect("recorded lines lock")
+                        .push(line.clone());
+                }
+
                 let resp: AnalysisResponse = match serde_json::from_str(&line) {
                     Ok(r) => r,
                     Err(e) => {
@@ -253,6 +282,17 @@ impl AnalysisClient {
                 .scripted_written
                 .lock()
                 .expect("scripted writes lock")
+                .clone(),
+        )
+    }
+
+    /// Raw engine stdout lines recorded when spawned with `record: true`.
+    pub fn recorded_lines(&self) -> impl std::future::Future<Output = Vec<String>> {
+        std::future::ready(
+            self.inner
+                .recorded_lines
+                .lock()
+                .expect("recorded lines lock")
                 .clone(),
         )
     }
@@ -467,6 +507,7 @@ mod cancellation_tests {
                 responses: Vec::new(),
                 cursor: 0,
             },
+            false,
             false,
         );
         (client, BufReader::new(peer))

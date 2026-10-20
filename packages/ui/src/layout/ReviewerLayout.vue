@@ -65,6 +65,8 @@ const props = withDefaults(
     commentTitle?: string;
     /** Analysis candidates for the current ply (sidebar panel). */
     candidates?: CandidateSnapshot[];
+    /** Root visits for Sabaki-like dimming of low-visit candidates. */
+    rootVisits?: number | null;
     previewCandidateIndex?: number | null;
     selectedCandidateIndex?: number;
     /** Teaching groups (块) for the current ply. */
@@ -86,6 +88,7 @@ const props = withDefaults(
     commentOverride: null,
     commentTitle: "Comment",
     candidates: () => [],
+    rootVisits: null,
     previewCandidateIndex: null,
     selectedCandidateIndex: 0,
     groups: () => [],
@@ -282,6 +285,7 @@ defineExpose({
       />
       <CandidatesPanel
         :candidates="candidates"
+        :root-visits="rootVisits"
         :preview-index="previewCandidateIndex"
         :selected-index="selectedCandidateIndex"
         @preview="(i) => emit('preview-candidate', i)"

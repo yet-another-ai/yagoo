@@ -20,7 +20,7 @@ const sample: GroupSnapshot[] = [
     kind: "simple",
     status: "weak",
     strength: { black: 0.4 },
-    source: "fixture_proposal",
+    source: "pipeline",
   },
   {
     groupId: "C2",
@@ -31,7 +31,7 @@ const sample: GroupSnapshot[] = [
     },
     kind: "contested",
     status: "dead",
-    source: "fixture_proposal",
+    source: "pipeline",
   },
 ];
 

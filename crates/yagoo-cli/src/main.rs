@@ -82,9 +82,12 @@ enum Commands {
         /// Max plies to deepen after ranking by swing magnitude.
         #[arg(long, default_value_t = 24)]
         max_deep_plies: usize,
-        /// Testing only: JSON array of engine response lines.
+        /// Testing only: JSON array of engine response lines (`.json` or `.json.gz`).
         #[arg(long, hide = true)]
         scripted_fixture: Option<PathBuf>,
+        /// Record raw KataGo stdout lines as a JSON array (local fixture regen).
+        #[arg(long)]
+        record_fixture: Option<PathBuf>,
     },
 }
 
@@ -130,11 +133,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             swing_own,
             max_deep_plies,
             scripted_fixture,
+            record_fixture,
         } => {
             let sgf_text = tokio::fs::read_to_string(&sgf).await?;
             let client = if let Some(fix) = scripted_fixture {
-                let raw = tokio::fs::read_to_string(&fix).await?;
-                let lines: Vec<String> = serde_json::from_str(&raw)?;
+                let lines = load_scripted_fixture(&fix)?;
                 AnalysisClient::scripted(lines)
             } else {
                 let katago = katago.ok_or("missing --katago (or YAGOO_KATAGO)")?;
@@ -148,8 +151,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     path_str(&config),
                 ];
                 args.extend(katago_extra);
-                AnalysisClient::spawn(katago, &args)?
+                AnalysisClient::spawn_with_recording(katago, &args, record_fixture.is_some())?
             };
+            let client = Arc::new(client);
 
             let pipeline_cfg = PipelineConfig {
                 strategy: strategy.into(),
@@ -173,7 +177,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let mut out = open_output(&output).await?;
             let mut aggregate: Option<GameSnapshot> = None;
-            let mut stream = analyze_game(&sgf_text, Arc::new(client), pipeline_cfg);
+            let mut stream = analyze_game(&sgf_text, Arc::clone(&client), pipeline_cfg);
             while let Some(item) = stream.next().await {
                 let ev = item.map_err(|e| e.to_string())?;
                 if let PipelineEvent::GameCompleted { game, .. } = &ev {
@@ -189,9 +193,102 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let pretty = serde_json::to_vec_pretty(&game)?;
                 tokio::fs::write(path, pretty).await?;
             }
+
+            if let Some(path) = record_fixture {
+                let lines = client.recorded_lines().await;
+                let trimmed: Vec<String> = lines.iter().map(|l| trim_response_line(l)).collect();
+                write_scripted_fixture(&path, &trimmed)?;
+                eprintln!(
+                    "recorded {} KataGo response lines → {}",
+                    trimmed.len(),
+                    path.display()
+                );
+            }
         }
     }
     Ok(())
+}
+
+fn load_scripted_fixture(path: &Path) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let bytes = std::fs::read(path)?;
+    let raw = if path.extension().is_some_and(|e| e == "gz")
+        || path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| n.ends_with(".json.gz"))
+    {
+        let mut decoder = flate2::read::GzDecoder::new(bytes.as_slice());
+        let mut s = String::new();
+        std::io::Read::read_to_string(&mut decoder, &mut s)?;
+        s
+    } else {
+        String::from_utf8(bytes)?
+    };
+    Ok(serde_json::from_str(&raw)?)
+}
+
+fn write_scripted_fixture(path: &Path, lines: &[String]) -> Result<(), Box<dyn std::error::Error>> {
+    let json = serde_json::to_vec(lines)?;
+    if path.extension().is_some_and(|e| e == "gz")
+        || path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| n.ends_with(".json.gz"))
+    {
+        use std::io::Write;
+        let file = std::fs::File::create(path)?;
+        let mut encoder = flate2::write::GzEncoder::new(file, flate2::Compression::default());
+        encoder.write_all(&json)?;
+        encoder.finish()?;
+    } else {
+        std::fs::write(path, json)?;
+    }
+    Ok(())
+}
+
+/// Drop bulky fields the pipeline does not need for groups / swing selection.
+fn trim_response_line(line: &str) -> String {
+    let Ok(mut v) = serde_json::from_str::<serde_json::Value>(line) else {
+        return line.to_owned();
+    };
+    if let Some(obj) = v.as_object_mut() {
+        obj.remove("policy");
+        obj.remove("humanPolicy");
+        if let Some(moves) = obj.get_mut("moveInfos").and_then(|m| m.as_array_mut()) {
+            for m in moves {
+                if let Some(mo) = m.as_object_mut() {
+                    mo.remove("ownershipStdev");
+                    // Keep ownership on candidates — needed for groups.
+                }
+            }
+        }
+        // Round floating arrays slightly to shrink fixtures.
+        for key in ["ownership", "ownershipStdev"] {
+            if let Some(arr) = obj.get_mut(key).and_then(|a| a.as_array_mut()) {
+                for x in arr {
+                    if let Some(n) = x.as_f64() {
+                        *x = serde_json::json!((n * 1000.0).round() / 1000.0);
+                    }
+                }
+            }
+        }
+        if let Some(moves) = obj.get_mut("moveInfos").and_then(|m| m.as_array_mut()) {
+            for m in moves {
+                if let Some(own) = m
+                    .as_object_mut()
+                    .and_then(|mo| mo.get_mut("ownership"))
+                    .and_then(|a| a.as_array_mut())
+                {
+                    for x in own {
+                        if let Some(n) = x.as_f64() {
+                            *x = serde_json::json!((n * 1000.0).round() / 1000.0);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    serde_json::to_string(&v).unwrap_or_else(|_| line.to_owned())
 }
 
 fn path_str(p: &Path) -> String {

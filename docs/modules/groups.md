@@ -2,6 +2,8 @@
 
 **Role.** Partition the board into units that “rise and fall together” across candidate futures. This is Yagoo’s primary object for talking about “a group”.
 
+**Implementation:** `yagoo_snapshot::compute_groups` runs after a **deep** position fill (root + pass probe + candidate / PV-end ownership). Results attach as `groups[]` on `PositionSnapshot` (`source: "pipeline"`). Scan phase leaves `groups` empty. Wire schema: [snapshots](../pipeline/snapshots.md).
+
 **Decided order:** (1) cluster by **correlation of ownership change** across scenarios; (2) **then** analyze connectivity **inside** each group. Affinity has **no spatial term**. There is **no geometric-rule fallback** if clustering looks odd.
 
 ## Inputs
@@ -37,9 +39,10 @@ In capturing races, black-win scenarios raise both black stones’ ownership *an
 
 ### 3. Clustering
 
-- **MVP:** hierarchical clustering, average linkage, distance \(1-r_{ij}\), cut at \(r^\ast\) (**initial** \(0.7\)).
-- Also implement **spectral clustering** (normalized Laplacian, eigengap for \(k\)) as a comparison during validation.
-- Clusters with fewer than \(n_{\min}\) members (**initial** 3) become “scattered change points”: not teaching units, but still sampled in score MC as tiny independent blocks.
+- **MVP (shipped):** hierarchical clustering, average linkage, distance \(1-r_{ij}\), cut at \(r^\ast\) (**initial** \(0.7\)). Scenario weights are **equal** so the pass probe is not drowned by high-visit candidates.
+- **Spectral clustering** (normalized Laplacian, eigengap for \(k\)) remains a validation comparison (not in the default pipeline path).
+- Clusters with fewer than \(n_{\min}\) members (**initial** 3) become “scattered change points”: not teaching units (omitted from `groups[]`); still intended as tiny independent blocks for future score MC.
+- Empty-only clusters (no stones) are omitted from teaching output — zoning handles open frameworks.
 - **No geometry in affinity or clustering.**
 
 ### 4. Connectivity inside each group
@@ -74,11 +77,13 @@ For each pair of parts \((C^{(a)},C^{(b)})\), require all of:
 
 Failures: mark **weak binding (low confidence)** in output; do **not** teach as shared fate; **do not split** the group; **do not** fall back to geometry.
 
-## Fact JSON fragment
+## Wire / fact fragment
+
+On `PositionSnapshot.groups` the pipeline emits camelCase (see [snapshots](../pipeline/snapshots.md)). Conceptual / fact-JSON shape:
 
 ```json
 {
-  "group_id": "C3",
+  "group_id": "D4",
   "members": {
     "black_stones": ["D4", "D5", "E5"],
     "white_stones": [],
@@ -90,11 +95,15 @@ Failures: mark **weak binding (low confidence)** in output; do **not** teach as 
   "strength": { "black": 0.42 },
   "certainty": 0.61,
   "cohesion": 0.83,
-  "bound_confidence": null
+  "bound_confidence": null,
+  "status": "weak",
+  "g_plus": 0.55,
+  "g_minus": 0.12,
+  "delta": 0.43
 }
 ```
 
-`cohesion` = mean \(r_{ij}\) inside the group.
+`group_id` is the lexicographically least member GTP (stones preferred). `cohesion` = mean \(r_{ij}\) inside the group. Tempo fields (`status`, `g_plus`, …) come from [tempo sensitivity](./tempo-sensitivity.md).
 
 ## Teaching uses
 

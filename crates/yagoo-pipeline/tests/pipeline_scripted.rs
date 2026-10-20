@@ -351,3 +351,81 @@ async fn from_to_filters_scan_and_selection() {
         PipelineEvent::DeepPliesSelected { plies, .. } if plies == &[2]
     )));
 }
+
+/// Deep phase attaches teaching groups (块) when scenario ownership differs.
+#[tokio::test]
+async fn deep_phase_emits_pipeline_groups() {
+    let n = 81_usize;
+    // Root: black-ish corner around A9 (index 0) / B9 (1) / A8 (9).
+    let mut root = vec![0.0_f64; n];
+    let mut pass = vec![0.0_f64; n];
+    let mut cand = vec![0.0_f64; n];
+    for &i in &[0usize, 1, 9, 10] {
+        root[i] = 0.55;
+        pass[i] = -0.45;
+        cand[i] = 0.75;
+    }
+    // Second region with orthogonal fate (bottom-right).
+    for &i in &[80usize, 79, 71] {
+        root[i] = -0.2;
+        pass[i] = 0.4;
+        cand[i] = -0.6;
+    }
+    let own_json = |v: &[f64]| {
+        format!(
+            "[{}]",
+            v.iter()
+                .map(|x| format!("{x}"))
+                .collect::<Vec<_>>()
+                .join(",")
+        )
+    };
+    let root_s = own_json(&root);
+    let pass_s = own_json(&pass);
+    let cand_s = own_json(&cand);
+    let stdev = format!("[{}]", vec!["0.1"; n].join(","));
+    let policy = format!("[{}]", vec!["0.01"; n].join(","));
+
+    let root_line = format!(
+        r#"{{"id":"p0-deep-root","isDuringSearch":false,"rootInfo":{{"visits":100,"winrate":0.55,"scoreLead":1.0}},"ownership":{root_s},"ownershipStdev":{stdev},"policy":{policy},"moveInfos":[{{"move":"C3","visits":40,"order":0,"winrate":0.56,"scoreLead":1.2,"prior":0.1,"pv":["C3"],"ownership":{cand_s}}}]}}"#
+    );
+    let pass_line = format!(
+        r#"{{"id":"p0-deep-pass","isDuringSearch":false,"rootInfo":{{"visits":100,"winrate":0.45,"scoreLead":-1.0}},"ownership":{pass_s},"ownershipStdev":{stdev},"policy":{policy},"moveInfos":[]}}"#
+    );
+
+    let client = Arc::new(AnalysisClient::scripted(vec![root_line, pass_line]));
+    // Setup stones matching the clustered corner so the group has stones.
+    let sgf = "(;SZ[9]KM[6.5]AB[aa][ba][ab][bb])";
+    let cfg = PipelineConfig {
+        strategy: PipelineStrategy::DeepOnly,
+        root_visits: 100,
+        from_ply: 0,
+        to_ply: Some(0),
+        report_during_search_every: None,
+        include_pv_ends: false,
+        emit_game_aggregate: false,
+        ..PipelineConfig::default()
+    };
+    let events = analyze_game_collected(sgf, client, cfg).await.unwrap();
+    let snap = events.iter().find_map(|e| match e {
+        PipelineEvent::PositionCompleted {
+            phase: AnalysisPhase::Deep,
+            snapshot,
+            ..
+        } => Some(snapshot.as_ref()),
+        _ => None,
+    });
+    let snap = snap.expect("deep snapshot");
+    assert!(
+        !snap.groups.is_empty(),
+        "expected teaching groups from correlated ownership"
+    );
+    assert!(snap
+        .groups
+        .iter()
+        .all(|g| { g.source == Some(yagoo_snapshot::GroupSource::Pipeline) }));
+    assert!(snap
+        .groups
+        .iter()
+        .any(|g| { !g.members.black_stones.is_empty() || !g.members.white_stones.is_empty() }));
+}

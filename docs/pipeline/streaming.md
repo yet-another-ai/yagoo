@@ -126,6 +126,10 @@ Origins must be exact `http://host:port` or `https://host` values, without a pat
 or trailing slash. The listener remains loopback-only. The server rejects
 unapproved browser origins and non-local Host headers, supports JSON preflight,
 and never uses wildcard CORS or credentials. The request body limit is 2 MiB.
+Live batch and interactive requests also accept at most 512 SGF nodes and 64
+nested variations. These limits are checked before recursive parsing or replay,
+and an analysis slot is reserved before interactive position preparation. Larger
+games can still use the file/stdout batch CLI.
 Browsers may require permission to access a local network service. If hosted
 browser policy blocks the connection, run the reviewer with `mise run docs`.
 

@@ -14,8 +14,8 @@ use std::{convert::Infallible, net::Ipv4Addr, sync::Arc};
 use tokio::sync::{mpsc, OwnedSemaphorePermit, Semaphore};
 use yagoo_katago::{AnalysisClient, AnalysisQuery, AnalysisUpdate, KatagoResult};
 use yagoo_pipeline::{
-    analyze_game, complete_position, prepare_position, AnalysisEngine, InteractivePositionRequest,
-    PipelineConfig, PreparedPosition, UpdateCallback,
+    analyze_game, complete_position, prepare_position, validate_analysis_sgf, AnalysisEngine,
+    InteractivePositionRequest, PipelineConfig, PreparedPosition, UpdateCallback,
 };
 use yagoo_snapshot::{PipelineEvent, SCHEMA_VERSION};
 
@@ -239,39 +239,51 @@ async fn access_policy(State(state): State<AppState>, request: Request, next: Ne
 }
 
 async fn default_analysis(State(state): State<AppState>) -> Result<Response, HttpError> {
+    let slot = acquire_slot(&state)?;
     let sgf = state
         .default_sgf
         .clone()
         .ok_or_else(|| bad_request("POST {sgf} or start with an SGF path"))?;
-    enqueue(&state, Work::Batch(sgf))
+    validate_analysis_sgf(&sgf).map_err(|error| bad_request(error.to_string()))?;
+    enqueue(&state, Work::Batch(sgf), slot)
 }
 
 async fn batch_analysis(
     State(state): State<AppState>,
     Json(body): Json<BatchRequest>,
 ) -> Result<Response, HttpError> {
-    enqueue(&state, Work::Batch(body.sgf))
+    let slot = acquire_slot(&state)?;
+    validate_analysis_sgf(&body.sgf).map_err(|error| bad_request(error.to_string()))?;
+    enqueue(&state, Work::Batch(body.sgf), slot)
 }
 
 async fn position_analysis(
     State(state): State<AppState>,
     Json(body): Json<InteractivePositionRequest>,
 ) -> Result<Response, HttpError> {
+    let slot = acquire_slot(&state)?;
     let position = prepare_position(&body).map_err(|error| bad_request(error.to_string()))?;
-    enqueue(&state, Work::Position(Box::new(position)))
+    enqueue(&state, Work::Position(Box::new(position)), slot)
 }
 
 fn bad_request(message: impl Into<String>) -> HttpError {
     (StatusCode::BAD_REQUEST, message.into())
 }
 
-fn enqueue(state: &AppState, work: Work) -> Result<Response, HttpError> {
-    let slot = Arc::clone(&state.slots).try_acquire_owned().map_err(|_| {
+fn acquire_slot(state: &AppState) -> Result<OwnedSemaphorePermit, HttpError> {
+    Arc::clone(&state.slots).try_acquire_owned().map_err(|_| {
         (
             StatusCode::TOO_MANY_REQUESTS,
             "four analyses already active".into(),
         )
-    })?;
+    })
+}
+
+fn enqueue(
+    state: &AppState,
+    work: Work,
+    slot: OwnedSemaphorePermit,
+) -> Result<Response, HttpError> {
     let (events, receiver) = mpsc::channel(8);
     state
         .jobs

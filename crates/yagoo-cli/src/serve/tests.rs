@@ -366,7 +366,8 @@ async fn rejects_untrusted_origins_hosts_invalid_positions_and_overload() {
                 app.oneshot(request(
                     Method::POST,
                     "/analyze-position",
-                    r#"{"sgf":"(;SZ[9])","ply":0}"#
+                    // Admission precedes parsing/replay, even for bad input.
+                    r#"{"sgf":"not SGF","ply":0}"#
                 ))
                 .await
                 .unwrap()
@@ -394,4 +395,50 @@ fn origin_configuration_requires_exact_origins() {
         );
     }
     assert!(ServeOptions::new(8710, vec!["https://yet-another-ai.github.io".into()]).is_ok());
+}
+
+#[tokio::test]
+async fn rejects_malformed_coordinates_and_overlarge_sgf_before_dispatch() {
+    LocalSet::new()
+        .run_until(async {
+            let (engine, mut starts, _) = pending();
+            let app = router(
+                engine,
+                None,
+                config(),
+                ServeOptions::new(8710, vec![]).unwrap(),
+            );
+            for mv in ["11", "!1", "@1", "中1"] {
+                let body = serde_json::json!({"sgf":"(;SZ[9])", "ply":0, "moves":[mv]});
+                let result = app
+                    .clone()
+                    .oneshot(request(Method::POST, "/analyze-position", body.to_string()))
+                    .await
+                    .unwrap();
+                assert_eq!(result.status(), StatusCode::BAD_REQUEST, "{mv}");
+            }
+            for sgf in [
+                format!("{}{}", "(;".repeat(65), ")".repeat(65)),
+                format!("({})", ";".repeat(513)),
+            ] {
+                for path in ["/analyze", "/analyze-position"] {
+                    let body = if path == "/analyze" {
+                        serde_json::json!({"sgf":sgf})
+                    } else {
+                        serde_json::json!({"sgf":sgf, "ply":0})
+                    };
+                    let result = app
+                        .clone()
+                        .oneshot(request(Method::POST, path, body.to_string()))
+                        .await
+                        .unwrap();
+                    assert_eq!(result.status(), StatusCode::BAD_REQUEST);
+                }
+            }
+            assert!(matches!(
+                starts.try_recv(),
+                Err(mpsc::error::TryRecvError::Empty)
+            ));
+        })
+        .await;
 }

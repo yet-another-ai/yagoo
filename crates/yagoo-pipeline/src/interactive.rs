@@ -26,6 +26,47 @@ pub struct PreparedPosition {
     pub snapshot: PositionSnapshot,
 }
 
+/// Bound network/interactive parsing and replay before building a recursive SGF
+/// tree or cloning per-ply history. Property text and escapes do not count as
+/// structure. This is an admission check, not a replacement for the SGF parser.
+pub fn validate_analysis_sgf(sgf: &str) -> PipelineResult<()> {
+    if sgf.len() > 2 * 1024 * 1024 {
+        return Err(message("analysis SGF exceeds 2 MiB"));
+    }
+    let (mut in_value, mut escaped) = (false, false);
+    let (mut depth, mut nodes) = (0_u32, 0_u32);
+    for byte in sgf.bytes() {
+        if in_value {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b']' {
+                in_value = false;
+            }
+            continue;
+        }
+        match byte {
+            b'[' => in_value = true,
+            b'(' => {
+                depth += 1;
+                if depth > 64 {
+                    return Err(message("analysis SGF exceeds 64 nested variations"));
+                }
+            }
+            b')' => depth = depth.saturating_sub(1),
+            b';' => {
+                nodes += 1;
+                if nodes > 512 {
+                    return Err(message("analysis SGF exceeds 512 nodes"));
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 /// Retain setup, PL, every main-line move through the anchor, and the entire
 /// branch. Never reconstruct from current stones: that loses ko/pass/NN history.
 pub fn prepare_position(body: &InteractivePositionRequest) -> PipelineResult<PreparedPosition> {
@@ -35,6 +76,7 @@ pub fn prepare_position(body: &InteractivePositionRequest) -> PipelineResult<Pre
             "visits must be 1..=100000 and branch at most 1000 moves",
         ));
     }
+    validate_analysis_sgf(&body.sgf)?;
     validate_history(&body.sgf)?;
     let mut record = parse_sgf(&body.sgf)?;
     let anchor = usize::try_from(body.ply).map_err(|_| message("anchor ply overflow"))?;
@@ -223,5 +265,25 @@ mod tests {
                 .to_string()
                 .contains("does not support"));
         }
+    }
+
+    #[test]
+    fn bounds_sgf_structure_before_recursive_parse_and_history_replay() {
+        let deep = format!("{}{}", "(;".repeat(65), ")".repeat(65));
+        let wide = format!("({})", ";".repeat(513));
+        for sgf in [deep, wide, " ".repeat(2 * 1024 * 1024 + 1)] {
+            assert!(prepare_position(&InteractivePositionRequest {
+                sgf,
+                ply: 0,
+                moves: vec![],
+                visits: None,
+            })
+            .err()
+            .unwrap()
+            .to_string()
+            .contains("exceeds"));
+        }
+        let comment = format!(r"(;C[{} \] still in comment])", "(;".repeat(1024));
+        assert!(validate_analysis_sgf(&comment).is_ok());
     }
 }

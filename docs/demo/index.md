@@ -1,8 +1,8 @@
 # Frontend demo
 
-Interactive reviewer chrome for Yagoo — Vue goban (Shudan-compatible), Sabaki-inspired layout, and an SVG overlay skeleton.
+The demo is the Sabaki-style reviewer with the experimental browser engine in its **Engine** panel. Recorded sample analysis is the board you see first. This site does not host model weights, and the page does not fetch a manifest on load.
 
-Use ← → in the bottom bar to step through the sample SGF. The blue outline on the board is the **group-outline** overlay demo (coordinates via `BoardGeometry`).
+Open **Engine** for the empty state: how to export a b18 bundle, **Load local model**, and the single-thread hint beside **Enable threads**. After a bundle checks out, **Use browser engine** replaces the recorded stream with live scan and deepen. `/yagoo/engine/` redirects here.
 
 <ClientOnly>
   <ReviewerDemo />
@@ -10,13 +10,12 @@ Use ← → in the bottom bar to step through the sample SGF. The blue outline o
 
 ## Package
 
-Source lives in [`packages/ui`](https://github.com/yet-another-ai/yagoo/tree/main/packages/ui) (`@yagoo/ui`).
+Source lives in [`packages/ui`](https://github.com/yet-another-ai/yagoo/tree/main/packages/ui) (`@yagoo/ui`). The docs host is `docs/engine/EngineHost.vue`, shared with the [reviewer](/app/).
 
 | Piece | Status |
 | --- | --- |
+| `AnalysisReviewer` | Board, analysis panels, engine selector |
 | `Goban` | Shudan map props + fuzzy placement / collision |
 | `useGame` | SGF load + forward / back / variations |
-| `ReviewerLayout` | Board + sidebar + bottom bar |
-| `WinrateGraph` | Static sample data |
-| Game tree panel | Placeholder |
-| `OverlayLayer` | SVG group-outline demo; WebGPU later |
+| Browser engine | Local bundle, then scan and deepen. Experimental |
+| Recorded NDJSON | Default until a model is loaded and started |

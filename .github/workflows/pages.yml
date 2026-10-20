@@ -1,7 +1,6 @@
-# Build the VitePress site (base /yagoo/) plus the experimental engine shell
-# and deploy it to GitHub Pages. Pull requests build the artifact only.
-# `mise run ci` already builds the docs; this job is the production assembly
-# (engine base /yagoo/engine/ copied into the site).
+# Build the VitePress site (base /yagoo/) and deploy it to GitHub Pages.
+# The demo reviewer bundles the browser engine. Pull requests build only.
+# `mise run ci` also builds the docs; this job is the production artifact check.
 
 name: Pages
 

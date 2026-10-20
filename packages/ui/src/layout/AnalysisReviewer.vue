@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import {
+  type BrowserEngineAdapter,
   buildGroupOutlines,
   buildGroupVertexIndex,
   createBrowserEngineSource,
@@ -42,6 +43,17 @@ const props = defineProps<{
   /** Force a theme. `auto` follows VitePress (`html.dark`) and these tokens. */
   theme?: "auto" | "light" | "dark";
   initialPerspective?: InspectorPerspective;
+  /** Set after a local bundle (or a configured remote URL) is staged. */
+  browserEngine?: BrowserEngineAdapter | null;
+  threadHint?: string | null;
+  remoteManifestUrl?: string | null;
+  modelStatus?: string | null;
+}>();
+
+const emit = defineEmits<{
+  (e: "local-model-files", files: File[]): void;
+  (e: "enable-threads"): void;
+  (e: "load-remote-manifest"): void;
 }>();
 
 function parseBoardSize(sgf: string): number {
@@ -201,7 +213,9 @@ const themeClass = computed(() =>
 );
 
 const liveAvailable = isLiveNativeAvailable();
-const browserAvailable = isBrowserEngineAvailable(null);
+const browserAvailable = computed(() =>
+  isBrowserEngineAvailable(props.browserEngine),
+);
 
 onMounted(() => {
   if (props.initialNdjson) {
@@ -277,9 +291,20 @@ function tryLiveNative() {
 }
 
 function tryBrowserEngine() {
+  if (!props.browserEngine) {
+    statusMessage.value =
+      "Load a local model bundle first. Recorded analysis stays on the board.";
+    return;
+  }
   reset();
-  statusMessage.value = "Starting browser engine…";
-  attachSource(createBrowserEngineSource());
+  statusMessage.value = "Starting experimental browser engine…";
+  attachSource(
+    createBrowserEngineSource({
+      engine: props.browserEngine,
+      sgf: sgfText.value,
+      label: "Browser engine (experimental)",
+    }),
+  );
 }
 
 function onPlyChange(ply: number) {
@@ -422,11 +447,17 @@ const phaseBadge = computed(() => {
       :native-available="liveAvailable"
       :browser-available="browserAvailable"
       :source-label="sourceLabel"
+      :thread-hint="threadHint"
+      :remote-manifest-url="remoteManifestUrl"
+      :model-status="modelStatus"
       @close="sourceOpen = false"
       @sgf-file="onSgfFile"
       @ndjson-file="onNdjsonFile"
       @connect-native="tryLiveNative"
       @connect-browser="tryBrowserEngine"
+      @local-model-files="emit('local-model-files', $event)"
+      @enable-threads="emit('enable-threads')"
+      @load-remote-manifest="emit('load-remote-manifest')"
     />
 
     <p v-if="statusMessage" class="yagoo-analysis-app__status">
@@ -564,11 +595,15 @@ const phaseBadge = computed(() => {
   border-bottom: 1px solid var(--yagoo-border, #e2e2e6);
 }
 
-.yagoo-analysis-app__source {
+.yagoo-analysis-app .yagoo-analysis-app__source {
   position: absolute;
   top: 3.1rem;
   right: 0.75rem;
+  bottom: 0.75rem;
   z-index: 30;
+  width: min(28rem, calc(100% - 1.5rem));
+  max-height: none;
+  overflow: auto;
 }
 
 .yagoo-analysis-app__drop {

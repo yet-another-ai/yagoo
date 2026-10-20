@@ -12,7 +12,7 @@ Layout, panel map, and the typed slots for issues #19 and #23–#29 are describe
 | --- | --- |
 | **(a) NDJSON import** | Supported — file picker, drag-and-drop, and bundled `public/app/sample-scan-deep.ndjson` |
 | **(b) Live native engine** | Adapter seam only — follow-up: `yagoo analyze --serve` |
-| **(c) Browser engine** | Adapter seam only — after browser KataGo lands |
+| **(c) Browser engine** | Experimental. **Engine** → **Load local model**, then **Use browser engine**. Recorded NDJSON stays until then. Same host as the [demo](/demo/). |
 
 Missing SGF `RU` is treated as **Chinese** (same as `yagoo-sgf` / the pipeline).
 

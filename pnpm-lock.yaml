@@ -10,6 +10,9 @@ importers:
 
   docs:
     dependencies:
+      '@yagoo/browser-engine':
+        specifier: workspace:*
+        version: link:../packages/browser-engine
       '@yagoo/ui':
         specifier: workspace:*
         version: link:../packages/ui

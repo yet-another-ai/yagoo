@@ -74,7 +74,7 @@ jobs:
   js:
     name: UI, types, and docs
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - name: Check out source
         uses: actions/checkout@v7
@@ -86,7 +86,13 @@ jobs:
         uses: ./.github/actions/setup
         with:
           pnpm: true
-          mise-install-args: node pnpm
+          rust-cache-key: wasm32
+
+      - name: Cache wasm-bindgen CLI
+        uses: actions/cache@v6
+        with:
+          path: .yagoo-data/wasm-tools
+          key: wasm-bindgen-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packages/browser-engine/scripts/build-wasm.mjs') }}
 
       - name: Typecheck UI
         run: mise run ui:check

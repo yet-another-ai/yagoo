@@ -10,9 +10,9 @@
   <header class="hero">
     <h1>Yagoo browser engine <span class="badge">EXPERIMENTAL</span></h1>
     <p><strong>EXPERIMENTAL.</strong> Not a drop-in replacement for native KataGo.
-      Weights are <em>never</em> downloaded on page load or in CI — you choose a model,
-      see its size, download with progress (cancellable), or load files you already exported.
-      Cached in OPFS (content-addressed), like jet’s playground. Native CLI path is unchanged.</p>
+      This page does not host KataGo weights and does not fetch a manifest on load.
+      Load a local export, or set <code>VITE_YAGOO_MANIFEST_URL</code> for local development.
+      Native CLI path is unchanged.</p>
   </header>
 
   <section class="island" id="model-island" data-slot="model-island" role="group" aria-label="Model download and load">
@@ -24,8 +24,8 @@
       <span id="cache-status" class="island__meta" role="status">Cache: checking…</span>
     </div>
     <p id="model-notes" class="island__notes"></p>
-    <label class="island__field island__grow">Hosted / same-origin manifest URL
-      <input id="manifest" size="65" value="models/manifest.json" spellcheck="false">
+    <label class="island__field island__grow" id="manifest-field" hidden>Configured manifest URL
+      <input id="manifest" size="65" value="" spellcheck="false">
     </label>
     <div class="island__status" id="model-status-wrap">
       <i class="island__dot" id="model-dot" aria-hidden="true"></i>
@@ -51,9 +51,10 @@
     <p id="activation-status" role="status">Root activation retention is disabled. Concept-head consumers are not implemented (issue #13).</p>
     <p>
       <button type="button" id="isolation">Enable threads on static hosting</button>
+      <span id="isolation-hint"></span>
       <button type="button" id="stop">Stop / release engine</button>
     </p>
-    <p id="status" role="status">Choose a model above, then Load model. Export instructions: docs/browser-engine.md.</p>
+    <p id="status" role="status">Load a local model bundle. Export instructions: docs/browser-engine.md.</p>
   </section>
 
   <label>SGF <textarea id="sgf" rows="5" cols="80">(;SZ[9]KM[7.5]RU[Chinese];B[cc];W[gg])</textarea></label>

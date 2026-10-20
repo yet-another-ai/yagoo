@@ -1,3 +1,5 @@
+import { configuredManifestUrl } from './manifest-url';
+
 /** User-facing model presets. Weights are never fetched until Load is clicked. */
 
 export type CatalogEntry = {
@@ -26,20 +28,20 @@ export const MODEL_CATALOG: CatalogEntry[] = [
     id: 'b18c384nbt-swa',
     name: 'b18c384nbt SWA (default)',
     model: 'kata1-b18c384nbt-s9996604416-d4316597426',
-    manifestUrl: 'models/manifest.json',
+    manifestUrl: configuredManifestUrl(),
     // Research / Kaya-scale fp32 onnx (~116 MiB) + small warmup/json; exact from manifest at load.
     approxBytes: 122_000_000,
     default: true,
-    notes: 'Official experimental teaching net. Export the ONNX bundle and serve it under models/, paste a hosted manifest URL, or load local files. Never auto-downloaded.',
+    notes: 'Official experimental teaching net. This site does not host the weights. Load a local export (manifest.json, .onnx, warmup.json). A remote manifest is used only when VITE_YAGOO_MANIFEST_URL is set.',
   },
   {
     id: 'b18c384nbt-swa-fp16',
     name: 'b18c384nbt SWA · prefer fp16',
     model: 'kata1-b18c384nbt-s9996604416-d4316597426',
-    manifestUrl: 'models/manifest.json',
+    manifestUrl: configuredManifestUrl(),
     approxBytes: 62_000_000,
     preferFp16: true,
-    notes: 'Same bundle; WebGPU tries fp16 first then retries fp32 if warmup fails (#8). Requires models/manifest.json with an fp16 variant.',
+    notes: 'Same local or configured bundle. WebGPU tries fp16 first, then retries fp32 if warmup fails (#8). The manifest must include an fp16 variant.',
   },
   {
     id: 'b10c128-mobile',

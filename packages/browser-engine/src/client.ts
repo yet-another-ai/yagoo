@@ -27,7 +27,6 @@ export class BrowserEngine {
     for (const backend of backends) {
       const plan = threadPlan({ isolated: crossOriginIsolated, sharedMemory: sharedMemoryAvailable(),
         hardwareConcurrency: navigator.hardwareConcurrency, requested: options.wasmThreads, backend });
-      if (plan.reason) messages.push(plan.reason);
       const attempts = backend === 'webgpu'
         ? [{ threads: 1, precision: 'auto' }, { threads: 1, precision: 'fp32' }]
         : (plan.ortThreads > 1 ? [plan.ortThreads, 1] : [1]).map(threads => ({ threads, precision: 'fp32' }));
@@ -62,7 +61,13 @@ export class BrowserEngine {
           if (generation !== this.generation) throw error;
           this.cancelInitialization = undefined;
           this.worker = undefined;
-          messages.push(`${backend} ${precision} (${threads} thread${threads === 1 ? '' : 's'}) failed: ${String(error)}`);
+          const message = String(error);
+          if (/Manifest download failed \(404\)/.test(message)) {
+            throw new Error(
+              'No model bundle is hosted here. Load a local model (manifest.json, the .onnx weights, and warmup.json), or set VITE_YAGOO_MANIFEST_URL for local development.',
+            );
+          }
+          messages.push(`${backend} ${precision} (${threads} thread${threads === 1 ? '' : 's'}) failed: ${message}`);
         }
       }
     }

@@ -59,8 +59,18 @@ async function setup(persist = async () => false) {
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false })));
   mockEngine.initialize.mockResolvedValue({ backend: 'wasm', precision: 'fp32', ortThreads: 1, maxBatch: 1, messages: [] });
   await import('../src/demo');
+  node('manifest').value = 'models/manifest.json';
   return node;
 }
+
+it('does not initialize when no manifest URL is configured', async () => {
+  const node = await setup();
+  node('manifest').value = '';
+  await node('load').listeners.click!();
+  expect(mockEngine.initialize).not.toHaveBeenCalled();
+  expect(node('status').textContent).toMatch(/local model/i);
+  expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+});
 
 it('does not fetch model weights on page load; only fills the catalog', async () => {
   const node = await setup();

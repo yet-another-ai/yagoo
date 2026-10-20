@@ -65,6 +65,30 @@ it('activation release and status messages do not unlock an active analysis', as
   engine.dispose();
 });
 
+it('stops after a missing hosted manifest instead of chaining backend errors', async () => {
+  environment();
+  const engine = new BrowserEngine();
+  const pending = engine.initialize('models/manifest.json');
+  TestWorker.instances[0].onmessage!({ data: { type: 'error', message: 'Manifest download failed (404)' } });
+  await expect(pending).rejects.toThrow(/No model bundle is hosted here/);
+  expect(TestWorker.instances).toHaveLength(1);
+  engine.dispose();
+});
+
+it('does not treat the single-thread note as an initialization error', async () => {
+  environment();
+  vi.stubGlobal('crossOriginIsolated', false);
+  vi.stubGlobal('SharedArrayBuffer', undefined);
+  const engine = new BrowserEngine();
+  const pending = engine.initialize('models/manifest.json', { forceWasm: true });
+  const worker = TestWorker.instances[0];
+  expect(worker.sent[0]).toMatchObject({ backend: 'wasm', precision: 'fp32', ortThreads: 1 });
+  worker.onmessage!({ data: { type: 'error', message: 'warmup failed' } });
+  await expect(pending).rejects.toThrow(/warmup failed/);
+  await expect(pending).rejects.not.toThrow(/one thread/);
+  engine.dispose();
+});
+
 it('keeps activation release in effect across initialization fallback workers', async () => {
   environment();
   const engine = new BrowserEngine();

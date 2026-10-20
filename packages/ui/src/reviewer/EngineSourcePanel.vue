@@ -3,6 +3,11 @@ defineProps<{
   nativeAvailable: boolean;
   browserAvailable: boolean;
   sourceLabel?: string | null;
+  /** Shown beside Enable threads when cross-origin isolation is off. Not an error. */
+  threadHint?: string | null;
+  /** Set only when a developer configured a remote manifest. Never fetched on load. */
+  remoteManifestUrl?: string | null;
+  modelStatus?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -11,7 +16,29 @@ const emit = defineEmits<{
   (e: "ndjson-file", file: File): void;
   (e: "connect-native"): void;
   (e: "connect-browser"): void;
+  (e: "local-model-files", files: File[]): void;
+  (e: "enable-threads"): void;
+  (e: "load-remote-manifest"): void;
 }>();
+
+const docsHref = `${import.meta.env.BASE_URL || "/"}browser-engine`;
+
+function onLocalFiles(ev: Event) {
+  const input = ev.target as HTMLInputElement;
+  const files = input.files ? Array.from(input.files) : [];
+  input.value = "";
+  if (files.length) emit("local-model-files", files);
+}
+
+function onModelDrop(ev: DragEvent) {
+  const files = ev.dataTransfer?.files;
+  if (!files?.length) return;
+  const picked = Array.from(files).filter((file) =>
+    /\.(json|onnx)$/i.test(file.name),
+  );
+  if (!picked.length) return;
+  emit("local-model-files", picked);
+}
 
 function onFile(kind: "sgf" | "ndjson", ev: Event) {
   const input = ev.target as HTMLInputElement;
@@ -92,30 +119,71 @@ function onFile(kind: "sgf" | "ndjson", ev: Event) {
     <section class="yagoo-source__card" data-source="browser-engine">
       <h3>
         Browser engine
-        <span class="yagoo-source__issue">Coming in #20</span>
+        <span class="yagoo-source__issue">Experimental</span>
       </h3>
-      <p>
-        Experimental WebGPU / Wasm analysis stays on its own page until the
-        adapter is wired. Weights are never downloaded from this reviewer.
-      </p>
       <div
         class="yagoo-model-island"
         data-testid="model-island-slot"
         data-slot="model-island"
+        @dragover.prevent
+        @drop.prevent="onModelDrop"
       >
-        <slot name="model-island">
-          <p class="yagoo-model-island__title">Model island</p>
+        <p class="yagoo-model-island__title">Local model</p>
+        <p>
+          This site does not host KataGo weights, and nothing is fetched until
+          you choose a bundle. Export or obtain a b18 SWA bundle
+          (<a :href="docsHref">how to export</a>), then load
+          <code>manifest.json</code> plus the <code>.onnx</code> and
+          <code>warmup.json</code> it names. You can also drop those files here.
+          Recorded sample analysis stays on the board until you start the engine.
+        </p>
+        <p v-if="modelStatus" class="yagoo-model-island__status" data-testid="model-status">
+          {{ modelStatus }}
+        </p>
+        <p v-if="threadHint" class="yagoo-thread-hint" data-testid="thread-hint">
+          {{ threadHint }}
+        </p>
+        <div class="yagoo-source__actions">
+          <label class="yagoo-btn">
+            Load local model
+            <input
+              type="file"
+              multiple
+              hidden
+              accept=".json,.onnx,application/json,application/octet-stream"
+              data-testid="load-local-model"
+              @change="onLocalFiles"
+            />
+          </label>
+          <button
+            type="button"
+            class="yagoo-btn"
+            data-testid="enable-threads"
+            @click="emit('enable-threads')"
+          >
+            Enable threads
+          </button>
+        </div>
+        <div v-if="remoteManifestUrl" class="yagoo-source__remote">
           <p>
-            Catalog, progress, cancel, OPFS cache, and local model files are on
-            the experimental page (#22). This slot is where that island mounts.
-            <strong>Coming in #20.</strong>
-            Page load does not fetch weights.
+            A manifest URL is configured for this build. It is not fetched
+            until you ask.
           </p>
-        </slot>
+          <p><code>{{ remoteManifestUrl }}</code></p>
+          <button
+            type="button"
+            class="yagoo-btn"
+            data-testid="load-remote-manifest"
+            @click="emit('load-remote-manifest')"
+          >
+            Load configured manifest
+          </button>
+        </div>
       </div>
       <button
         type="button"
         class="yagoo-btn"
+        data-testid="use-browser-engine"
         :disabled="!browserAvailable"
         @click="emit('connect-browser')"
       >
@@ -213,5 +281,20 @@ function onFile(kind: "sgf" | "ndjson", ev: Event) {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--yagoo-muted, #5c5c66);
+}
+
+.yagoo-model-island__status,
+.yagoo-thread-hint {
+  margin: 0.35rem 0;
+}
+
+.yagoo-thread-hint {
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--yagoo-accent, #0066cc) 8%, transparent);
+}
+
+.yagoo-source__remote {
+  margin-top: 0.45rem;
 }
 </style>

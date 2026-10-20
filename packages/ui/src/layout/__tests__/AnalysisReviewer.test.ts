@@ -80,14 +80,14 @@ describe("AnalysisReviewer", () => {
       await wrapper.get('[data-testid="engine-source-button"]').trigger("click");
       const source = wrapper.get('[data-testid="engine-source"]');
       expect(source.text()).toMatch(/Coming in #19/);
-      expect(source.text()).toMatch(/Coming in #20/);
+      expect(source.text()).not.toMatch(/Coming in #20/);
       expect(source.get('[data-testid="model-island-slot"]').text()).toMatch(
-        /#22/,
+        /Load local model/,
       );
       expect(source.get('[data-testid="model-island-slot"]').text()).toMatch(
-        /Coming in #20/,
+        /does not host/i,
       );
-      expect(source.text()).toMatch(/never downloaded/i);
+      expect(source.get('[data-testid="use-browser-engine"]').attributes("disabled")).toBeDefined();
 
       await wrapper.get('[data-testid="try-move-toggle"]').trigger("click");
       expect(wrapper.get('[data-testid="variation-tree"]').text()).toMatch(

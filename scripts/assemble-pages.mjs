@@ -1,16 +1,11 @@
-// Copy the experimental engine onto the VitePress artifact and fail if the
-// production /yagoo/ base is missing from docs, fixtures, or engine assets.
-import { cp, readdir, readFile, stat } from "node:fs/promises";
-import { join, relative } from "node:path";
+// Fail the Pages build if the production /yagoo/ site is missing the demo
+// engine wiring: fixtures, redirect, scoped isolation worker, or ORT wasm.
+import { readdir, readFile, stat } from "node:fs/promises";
+import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repo = fileURLToPath(new URL("..", import.meta.url));
 const site = join(repo, "docs/.vitepress/dist");
-const engineDist = join(repo, "packages/browser-engine/dist");
-const engineOut = join(site, "engine");
-
-await cp(engineDist, engineOut, { recursive: true });
-
 const failures = [];
 
 async function exists(path) {
@@ -44,40 +39,42 @@ await oneOf("home", ["index.html"]);
 await oneOf("reviewer", ["app/index.html", "app.html"]);
 await oneOf("sample sgf", ["app/sample.sgf"]);
 await oneOf("sample ndjson", ["app/sample-scan-deep.ndjson"]);
-await oneOf("browser-engine page", ["browser-engine.html", "browser-engine/index.html"]);
+await oneOf("browser-engine docs", ["browser-engine.html", "browser-engine/index.html"]);
 await oneOf("demo", ["demo/index.html", "demo.html"]);
-await oneOf("engine shell", ["engine/index.html"]);
-await oneOf("isolation worker", ["engine/coi-serviceworker.js"]);
+await oneOf("engine redirect", ["engine/index.html"]);
+await oneOf("demo isolation worker", ["demo/coi-serviceworker.js"]);
+await oneOf("app isolation worker", ["app/coi-serviceworker.js"]);
 
 const siteFiles = await walk(site);
-const wasm = siteFiles.filter((path) => path.startsWith(`${engineOut}/`) && path.endsWith(".wasm"));
-if (wasm.length === 0) failures.push("engine wasm: no .wasm file under engine/");
+const ortWasm = siteFiles.filter((path) => path.split(sep).includes("ort") && path.endsWith(".wasm"));
+const bundledWasm = siteFiles.filter((path) => path.split(sep).includes("assets") && path.endsWith(".wasm"));
+if (ortWasm.length === 0) failures.push("no ORT .wasm under ort/");
+if (bundledWasm.length === 0) failures.push("no bundled engine .wasm under assets/");
 
 const home = await readFile(join(site, "index.html"), "utf8");
 if (!home.includes("/yagoo/")) failures.push("index.html does not reference /yagoo/");
 
-const engineHome = await readFile(join(site, "engine/index.html"), "utf8");
-if (!engineHome.includes("/yagoo/engine/")) {
-  failures.push("engine/index.html does not reference /yagoo/engine/");
-}
+const redirect = await readFile(join(site, "engine/index.html"), "utf8");
+if (!redirect.includes("/yagoo/demo/")) failures.push("engine/index.html does not redirect to /yagoo/demo/");
+if (redirect.includes("id=\"model-island\"")) failures.push("engine/index.html is still the standalone engine UI");
 
 for (const path of siteFiles) {
   if (!path.endsWith(".js") && !path.endsWith(".html") && !path.endsWith(".css")) continue;
   const text = await readFile(path, "utf8");
   const rel = relative(site, path);
-  if (rel.startsWith("engine/") && text.includes("/yagoo-engine/")) {
-    failures.push(`${rel} still references /yagoo-engine/`);
-  }
   if (text.includes('"/app/sample.sgf"') || text.includes("'/app/sample.sgf'")) {
     failures.push(`${rel} fetches /app/sample.sgf without the /yagoo/ base`);
   }
   if (text.includes('"/app/sample-scan-deep.ndjson"') || text.includes("'/app/sample-scan-deep.ndjson'")) {
     failures.push(`${rel} fetches /app/sample-scan-deep.ndjson without the /yagoo/ base`);
   }
+  if (rel.endsWith(".js") && /fetch\(\s*["'`]models\/manifest\.json["'`]/.test(text)) {
+    failures.push(`${rel} fetches models/manifest.json`);
+  }
 }
 
 const reviewerJs = siteFiles.filter((path) => path.endsWith(".js"));
-const fixtureFetches = [];
+let fixtureFetch = false;
 for (const path of reviewerJs) {
   const text = await readFile(path, "utf8");
   const inlined =
@@ -88,11 +85,9 @@ for (const path of reviewerJs) {
     (text.includes('"/yagoo/app/sample.sgf"') || text.includes("'/yagoo/app/sample.sgf'")) &&
     (text.includes('"/yagoo/app/sample-scan-deep.ndjson"') ||
       text.includes("'/yagoo/app/sample-scan-deep.ndjson'"));
-  if (inlined || literal) fixtureFetches.push(relative(site, path));
+  if (inlined || literal) fixtureFetch = true;
 }
-if (fixtureFetches.length === 0) {
-  failures.push("no built script fetches the sample SGF and NDJSON under /yagoo/");
-}
+if (!fixtureFetch) failures.push("no built script fetches the sample SGF and NDJSON under /yagoo/");
 
 if (failures.length > 0) {
   console.error("Pages assembly failed:");
@@ -100,4 +95,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`Pages site assembled at ${site} (${wasm.length} wasm file(s) under engine/).`);
+console.log(`Pages site checked at ${site} (${ortWasm.length} ORT wasm, ${bundledWasm.length} bundled wasm).`);

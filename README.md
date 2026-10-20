@@ -52,6 +52,17 @@ Pinned teaching net for v1 work: **`kata1-b18c384nbt-s9996604416-d4316597426`** 
 
 Start at **[docs/](docs/index.md)** — glossary, data sources, one page per module, architecture, MVP plan, open questions.
 
+The published site is **[yet-another-ai.github.io/yagoo](https://yet-another-ai.github.io/yagoo/)**. [`.github/workflows/pages.yml`](.github/workflows/pages.yml) runs `mise run pages:build` and deploys to GitHub Pages on pushes to `main` (and on manual dispatch). Pull requests build the same artifact and do not deploy. This repository's Pages source is already **GitHub Actions**.
+
+VitePress `base` is `/yagoo/`, including for local dev, so asset URLs match production:
+
+```sh
+mise run docs
+# http://localhost:5173/yagoo/
+```
+
+The reviewer is at `/yagoo/app/` and loads its bundled SGF and NDJSON from that base. The experimental engine shell is at `/yagoo/engine/` (no model weights). GitHub Pages serves `.wasm` as `application/wasm`. It cannot set COOP/COEP or other custom headers, and it ignores `public/_headers`. Multi-thread Wasm needs those headers, so the engine page stays single-threaded until you click **Enable threads on static hosting**. That registers `coi-serviceworker.js` scoped only to `/yagoo/engine/` and reloads once. The rest of the docs site is not isolated.
+
 ## Experimental browser engine
 
 An **EXPERIMENTAL** in-browser KataGo path (`packages/browser-engine`) can load a self-hosted official b18 SWA ONNX bundle over WebGPU (Wasm fallback), run simplified Rust/Wasm search, and emit the same NDJSON event stream the reviewer already opens. It is **not** search-equivalent to native KataGo and does not change the native `yagoo analyze` / CLI path. Setup, limits, and evidence: [docs/browser-engine.md](docs/browser-engine.md). Research tracking: issue #5.
@@ -64,7 +75,7 @@ mise run check
 mise run docs          # VitePress docs site
 ```
 
-Foundation crates (`yagoo-core`, `yagoo-sgf`, `yagoo-katago`, `yagoo-snapshot`, `yagoo-pipeline`) are in place. The Vue UI package (`packages/ui` / `@yagoo/ui`) provides a Shudan-compatible goban and Sabaki-inspired reviewer chrome embeddable in the docs (`mise run docs`, then open **Reviewer** / `/app`). Teaching **groups** (块) and tempo status are computed in the deep pipeline phase.
+Foundation crates (`yagoo-core`, `yagoo-sgf`, `yagoo-katago`, `yagoo-snapshot`, `yagoo-pipeline`) are in place. The Vue UI package (`packages/ui` / `@yagoo/ui`) provides a Shudan-compatible goban and Sabaki-inspired reviewer chrome embeddable in the docs (`mise run docs`, then open **Reviewer** at `/yagoo/app/`). Teaching **groups** (块) and tempo status are computed in the deep pipeline phase.
 
 ```sh
 mise run ui:test       # Vitest (incl. fuzzy-shift / collision)

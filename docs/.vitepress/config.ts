@@ -9,6 +9,9 @@ export default defineConfig({
   title: "Yagoo",
   description:
     "Interpret KataGo internals for practical Go review and teaching.",
+  // Project site: https://yet-another-ai.github.io/yagoo/
+  // Always this path so local preview and CI match production asset URLs.
+  base: "/yagoo/",
   cleanUrls: true,
   lastUpdated: true,
   themeConfig: {

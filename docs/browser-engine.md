@@ -81,13 +81,14 @@ on every inference. Warmup probability/ownership/lead checks keep the same
 tolerances on retries; a failed fp16 warmup is never labeled as validated fp16.
 
 Vite copies the installed ORT `.wasm` and `.mjs` worker assets into `ort/`, and
-bundles the Rust Wasm URL. Base paths default to `/yagoo-engine/` and can be
-overridden using `YAGOO_BASE`, an absolute path with a trailing slash (for example
-`/engine/`). Relative paths, query strings and URL hosts are rejected at build
-time so ORT and service-worker URLs cannot silently resolve elsewhere.
+bundles the Rust Wasm URL. Local dev and preview default to `/yagoo-engine/`.
+Override that with `YAGOO_BASE`, an absolute path with a trailing slash.
+`mise run pages:build` sets `YAGOO_BASE=/yagoo/engine/` and copies the bundle
+into the docs site. Relative paths, query strings and URL hosts are rejected at
+build time so ORT and service-worker URLs cannot silently resolve elsewhere.
 Dev and preview serve COOP `same-origin` and COEP
-`require-corp`. Deployments should supply those response headers (`public/_headers`
-is supplied for compatible hosts). On static hosts that cannot set headers,
+`require-corp`. `public/_headers` carries the same pair for hosts that honor it.
+GitHub Pages does not. On static hosts that cannot set headers,
 the page offers an explicit, scoped service-worker opt-in with a one-reload guard.
 Serve over HTTPS or localhost. Model hosting must be same-origin or permit CORS.
 Production bundles also contain the KataGo code notice and matching ORT license
@@ -151,9 +152,30 @@ responses have the WebAssembly MIME type and that COOP/COEP headers apply to the
 entry document. A remote model host must also allow the page's origin through
 CORS. The page verifies file hashes and nine required heads against the selected
 official model manifest before analysis; a missing model is an explicit load
-error. Public-host deployment has not been performed or verified
-([#17](https://github.com/yet-another-ai/yagoo/issues/17)). Small-net / mobile
-profiles are not shipped ([#15](https://github.com/yet-another-ai/yagoo/issues/15)).
+error. Small-net / mobile profiles are not shipped
+([#15](https://github.com/yet-another-ai/yagoo/issues/15)).
+
+### GitHub Pages
+
+`mise run pages:build` publishes the **static shell** (not the weights) at
+<a href="engine/" target="_blank" rel="noopener">/yagoo/engine/</a>
+(`https://yet-another-ai.github.io/yagoo/engine/`).
+The link opens the shell directly so the docs router does not treat it as a missing page.
+The docs workflow copies `packages/browser-engine/dist` to `engine/` inside the
+VitePress artifact. Model files are still absent; **Load model** does nothing
+useful until you supply a manifest. A verified public analysis host, with
+weights, is still open
+([#17](https://github.com/yet-another-ai/yagoo/issues/17)).
+
+GitHub Pages serves `.wasm` as `application/wasm` and `.mjs` as JavaScript. It
+cannot set custom response headers or per-file MIME types, so `public/_headers`
+is ignored and the first load is **not** cross-origin isolated. ORT then uses
+one Wasm thread. **Enable threads on static hosting** registers
+`coi-serviceworker.js` with scope `/yagoo/engine/` only, then reloads once. The
+worker adds COOP `same-origin` and COEP `require-corp` to same-origin responses
+under that scope. The rest of the docs site is left alone, because isolating
+`/yagoo/` would require CORP on every docs asset. If the reload still is not
+isolated, the page keeps the single-thread fallback.
 
 ## Root activations
 
@@ -231,7 +253,7 @@ semantics and should not be presented as calibrated teaching conclusions.
   at `[1,384,19,19]`, with GPU validation errors checked; the Wasm run accurately
   reported retention unavailable. Both still used 24 neural evaluations for
   three positions. This validates GPU residence and lifetime, not a new readback
-  comparison of activation values. See [the recorded evidence](./evidence/browser-extra-outputs.json).
+  comparison of activation values. See [the recorded evidence](/evidence/browser-extra-outputs.json).
 - Search contract tests cover inverse symmetry, normalized root averaging,
   distinct leaf reservations, exact visit budgets, inference failure cleanup,
   and a mixed batch containing scored terminal and neural leaves. Terminal
@@ -257,7 +279,7 @@ semantics and should not be presented as calibrated teaching conclusions.
   acceptance tolerances. Native search heuristics/defaults and this batched PUCT
   search are different; a single tiny-budget run does not establish strength or
   search equivalence ([#11](https://github.com/yet-another-ai/yagoo/issues/11)).
-  See [the recorded comparison](./evidence/native-katago-comparison.json).
+  See [the recorded comparison](/evidence/native-katago-comparison.json).
 - Two independent code reviews covered algorithms/rules and runtime/cancellation/
   provenance. Confirmed defects were fixed, including friendly-pass history,
   komi clipping, no-result output, ownership/PV fields, repeated-click event loss,

@@ -1,0 +1,81 @@
+# Build the VitePress site (base /yagoo/) plus the experimental engine shell
+# and deploy it to GitHub Pages. Pull requests build the artifact only.
+# `mise run ci` already builds the docs; this job is the production assembly
+# (engine base /yagoo/engine/ copied into the site).
+
+name: Pages
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  RUSTUP_HOME: /home/runner/.local/share/mise/rustup
+  CARGO_HOME: /home/runner/.local/share/mise/cargo
+
+jobs:
+  build:
+    name: Build site
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up tools
+        uses: ./.github/actions/setup
+        with:
+          pnpm: true
+          rust-cache-key: wasm32
+
+      - name: Cache wasm-bindgen CLI
+        uses: actions/cache@v6
+        with:
+          path: .yagoo-data/wasm-tools
+          key: wasm-bindgen-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packages/browser-engine/scripts/build-wasm.mjs') }}
+
+      - name: Assemble Pages site
+        run: mise run pages:build
+
+      - name: Configure Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v6
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/.vitepress/dist
+
+  deploy:
+    name: Deploy
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

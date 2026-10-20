@@ -12,8 +12,9 @@ mise run check
 | Task | Purpose |
 | --- | --- |
 | `mise run install` | pnpm install (docs site) |
-| `mise run docs` | VitePress docs dev server |
-| `mise run docs-build` | Build docs |
+| `mise run docs` | VitePress docs dev server at `http://localhost:5173/yagoo/` |
+| `mise run docs-build` | Build docs with base `/yagoo/` |
+| `mise run pages:build` | Docs plus the engine shell, the GitHub Pages artifact |
 | `mise run format` / `format-check` | Rustfmt |
 | `mise run lint` | Clippy (`-D warnings`) |
 | `mise run rust:test` | Cargo tests |

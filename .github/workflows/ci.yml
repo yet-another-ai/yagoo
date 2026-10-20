@@ -1,3 +1,8 @@
+# Mirrors `mise run ci` (see mise.toml `check`): format, Clippy, Rust tests,
+# UI typecheck and unit tests, browser engine check, and the docs build.
+# Jobs are independent. KataGo fixtures are the committed recordings; nothing
+# here downloads models or runs native KataGo.
+
 name: CI
 
 on:
@@ -9,33 +14,37 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: "0"
+  # ubuntu-latest keeps mise's data in /home/runner/.local/share/mise, which
+  # jdx/mise-action caches. The image's own RUSTUP_HOME (~/.rustup) is not in
+  # that cache, so pin the toolchain and cargo home underneath it.
+  RUSTUP_HOME: /home/runner/.local/share/mise/rustup
+  CARGO_HOME: /home/runner/.local/share/mise/cargo
 
 jobs:
-  check:
-    name: Check
+  rust-lint:
+    name: Rust format and Clippy
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - name: Check out source
         uses: actions/checkout@v7
         with:
           persist-credentials: false
+          fetch-depth: 1
 
-      - name: Install toolchain
-        uses: jdx/mise-action@v5
+      - name: Set up tools
+        uses: ./.github/actions/setup
         with:
-          cache: true
-
-      - name: Install JavaScript dependencies
-        run: mise run install
+          rust-cache-key: clippy
 
       - name: Rust format check
         run: mise run format-check
@@ -43,17 +52,73 @@ jobs:
       - name: Rust Clippy
         run: mise run lint
 
-      - name: Cargo check
-        run: mise run rust:check
+  rust-test:
+    name: Rust tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up tools
+        uses: ./.github/actions/setup
+        with:
+          rust-cache-key: test
 
       - name: Rust tests
         run: mise run rust:test
 
+  js:
+    name: UI, types, and docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up tools
+        uses: ./.github/actions/setup
+        with:
+          pnpm: true
+          mise-install-args: node pnpm
+
+      - name: Typecheck UI
+        run: mise run ui:check
+
       - name: UI unit tests
         run: mise run ui:test
 
-      - name: Browser Wasm build and functional unit tests
-        run: mise run browser:check
-
       - name: Build documentation
         run: mise run docs-build
+
+  browser:
+    name: Browser engine
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up tools
+        uses: ./.github/actions/setup
+        with:
+          pnpm: true
+          rust-cache-key: wasm32
+
+      - name: Cache wasm-bindgen CLI
+        uses: actions/cache@v6
+        with:
+          path: .yagoo-data/wasm-tools
+          key: wasm-bindgen-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('packages/browser-engine/scripts/build-wasm.mjs') }}
+
+      - name: Wasm build, typecheck, unit tests, and bundle
+        run: mise run browser:check

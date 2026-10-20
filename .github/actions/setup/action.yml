@@ -1,0 +1,55 @@
+name: Setup tools
+description: Install mise tools and restore the pnpm store and Cargo caches when requested.
+
+inputs:
+  pnpm:
+    description: Restore the pnpm content-addressable store before JavaScript tasks.
+    required: false
+    default: "false"
+  rust-cache-key:
+    description: Swatinem/rust-cache shared key. Leave empty to skip Cargo caching.
+    required: false
+    default: ""
+  mise-install-args:
+    description: Arguments passed to mise install. Empty installs every tool in mise.toml.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Install toolchain
+      if: inputs.mise-install-args == ''
+      uses: jdx/mise-action@v5
+      with:
+        cache: true
+
+    - name: Install selected tools
+      if: inputs.mise-install-args != ''
+      uses: jdx/mise-action@v5
+      with:
+        cache: true
+        install_args: ${{ inputs.mise-install-args }}
+
+    - name: Resolve pnpm store path
+      if: inputs.pnpm == 'true'
+      id: pnpm-store
+      shell: bash
+      run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+    - name: Cache pnpm store
+      if: inputs.pnpm == 'true'
+      uses: actions/cache@v6
+      with:
+        path: ${{ steps.pnpm-store.outputs.path }}
+        key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: |
+          pnpm-${{ runner.os }}-
+
+    - name: Cache Rust registry and target
+      if: inputs.rust-cache-key != ''
+      uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: ${{ inputs.rust-cache-key }}
+        cache-all-crates: "true"
+        env-vars: CARGO_INCREMENTAL

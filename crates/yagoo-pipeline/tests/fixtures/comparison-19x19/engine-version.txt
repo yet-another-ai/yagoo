@@ -1,0 +1,6 @@
+KataGo v1.16.4
+Git revision: 4b8de63bea2bd8790db96cd6f8daf86dc87be6f7
+Compile Time: Oct 20 2025 09:47:37
+Using Eigen(CPU) backend
+Compiled with AVX2 and FMA instructions
+Compiled to support contributing to online distributed selfplay

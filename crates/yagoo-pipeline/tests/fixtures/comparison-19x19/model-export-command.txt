@@ -1,0 +1,1 @@
+['..\\katago-upstream\\python\\export_model_pytorch.py', '-checkpoint', '.yagoo-data/models/b18/kata1-b18c384nbt-s9996604416-d4316597426/model.ckpt', '-export-dir', '.yagoo-data/native-katago', '-model-name', 'kata1-b18c384nbt-s9996604416-d4316597426', '-filename-prefix', 'official-swa', '-use-swa']

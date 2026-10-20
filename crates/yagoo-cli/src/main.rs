@@ -73,6 +73,12 @@ enum Commands {
         /// Query PV-end ownership for top candidates (deep phase).
         #[arg(long, default_value_t = false)]
         pv_ends: bool,
+        /// Disable historical actual-versus-AI queries (e.g. legacy fixture replay).
+        #[arg(long)]
+        no_comparison: bool,
+        /// Candidate visits below which the actual move is re-searched.
+        #[arg(long, default_value_t = 16)]
+        comparison_min_visits: u64,
         /// Opt-in during-search `stagePartial` events (off by default).
         #[arg(long, default_value_t = false)]
         partials: bool,
@@ -141,6 +147,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             to,
             strategy,
             pv_ends,
+            no_comparison,
+            comparison_min_visits,
             partials,
             report_every,
             deepen_all,
@@ -184,6 +192,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 from_ply: from,
                 to_ply: to,
                 include_pv_ends: pv_ends,
+                include_comparison: !no_comparison,
+                comparison_min_visits,
                 report_during_search_every: if partials { Some(report_every) } else { None },
                 emit_game_aggregate: final_json.is_some(),
                 deepen_all,

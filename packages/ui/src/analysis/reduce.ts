@@ -4,6 +4,7 @@ import {
   type PlyAnalysis,
   createInitialAnalysisState,
 } from "./types";
+import { isAlignedComparison } from "./comparison";
 
 function ensurePly(state: AnalysisState, ply: number): PlyAnalysis {
   const existing = state.plies[ply];
@@ -104,6 +105,7 @@ export function reducePipelineEvent(
         // Deepening replaces scan completeness; keep scan root until deep root arrives.
         ply.complete = false;
         ply.rootPartial = false;
+        ply.comparison = null;
       }
       break;
     }
@@ -145,6 +147,8 @@ export function reducePipelineEvent(
       ply.groups = snap.groups ? [...snap.groups] : [];
       // The completed snapshot is authoritative, including omitted/null fields.
       ply.ledger = snap.ledger ?? null;
+      ply.comparison = isAlignedComparison(snap.comparison, snap.ply, snap.board.size)
+        ? snap.comparison : null;
       ply.complete = true;
       break;
     }

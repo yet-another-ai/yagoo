@@ -65,6 +65,7 @@ SGF="$ROOT/docs/public/app/sample.sgf"
   --visits "$DEEP_VISITS" \
   --max-deep-plies "$MAX_DEEP" \
   --top-k "$TOP_K" \
+  --no-comparison \
   --record-fixture "$RESPONSES" \
   -o "$NDJSON_DOCS"
 

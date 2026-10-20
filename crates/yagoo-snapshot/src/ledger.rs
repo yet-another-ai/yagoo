@@ -8,7 +8,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use yagoo_core::Point;
 
-use crate::{CandidateSnapshot, ColorToken, GroupSnapshot, GroupStatus, PositionSnapshot};
+use crate::{
+    CandidateSnapshot, ColorToken, ComparisonGroupTempo, GroupSnapshot, GroupStatus,
+    PositionSnapshot,
+};
 
 /// Initial, uncalibrated tolerance in ownership-book versus search points.
 pub const LEDGER_CONSISTENCY_TOLERANCE: f64 = 3.0;
@@ -50,6 +53,7 @@ pub enum LedgerInconsistency {
 #[serde(rename_all = "snake_case")]
 pub enum LedgerTempo {
     Unassessed,
+    BranchPassProbes,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -92,6 +96,8 @@ pub struct GainLossLine {
     pub strength_changes: Vec<LedgerStrengthChange>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tempo: Option<LedgerTempo>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tempo_changes: Vec<ComparisonGroupTempo>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -143,6 +149,7 @@ pub fn compute_ledger(
                 "pass",
                 reference.ownership.as_deref()?,
                 reference.score_lead?,
+                &[],
             )
         }
         LedgerBaseline::Best => {
@@ -166,6 +173,27 @@ pub fn compute_ledger_against(
         &reference.move_,
         reference.ownership.as_deref()?,
         reference.score_lead?,
+        &[],
+    )
+}
+
+/// Same-root ledger with status evidence on the root's fixed group membership.
+/// The evidence comes from explicit root/pass probes of both played branches.
+#[must_use]
+pub fn compute_ledger_against_with_tempo(
+    snapshot: &PositionSnapshot,
+    candidate: &CandidateSnapshot,
+    reference: &CandidateSnapshot,
+    tempo: &[ComparisonGroupTempo],
+) -> Option<GainLossLedger> {
+    build_ledger(
+        snapshot,
+        candidate,
+        LedgerBaseline::Best,
+        &reference.move_,
+        reference.ownership.as_deref()?,
+        reference.score_lead?,
+        tempo,
     )
 }
 
@@ -201,7 +229,7 @@ fn same_stones(left: &[String], right: &[String]) -> bool {
     left == right
 }
 
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines, clippy::too_many_arguments)]
 fn build_ledger(
     snapshot: &PositionSnapshot,
     candidate: &CandidateSnapshot,
@@ -209,6 +237,7 @@ fn build_ledger(
     reference_move: &str,
     reference: &[f64],
     reference_score: f64,
+    tempo: &[ComparisonGroupTempo],
 ) -> Option<GainLossLedger> {
     let size = snapshot.board.size;
     let count = usize::from(size).pow(2);
@@ -243,9 +272,28 @@ fn build_ledger(
     let mut lines = Vec::new();
     for group in &snapshot.groups {
         let changes = strength_changes(group, own, reference, size)?;
+        let statuses: Vec<_> = tempo
+            .iter()
+            .filter(|entry| {
+                entry.group_id == group.group_id
+                    && same_stones(
+                        &entry.stones,
+                        if entry.color == ColorToken::B {
+                            &group.members.black_stones
+                        } else {
+                            &group.members.white_stones
+                        },
+                    )
+            })
+            .cloned()
+            .collect();
+        let status_changed = statuses
+            .iter()
+            .any(|entry| entry.actual_status != entry.preferred_status);
         if !changes
             .iter()
             .any(|change| change.delta.abs() >= LEDGER_STRENGTH_THRESHOLD)
+            && !status_changed
         {
             continue;
         }
@@ -268,9 +316,21 @@ fn build_ledger(
         }
         let mut line = make_line(LedgerLineKind::Group, &indices, &delta, size);
         line.id = Some(group.group_id.clone());
-        line.change = Some("strength_changed".into());
+        line.change = Some(
+            if status_changed {
+                "status_changed"
+            } else {
+                "strength_changed"
+            }
+            .into(),
+        );
         line.strength_changes = changes;
-        line.tempo = Some(LedgerTempo::Unassessed);
+        line.tempo = Some(if statuses.is_empty() {
+            LedgerTempo::Unassessed
+        } else {
+            LedgerTempo::BranchPassProbes
+        });
+        line.tempo_changes = statuses;
         lines.push(line);
     }
     for kind in [
@@ -407,6 +467,7 @@ fn make_line(kind: LedgerLineKind, indices: &[usize], delta: &[f64], size: u8) -
             .collect(),
         strength_changes: Vec::new(),
         tempo: None,
+        tempo_changes: Vec::new(),
     }
 }
 

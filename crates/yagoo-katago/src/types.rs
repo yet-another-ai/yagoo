@@ -62,7 +62,11 @@ pub struct AnalysisQuery {
     /// Seconds between during-search progress reports (KataGo `reportDuringSearchEvery`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub report_during_search_every: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "analysisPVLen",
+        alias = "analysisPvLen",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub analysis_pv_len: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_ownership: Option<bool>,
@@ -74,7 +78,11 @@ pub struct AnalysisQuery {
     pub include_moves_ownership_stdev: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_policy: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "includePVVisits",
+        alias = "includePvVisits",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub include_pv_visits: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub avoid_moves: Option<Value>,
@@ -94,6 +102,8 @@ pub struct AnalysisQuery {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct RootInfo {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub this_hash: Option<String>,
     #[serde(default)]
     pub winrate: Option<f64>,
     #[serde(default)]

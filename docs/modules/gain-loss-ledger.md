@@ -96,14 +96,15 @@ ownership sum. With difference at most **3 points** and `abs(bookTotal) >= 1e-6`
 Signed shares can cancel; they are not win probabilities or calibrated points.
 `inconsistency` distinguishes `zero_book` from `book_search_mismatch`.
 
-Tempo transitions remain **unassessed**. One ownership map per candidate does
-not establish post-move life status, sente, or gote. Group rows expose
-`strengthChanges` for each color and `tempo: "unassessed"`; the UI says why.
-The library's `compute_tempo_changes` can compare actual assessed group snapshots
-when their stone membership agrees, but the pipeline does not yet collect the
-branch pass probes needed to populate such transitions. Consequently the tempo
-transition acceptance item in issue #23 remains open; no full issue closure is
-claimed by this implementation.
+The ordinary best-versus-pass ledger keeps tempo transitions **unassessed**:
+one ownership map per candidate does not establish post-move life status.
+The [played-move comparison](move-comparison.md) now collects actual/preferred
+branch root/pass pairs, retaining fixed root stone membership per color.
+`compute_ledger_against_with_tempo` gives a group priority when these supported
+statuses differ, even below the 0.3 strength threshold. Those rows carry
+`tempo: "branch_pass_probes"` and detailed `tempoChanges`. Missing probes retain
+`unassessed`. These ownership-based statuses establish neither sente/gote nor
+geometric seki, and broad teaching calibration remains incomplete.
 
 Validation uses constructed arithmetic tests separately from all eight deep
 positions in the genuine 2026-10-19 KataGo recording (see the fixture README).
@@ -111,3 +112,8 @@ The bundled NDJSON is replayed through the new pipeline without changing the raw
 responses. `ledger-position.json` is a derived ply-50 snapshot used by reducer and
 UI hover/focus tests. This checks data flow and arithmetic, not human teaching
 calibration; the initial thresholds remain unvalidated on a broad game corpus.
+
+The older recording omitted move history; some candidates violate the true
+game's ko restriction. It remains an arithmetic/data-flow regression fixture,
+not historical comparison evidence. The newer full-history `comparison-19x19`
+corpus is used for actual-versus-preferred tests and supported branch statuses.

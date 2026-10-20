@@ -223,6 +223,9 @@ pub struct PositionSnapshot {
     /// Best root candidate versus the explicit pass probe; deep phase only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ledger: Option<crate::ledger::GainLossLedger>,
+    /// Actual move at this ply, evaluated at the preceding full-history root.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comparison: Option<crate::comparison::MoveComparison>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub root: Option<EngineAnalysis>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -256,6 +259,7 @@ impl PositionSnapshot {
             chains,
             groups: Vec::new(),
             ledger: None,
+            comparison: None,
             root: None,
             pass_probe: None,
             pass_probe_skipped: None,

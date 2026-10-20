@@ -71,6 +71,7 @@ fn config() -> PipelineConfig {
         root_visits: 500,
         top_k: 5,
         emit_game_aggregate: false,
+        include_comparison: false,
         deep_select: DeepSelectConfig {
             max_deep_plies: 8,
             ..DeepSelectConfig::default()

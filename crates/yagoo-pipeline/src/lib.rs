@@ -4,6 +4,7 @@
 
 #![forbid(unsafe_code)]
 
+mod comparison;
 mod config;
 mod engine;
 mod error;
@@ -11,6 +12,7 @@ mod interactive;
 mod run;
 mod select;
 
+pub use comparison::analyze_move_comparison;
 pub use config::{PipelineConfig, PipelineStrategy};
 pub use engine::{AnalysisEngine, UpdateCallback};
 pub use error::{PipelineError, PipelineResult};

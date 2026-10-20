@@ -77,6 +77,7 @@ fn fixture_pipeline_config() -> PipelineConfig {
             max_deep_plies: 8,
             ..DeepSelectConfig::default()
         },
+        include_comparison: false,
         ..PipelineConfig::default()
     }
 }

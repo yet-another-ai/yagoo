@@ -15,7 +15,7 @@
 
 mod cluster;
 mod params;
-mod tempo;
+pub(crate) mod tempo;
 
 pub use params::GroupParams;
 

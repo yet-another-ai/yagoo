@@ -1,0 +1,375 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-20T17:16:29.180Z",
+  "state": "complete",
+  "source": {
+    "path": "C:\\Users\\dsh04\\Documents\\Codex\\2026-10-21\\task\\yagoo-ledger\\docs\\public\\app\\sample.sgf",
+    "sha256": "6b0310aec23fd026120aed5bb29ec4a68350494c47403fad1dde09757308b269",
+    "fixture": "source.sgf",
+    "name": "Ear-reddening game (truncated)",
+    "credit": "Public-domain historical game: Yasuda Shusaku (Black, 4d) vs Inoue Gennan Inseki (White, 8d), 1846; bundled first 100 moves.",
+    "upstreamArchive": "https://homepages.cwi.nl/~aeb/go/games/",
+    "archiveGame": 126,
+    "provenance": "Copied byte-for-byte from repository docs/public/app/sample.sgf. No new source fetch."
+  },
+  "engine": {
+    "path": "C:\\Users\\dsh04\\Documents\\Codex\\2026-10-18\\task\\yagoo-issue5\\.yagoo-data\\native-katago\\katago.exe",
+    "sha256": "bad55cf31ec42f58dec821a2e428c8d45d9e4697f9e2741b8aa644d03a37acfc",
+    "version": "KataGo v1.16.4\r\nGit revision: 4b8de63bea2bd8790db96cd6f8daf86dc87be6f7\r\nCompile Time: Oct 20 2025 09:47:37\r\nUsing Eigen(CPU) backend\r\nCompiled with AVX2 and FMA instructions\r\nCompiled to support contributing to online distributed selfplay",
+    "backend": "Eigen AVX2 CPU Windows"
+  },
+  "model": {
+    "path": "C:\\Users\\dsh04\\Documents\\Codex\\2026-10-18\\task\\yagoo-issue5\\.yagoo-data\\native-katago\\official-swa.bin",
+    "sha256": "46a623a366ef6ef423fa2055f1b094fd8f64c518c065e7d254a9e0829c192c5c",
+    "bytes": 105532578,
+    "name": "kata1-b18c384nbt-s9996604416-d4316597426",
+    "provenance": "Existing local official-swa.bin exported using KataGo python/export_model_pytorch.py -use-swa from existing model.ckpt; see model-export-command.txt. No model downloaded/uploaded."
+  },
+  "config": {
+    "file": "analysis.cfg",
+    "sha256": "104027dae6852a2531727a57eb77ff19eded6076f97ebfd7a709cf89b0b1d893"
+  },
+  "rules": "chinese",
+  "komi": 0,
+  "boardSize": 19,
+  "coordinates": "GTP; ownership arrays row-major A19 to T1",
+  "perspective": "BLACK for winrate, scoreLead, root and move ownership",
+  "visits": 64,
+  "requestedPlies": [
+    43,
+    44,
+    50,
+    60,
+    96
+  ],
+  "cases": [
+    {
+      "ply": 43,
+      "rootPly": 42,
+      "mover": "B",
+      "actualMove": "R2",
+      "queries": {
+        "root": "p43-root",
+        "root-pass": "p43-root-pass",
+        "actual-branch-root": "p43-actual-branch-root",
+        "actual-branch-pass": "p43-actual-branch-pass",
+        "ai-branch-root": "p43-actual-branch-root",
+        "ai-branch-pass": "p43-actual-branch-pass",
+        "ai-pv-end": "p43-ai-pv-end"
+      },
+      "aiMove": "R2",
+      "aiRootOrder": 0,
+      "actualInUnrestrictedRoot": true,
+      "actualCandidateSource": "p43-root",
+      "rootHash": "6C9F8766F4CAED2ACAE4567859AF2B33",
+      "actualRootVisits": 61,
+      "aiRootVisits": 61,
+      "sameRootDeltaBlack": 0,
+      "sameRootDeltaMover": 0,
+      "aiPv": [
+        "R2",
+        "P9",
+        "P2",
+        "Q10",
+        "S8",
+        "R10",
+        "S6",
+        "R9",
+        "S5",
+        "R8"
+      ],
+      "aiPvVisits": [
+        61,
+        60,
+        41,
+        40,
+        8,
+        4,
+        4,
+        3,
+        2,
+        1
+      ],
+      "endpointPly": 52,
+      "rootScoreBlack": 2.37212156,
+      "aiScoreBlack": 2.34095432,
+      "endpointScoreBlack": 2.25111938
+    },
+    {
+      "ply": 44,
+      "rootPly": 43,
+      "mover": "W",
+      "actualMove": "S7",
+      "queries": {
+        "root": "p44-root",
+        "root-pass": "p44-root-pass",
+        "actual-branch-root": "p44-actual-branch-root",
+        "actual-branch-pass": "p44-actual-branch-pass",
+        "ai-branch-root": "p44-ai-branch-root",
+        "ai-branch-pass": "p44-ai-branch-pass",
+        "ai-pv-end": "p44-ai-pv-end"
+      },
+      "aiMove": "P9",
+      "aiRootOrder": 0,
+      "actualInUnrestrictedRoot": true,
+      "actualCandidateSource": "p44-root",
+      "rootHash": "985E6E35E18B8AF7C1488CAFA1249A31",
+      "actualRootVisits": 2,
+      "aiRootVisits": 58,
+      "sameRootDeltaBlack": 2.45758513,
+      "sameRootDeltaMover": -2.45758513,
+      "aiPv": [
+        "P9",
+        "P2",
+        "Q10",
+        "S8",
+        "R10",
+        "S6",
+        "R9",
+        "S5",
+        "R8"
+      ],
+      "aiPvVisits": [
+        58,
+        41,
+        40,
+        8,
+        4,
+        4,
+        3,
+        2,
+        1
+      ],
+      "endpointPly": 52,
+      "rootScoreBlack": 2.38910076,
+      "aiScoreBlack": 2.31487819,
+      "endpointScoreBlack": 2.25316587
+    },
+    {
+      "ply": 50,
+      "rootPly": 49,
+      "mover": "W",
+      "actualMove": "R7",
+      "queries": {
+        "root": "p50-root",
+        "root-pass": "p50-root-pass",
+        "actual-branch-root": "p50-actual-branch-root",
+        "actual-branch-pass": "p50-actual-branch-pass",
+        "ai-branch-root": "p50-actual-branch-root",
+        "ai-branch-pass": "p50-actual-branch-pass",
+        "ai-pv-end": "p50-ai-pv-end"
+      },
+      "aiMove": "R7",
+      "aiRootOrder": 0,
+      "actualInUnrestrictedRoot": true,
+      "actualCandidateSource": "p50-root",
+      "rootHash": "90B686C102A7019856D6F188BF1AE43C",
+      "actualRootVisits": 15,
+      "aiRootVisits": 15,
+      "sameRootDeltaBlack": 0,
+      "sameRootDeltaMover": 0,
+      "aiPv": [
+        "R7",
+        "P2",
+        "R8",
+        "M6",
+        "N7",
+        "R9",
+        "S9",
+        "S10",
+        "T8",
+        "H3",
+        "J4"
+      ],
+      "aiPvVisits": [
+        15,
+        14,
+        28,
+        14,
+        13,
+        8,
+        7,
+        6,
+        5,
+        3,
+        1
+      ],
+      "endpointPly": 60,
+      "rootScoreBlack": 2.8842269,
+      "aiScoreBlack": 2.60997842,
+      "endpointScoreBlack": 2.85745504
+    },
+    {
+      "ply": 60,
+      "rootPly": 59,
+      "mover": "W",
+      "actualMove": "S3",
+      "queries": {
+        "root": "p60-root",
+        "actual-forced": "p60-actual-forced",
+        "root-pass": "p60-root-pass",
+        "actual-branch-root": "p60-actual-branch-root",
+        "actual-branch-pass": "p60-actual-branch-pass",
+        "ai-branch-root": "p60-ai-branch-root",
+        "ai-branch-pass": "p60-ai-branch-pass",
+        "ai-pv-end": "p60-ai-pv-end"
+      },
+      "aiMove": "H3",
+      "aiRootOrder": 0,
+      "actualInUnrestrictedRoot": false,
+      "actualCandidateSource": "p60-actual-forced",
+      "rootHash": "79F05CEFA5F9EF604405D01E98B49752",
+      "actualRootVisits": 63,
+      "aiRootVisits": 56,
+      "sameRootDeltaBlack": 6.681626325,
+      "sameRootDeltaMover": -6.681626325,
+      "aiPv": [
+        "H3",
+        "G4",
+        "G3",
+        "D13",
+        "D14",
+        "C13",
+        "C5"
+      ],
+      "aiPvVisits": [
+        56,
+        23,
+        16,
+        8,
+        4,
+        3,
+        1
+      ],
+      "endpointPly": 66,
+      "rootScoreBlack": 0.700647246,
+      "aiScoreBlack": 0.684380635,
+      "endpointScoreBlack": 0.578641693
+    },
+    {
+      "ply": 96,
+      "rootPly": 95,
+      "mover": "W",
+      "actualMove": "R14",
+      "queries": {
+        "root": "p96-root",
+        "root-pass": "p96-root-pass",
+        "actual-branch-root": "p96-actual-branch-root",
+        "actual-branch-pass": "p96-actual-branch-pass",
+        "ai-branch-root": "p96-actual-branch-root",
+        "ai-branch-pass": "p96-actual-branch-pass",
+        "ai-pv-end": "p96-ai-pv-end"
+      },
+      "aiMove": "R14",
+      "aiRootOrder": 0,
+      "actualInUnrestrictedRoot": true,
+      "actualCandidateSource": "p96-root",
+      "rootHash": "C2031BF410F713508847C14B16648BC1",
+      "actualRootVisits": 47,
+      "aiRootVisits": 47,
+      "sameRootDeltaBlack": 0,
+      "sameRootDeltaMover": 0,
+      "aiPv": [
+        "R14",
+        "S13",
+        "Q14",
+        "S15",
+        "L18",
+        "K18",
+        "M19",
+        "K17",
+        "S14",
+        "T14",
+        "P18"
+      ],
+      "aiPvVisits": [
+        47,
+        41,
+        22,
+        16,
+        13,
+        12,
+        8,
+        7,
+        3,
+        2,
+        1
+      ],
+      "endpointPly": 106,
+      "rootScoreBlack": 4.4489298,
+      "aiScoreBlack": 4.06616979,
+      "endpointScoreBlack": 3.5992624
+    }
+  ],
+  "queryCount": 30,
+  "caveats": [
+    "Finite-visit engine evidence is not expert-labelled sacrifice ground truth.",
+    "Raw responses are replay artifacts; regeneration may differ across hardware or engine versions.",
+    "The sample game is historical but uses its repository Chinese rules and zero komi, not a reconstructed historical rule set.",
+    "KataGo v1.16.4 reports searchRandSeed as unused. Its warning is retained in stderr.log. The recording supports deterministic offline replay, not bitwise deterministic regeneration."
+  ],
+  "engineExit": {
+    "code": 0,
+    "signal": null
+  },
+  "finishedAt": "2026-10-20T17:26:55.459Z",
+  "files": {
+    "queries.ndjson": {
+      "sha256": "bb57103a639e3b485f4f8ace435fa581a5ba18dfa19e38e806c718c3b5c11acf",
+      "bytes": 28578
+    },
+    "responses.ndjson": {
+      "sha256": "f24f30dc632759e381d3536b959f71669aafc8749a527560f09d6518adfa7f0f",
+      "bytes": 1161079
+    },
+    "responses.json.gz": {
+      "sha256": "6acbc9a6d80dffc90d3ccfd07f7a093a498428ace65a757b9c6b47ab97310fd6",
+      "bytes": 407499
+    },
+    "source.sgf": {
+      "sha256": "6b0310aec23fd026120aed5bb29ec4a68350494c47403fad1dde09757308b269",
+      "bytes": 1348
+    },
+    "analysis.cfg": {
+      "sha256": "104027dae6852a2531727a57eb77ff19eded6076f97ebfd7a709cf89b0b1d893",
+      "bytes": 409
+    },
+    "stderr.log": {
+      "sha256": "992622a668e7d588fa193e59c9bc4577c564a9a7e31779abbc51fbe0c247941b",
+      "bytes": 438
+    },
+    "engine-version.txt": {
+      "sha256": "d5e44a76441a14cb6489e86bc294c56206a4934d04a578bb926ea674ad4285ec",
+      "bytes": 239
+    },
+    "derived-summary.json": {
+      "sha256": "c28b18e2e053c39b6c2461de378ebeb5963dc6912235834f2d6d507bfbdb5ed3",
+      "bytes": 2313612
+    },
+    "record-fixtures.mjs": {
+      "sha256": "0afd3620c788683b15a6a33d6396e138836108e046ab68a4d4e26652ab7bc625",
+      "bytes": 10863
+    },
+    "validate-recording.mjs": {
+      "sha256": "42005aa7e930d5ff0c3d8f3c5e2e7290e10c4d5cf3771eb5a897a7874a9f77c9",
+      "bytes": 5807
+    },
+    "README.md": {
+      "sha256": "580c15b28528112790773d75ad4274446458267c5a8dd70603cd3533c00fce8f",
+      "bytes": 5492
+    },
+    "model-export-command.txt": {
+      "sha256": "d89407f20494f9fa3e87b35bcbf1792f7fb7bce717df28307de54938542e1e39",
+      "bytes": 302
+    },
+    "model-metadata.json": {
+      "sha256": "9f755c37a361c7cd0ae9153a14b3b370cabd04b1b60c60208d1382ed6b9f4900",
+      "bytes": 70
+    }
+  },
+  "derivedEvidence": {
+    "file": "derived-summary.json",
+    "tool": "../replay-summary",
+    "kind": "Offline conversion through current yagoo-core/yagoo-snapshot crates; not engine output or expert sacrifice ground truth."
+  }
+}

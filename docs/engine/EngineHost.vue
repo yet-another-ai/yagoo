@@ -96,6 +96,7 @@ async function onThreads() {
       v-else
       :initial-sgf="sgf"
       :initial-ndjson="ndjson"
+      initial-analysis-notice="Historical recording: queries omitted move history, so ko-forbidden candidates can appear. Use this sample to inspect the UI, not to assess the historical moves."
       :theme="theme"
       :browser-engine="staged ? engine : null"
       :thread-hint="threadHint"

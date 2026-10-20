@@ -37,6 +37,16 @@ mise run fixtures:regen
 
 ## Ledger derivative (2026-10-21)
 
+**History limitation discovered during roadmap validation:** these legacy
+responses have `turnNumber: 0` at nonzero plies and represent setup-board
+queries. They do not preserve the game's ko history. For example, R1 is a
+simple-ko forbidden move after plies 43 and 49 of the bundled SGF, yet appears
+among the recorded candidates. These responses remain genuine recordings,
+but are only evidence for arithmetic, serialization, and UI replay. They must
+not establish actual-move loss, legal alternatives, or sacrifice claims for
+those historical positions. The reviewer labels this limitation visibly.
+New comparison recordings retain the full initial setup and move sequence.
+
 The raw `responses.json.gz` recording above is unchanged. Both bundled
 `sample-scan-deep.ndjson` files were replayed through the ledger-enabled pipeline:
 

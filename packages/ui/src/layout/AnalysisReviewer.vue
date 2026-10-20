@@ -35,6 +35,8 @@ const props = defineProps<{
   initialSgf?: string;
   /** Initial / bundled NDJSON analysis (loaded progressively). */
   initialNdjson?: string;
+  /** Provenance limitation shown only while using the initial recording. */
+  initialAnalysisNotice?: string;
   /**
    * Optional fixed stone size. When omitted, `ReviewerLayout` sizes the board
    * from its container via ResizeObserver (fills available area).
@@ -462,6 +464,14 @@ const phaseBadge = computed(() => {
 
     <p v-if="statusMessage" class="yagoo-analysis-app__status">
       {{ statusMessage }}
+    </p>
+    <p
+      v-if="initialAnalysisNotice && sourceLabel === 'bundled sample analysis'"
+      class="yagoo-analysis-app__status"
+      role="note"
+      data-testid="recording-provenance-notice"
+    >
+      {{ initialAnalysisNotice }}
     </p>
     <p v-if="dragOver" class="yagoo-analysis-app__drop">
       Drop SGF and/or NDJSON analysis files…

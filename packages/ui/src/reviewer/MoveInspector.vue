@@ -13,6 +13,9 @@ import StubPane from "./StubPane.vue";
 import LedgerPanel from "./LedgerPanel.vue";
 import ComparisonPanel from "./ComparisonPanel.vue";
 import SacrificePanel from "./SacrificePanel.vue";
+import CommentaryPanel from "./CommentaryPanel.vue";
+import type { CommentaryInput, CommentaryTarget, CommentaryOrigin, GroundedCommentary } from "../commentary/facts";
+import type { CommentaryProvider } from "../commentary/session";
 
 export type InspectorPerspective =
   | "ai"
@@ -33,6 +36,9 @@ const props = withDefaults(
     showComparisonDifference?: boolean;
     sacrifices?: SacrificeAnnotation[] | null;
     commentary?: LlmCommentary | null;
+    commentaryInput?: CommentaryInput;
+    commentaryProvider?: CommentaryProvider | null;
+    commentaryContextKey?: string | number;
     initialPerspective?: InspectorPerspective;
     /** Ply shown in the header, for key-move context. */
     ply?: number;
@@ -69,6 +75,9 @@ const emit = defineEmits<{
   (e: "perspective-change", perspective: InspectorPerspective): void;
   (e: "prev-key"): void;
   (e: "next-key"): void;
+  (e: "commentary", result: GroundedCommentary | null, origin: CommentaryOrigin): void;
+  (e: "cite-commentary", target: CommentaryTarget): void;
+  (e: "clear-commentary-citation"): void;
 }>();
 
 const tabs: { id: InspectorPerspective; label: string }[] = [
@@ -269,27 +278,14 @@ defineExpose({ perspective });
       aria-labelledby="yagoo-tab-notes"
       class="yagoo-inspector__panel"
     >
-      <div v-if="commentary" data-testid="commentary-body" class="yagoo-notes">
-        <p>{{ commentary.text }}</p>
-        <p class="yagoo-inspector__wait">
-          {{ commentary.provider }} ·
-          {{ commentary.verified ? "verified" : "template fallback" }}
-          <template v-if="commentary.citedFactIds.length">
-            · {{ commentary.citedFactIds.join(", ") }}
-          </template>
-        </p>
-      </div>
-      <div v-else>
-        <StubPane
-          :issue="28"
-          title="Natural-language notes"
-          summary="An optional model may paraphrase the structured facts (candidates, ledger, comparison, sacrifices, opening). It will not judge the position itself. Commentary stays off, including in CI."
-        />
-        <label class="yagoo-notes__opt">
-          <input type="checkbox" disabled />
-          Generate commentary (off until #28)
-        </label>
-      </div>
+      <CommentaryPanel
+        :input="commentaryInput ?? { ply, root, candidates, ledger, comparison, sacrifices }"
+        :context-key="commentaryContextKey"
+        :provider="commentaryProvider"
+        @result="(result, origin) => emit('commentary', result, origin)"
+        @cite="emit('cite-commentary', $event)"
+        @clear-citation="emit('clear-commentary-citation')"
+      />
     </div>
   </section>
 </template>

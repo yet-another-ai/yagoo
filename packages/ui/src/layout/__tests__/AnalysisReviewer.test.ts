@@ -202,7 +202,6 @@ describe("AnalysisReviewer", () => {
       for (const [tab, issue] of [
         ["why", "#24"],
         ["ledger", "#23"],
-        ["notes", "#28"],
       ] as const) {
         await wrapper.get(`[data-testid="perspective-${tab}"]`).trigger("click");
         expect(wrapper.get(`#yagoo-panel-${tab}`).text()).toContain(
@@ -213,6 +212,9 @@ describe("AnalysisReviewer", () => {
       expect(wrapper.get("#yagoo-panel-sacrifice").text()).toContain(
         "Sacrifice assessment is unavailable",
       );
+      await wrapper.get('[data-testid="perspective-notes"]').trigger("click");
+      expect(wrapper.get("#yagoo-panel-notes").text()).toContain("Show grounded notes");
+      expect(wrapper.get<HTMLInputElement>('[data-testid="commentary-enable"]').element.checked).toBe(false);
 
       await wrapper.get('[data-testid="perspective-ai"]').trigger("click");
       await wrapper.get('[data-testid="next-key-move"]').trigger("click");

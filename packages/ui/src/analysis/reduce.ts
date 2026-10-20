@@ -120,6 +120,7 @@ export function reducePipelineEvent(
     case "stagePartial": {
       if (event.stage !== "root" || event.root == null) break;
       const ply = ensurePly(state, event.ply);
+      ply.commentary = null;
       ply.phase = event.phase;
       ply.root = { ...event.root };
       ply.rootPartial = true;
@@ -128,6 +129,7 @@ export function reducePipelineEvent(
     }
     case "stageCompleted": {
       const ply = ensurePly(state, event.ply);
+      ply.commentary = null;
       ply.phase = event.phase;
       if (event.stage === "root" && event.analysis != null) {
         ply.root = { ...event.analysis };
@@ -140,6 +142,7 @@ export function reducePipelineEvent(
     case "positionCompleted": {
       const snap = event.snapshot;
       const ply = ensurePly(state, snap.ply);
+      ply.commentary = null;
       ply.phase = event.phase;
       ply.toPlay = snap.toPlay;
       ply.snapshot = snap;

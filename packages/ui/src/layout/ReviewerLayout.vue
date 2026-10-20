@@ -28,6 +28,8 @@ import type { GamePosition } from "../composables/gamePosition";
 import Goban from "../goban/Goban.vue";
 import OverlayLayer from "../overlays/OverlayLayer.vue";
 import type { OverlayData } from "../overlays/OverlayRenderer";
+import type { CommentaryInput, CommentaryTarget, CommentaryOrigin, GroundedCommentary } from "../commentary/facts";
+import type { CommentaryProvider } from "../commentary/session";
 import MoveInspector, {
   type InspectorPerspective,
 } from "../reviewer/MoveInspector.vue";
@@ -111,6 +113,9 @@ const props = withDefaults(
     comparison?: MoveComparison | null;
     sacrifices?: SacrificeAnnotation[] | null;
     commentary?: LlmCommentary | null;
+    commentaryInput?: CommentaryInput;
+    commentaryProvider?: CommentaryProvider | null;
+    commentaryContextKey?: string | number;
     reportDocument?: ReviewReportDocument | null;
     initialPerspective?: InspectorPerspective;
     /** Live source for the selected variation, separate from main-line results. */
@@ -163,6 +168,7 @@ const emit = defineEmits<{
   (e: "select-group", groupId: string): void;
   (e: "variation-analysis"): void;
   (e: "variation-change", active: boolean): void;
+  (e: "commentary", result: GroundedCommentary | null, origin: CommentaryOrigin): void;
 }>();
 
 const {
@@ -398,6 +404,22 @@ function clearDisplayedGroup() {
 function selectDisplayedGroup(id: string) {
   if (activeComparison.value) previewDisplayedGroup(id);
   else emit("select-group", id);
+}
+
+function citeCommentary(target: CommentaryTarget) {
+  if (suspendAnalysis.value) return;
+  if (target.intersections?.length) {
+    ledgerPreview.value = target.intersections
+      .map((coordinate) => parseGtpVertex(coordinate, boardSize.value))
+      .filter((vertex): vertex is Vertex => vertex != null);
+  } else if (target.groupId) {
+    emit("preview-group", target.groupId);
+  }
+}
+
+function clearCommentaryCitation() {
+  ledgerPreview.value = null;
+  emit("clear-group-preview");
 }
 
 const overlayData = computed<OverlayData>(() => {
@@ -905,6 +927,9 @@ defineExpose({
           :show-comparison-difference="comparisonDifference"
           :sacrifices="suspendAnalysis ? null : sacrifices"
           :commentary="suspendAnalysis ? null : commentary"
+          :commentary-input="suspendAnalysis ? { ply: moveNumber } : commentaryInput"
+          :commentary-provider="commentaryProvider"
+          :commentary-context-key="commentaryContextKey ?? sgf"
           :initial-perspective="initialPerspective"
           :ply="variationPly"
           :key-index="keyIndex"
@@ -919,6 +944,9 @@ defineExpose({
           @perspective-change="inspectorPerspective = $event"
           @toggle-comparison-difference="comparisonDifference = $event"
           @clear-ledger-preview="ledgerPreview = null"
+          @commentary="(result, origin) => emit('commentary', result, origin)"
+          @cite-commentary="citeCommentary"
+          @clear-commentary-citation="clearCommentaryCitation"
           @prev-key="stepKey(-1)"
           @next-key="stepKey(1)"
         />

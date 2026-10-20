@@ -22,6 +22,8 @@ import EngineSourcePanel from "../reviewer/EngineSourcePanel.vue";
 import { keyMovesFromState } from "../reviewer/keyMoves";
 import type { InspectorPerspective } from "../reviewer/MoveInspector.vue";
 import OpeningBadge from "../reviewer/OpeningBadge.vue";
+import { buildCommentaryFacts, resolveCommentary, type CommentaryInput, type CommentaryOrigin, type GroundedCommentary } from "../commentary/facts";
+import type { CommentaryProvider } from "../commentary/session";
 import type {
   BoardMap,
   GhostStone,
@@ -48,6 +50,8 @@ const props = defineProps<{
   /** Force a theme. `auto` follows VitePress (`html.dark`) and these tokens. */
   theme?: "auto" | "light" | "dark";
   initialPerspective?: InspectorPerspective;
+  /** Optional host-supplied adapter. Never called until explicit opt-in/action. */
+  commentaryProvider?: CommentaryProvider | null;
   /** Set after a local bundle (or a configured remote URL) is staged. */
   browserEngine?: BrowserEngineAdapter | null;
   threadHint?: string | null;
@@ -99,6 +103,7 @@ const selectedGroupId = ref<string | null>(null);
 
 const {
   state,
+  gameGeneration,
   series,
   sourceLabel,
   isStreaming,
@@ -251,6 +256,29 @@ const keyMoves = computed(() => keyMovesFromState(state.value));
 const currentPlyAnalysis = computed(
   () => state.value.plies[currentPly.value] ?? null,
 );
+const commentaryInput = computed<CommentaryInput>(() => ({
+  ply: currentPly.value,
+  toPlay: currentPlyAnalysis.value?.toPlay,
+  root: currentPlyAnalysis.value?.root,
+  candidates: currentPlyAnalysis.value?.candidates,
+  groups: currentPlyAnalysis.value?.groups,
+  ledger: currentPlyAnalysis.value?.ledger,
+  comparison: currentPlyAnalysis.value?.comparison,
+  sacrifices: currentPlyAnalysis.value?.sacrifices,
+  opening: state.value.opening,
+}));
+// Kept inside the reviewer; this context key is never in the provider packet.
+const commentaryContextKey = computed(() => `${gameGeneration.value}:${sgfText.value}`);
+function saveCommentary(result: GroundedCommentary | null, origin: CommentaryOrigin) {
+  if (origin.contextKey !== commentaryContextKey.value || origin.ply !== currentPly.value) return;
+  if (result && resolveCommentary(buildCommentaryFacts(commentaryInput.value), result).fallbackReason) return;
+  const ply = state.value.plies[currentPly.value];
+  if (!ply || JSON.stringify(ply.commentary) === JSON.stringify(result)) return;
+  state.value = {
+    ...state.value,
+    plies: { ...state.value.plies, [currentPly.value]: { ...ply, commentary: result } },
+  };
+}
 const themeClass = computed(() =>
   props.theme === "dark"
     ? "yagoo-theme-dark"
@@ -611,6 +639,9 @@ const phaseBadge = computed(() => {
         :comparison="currentPlyAnalysis?.comparison ?? null"
         :sacrifices="currentPlyAnalysis?.sacrifices ?? null"
         :commentary="currentPlyAnalysis?.commentary ?? null"
+        :commentary-input="commentaryInput"
+        :commentary-context-key="commentaryContextKey"
+        :commentary-provider="commentaryProvider"
         :report-document="state.report"
         :initial-perspective="initialPerspective"
         :vertex-size="vertexSize"
@@ -629,6 +660,7 @@ const phaseBadge = computed(() => {
         @preview-group="setGroupPreview"
         @clear-group-preview="clearGroupPreview"
         @select-group="selectGroup"
+        @commentary="saveCommentary"
       />
     </div>
   </div>

@@ -160,3 +160,4 @@ export {
   SAMPLE_WINRATE,
   sampleHeatMap,
 } from "./demo/sampleData";
+export * from "./commentary";

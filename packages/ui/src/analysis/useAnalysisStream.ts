@@ -18,6 +18,8 @@ import type {
 
 export interface UseAnalysisStreamResult {
   state: Ref<AnalysisState>;
+  /** Changes on reset/new stream game; invalidates optional commentary consent. */
+  gameGeneration: Ref<number>;
   series: Ref<ReviewSeriesPoint[]>;
   deepPlySet: Ref<Set<number>>;
   isStreaming: Ref<boolean>;
@@ -40,16 +42,19 @@ export interface UseAnalysisStreamResult {
 export function useAnalysisStream(): UseAnalysisStreamResult {
   const state = shallowRef<AnalysisState>(createInitialAnalysisState());
   const sourceLabel = ref<string | null>(null);
+  const gameGeneration = ref(0);
   let handle: AnalysisSourceHandle | null = null;
   let generation = 0;
 
   function reset() {
     stop();
+    gameGeneration.value++;
     state.value = createInitialAnalysisState();
     sourceLabel.value = null;
   }
 
   function applyEvent(event: PipelineEvent) {
+    if (event.type === "gameStarted") gameGeneration.value++;
     state.value = reducePipelineEvent(state.value, event);
   }
 
@@ -116,6 +121,7 @@ export function useAnalysisStream(): UseAnalysisStreamResult {
 
   return {
     state,
+    gameGeneration,
     series,
     deepPlySet,
     isStreaming,

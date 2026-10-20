@@ -38,8 +38,11 @@ function consume(fetch: typeof globalThis.fetch, position?: { ply: number }) {
 describe("live native SSE", () => {
   it("renders recorded NDJSON unchanged across arbitrary chunks and SSE comments", async () => {
     const expected = parseNdjson(sample);
+    // Preserve the recorded wire numbers, including Rust's serialized -0.0.
+    // JSON.stringify(parsed) would change negative zero before testing SSE.
+    const recordedSse = sample.trim().split(/\r?\n/).map(line => `data: ${line}\r\n\r\n`).join("");
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
-      response(`: heartbeat\n\n${sse(...expected)}`),
+      response(`: heartbeat\n\n${recordedSse}`),
     );
     expect(await consume(fetch)).toEqual(expected);
     const [url, options] = fetch.mock.calls[0]!;

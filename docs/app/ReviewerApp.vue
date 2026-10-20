@@ -13,9 +13,10 @@ onMounted(async () => {
   const requested = new URLSearchParams(window.location.search).get("theme");
   if (requested === "dark" || requested === "light") theme.value = requested;
   try {
+    const base = import.meta.env.BASE_URL;
     const [sgfRes, ndjsonRes] = await Promise.all([
-      fetch("/app/sample.sgf"),
-      fetch("/app/sample-scan-deep.ndjson"),
+      fetch(`${base}app/sample.sgf`),
+      fetch(`${base}app/sample-scan-deep.ndjson`),
     ]);
     if (!sgfRes.ok || !ndjsonRes.ok) {
       throw new Error("Failed to load bundled sample SGF / NDJSON");

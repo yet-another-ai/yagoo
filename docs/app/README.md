@@ -1,6 +1,8 @@
 # Docs reviewer app
 
-VitePress page at `/app/` hosts the real `@yagoo/ui` reviewer (Sabaki chrome + Shudan goban) driven by the same NDJSON event stream that `yagoo analyze` emits.
+VitePress page at `/app/` (published as `/yagoo/app/`) hosts the real `@yagoo/ui` reviewer (Sabaki chrome + Shudan goban) driven by the same NDJSON event stream that `yagoo analyze` emits.
+
+The page fetches the bundled fixtures with the VitePress base prefix: `/yagoo/app/sample.sgf` and `/yagoo/app/sample-scan-deep.ndjson` on the published site and on `mise run docs`.
 
 Layout, panel map, and the typed slots for issues #19 and #23–#29 are described in [Reviewer UI](../design/reviewer-ui.md). Unimplemented modules render an empty state named with their issue. They are not filled with client-side guesses.
 

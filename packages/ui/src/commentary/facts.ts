@@ -1,19 +1,7 @@
 import type {
   GainLossLedger, LlmCommentary, MoveComparison, OpeningMatch, SacrificeAnnotation,
 } from "../analysis/modules";
-import type { CandidateSnapshot, EngineAnalysis, GroupSnapshot, GroupStatus } from "../analysis/types";
-
-/** Additive historical-root fields; legacy comparisons without them are omitted. */
-type RootedComparison = MoveComparison & {
-  rootPly?: number;
-  mover?: "B" | "W";
-  scoreLoss?: number;
-  winrateLoss?: number;
-  groupTempo?: Array<{
-    groupId: string; color: "B" | "W"; stones: string[];
-    actualStatus: GroupStatus; preferredStatus: GroupStatus;
-  }>;
-};
+import type { CandidateSnapshot, EngineAnalysis, GroupSnapshot } from "../analysis/types";
 
 export interface CommentaryInput {
   ply: number;
@@ -22,7 +10,7 @@ export interface CommentaryInput {
   candidates?: CandidateSnapshot[];
   groups?: GroupSnapshot[];
   ledger?: GainLossLedger | null;
-  comparison?: RootedComparison | null;
+  comparison?: MoveComparison | null;
   sacrifices?: SacrificeAnnotation[] | null;
   opening?: OpeningMatch | null;
 }

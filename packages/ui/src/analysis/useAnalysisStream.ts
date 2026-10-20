@@ -71,6 +71,7 @@ export function useAnalysisStream(): UseAnalysisStreamResult {
 
   function attachSource(source: AnalysisEventSource) {
     stop();
+    gameGeneration.value++;
     const current = generation;
     state.value = createInitialAnalysisState();
     sourceLabel.value = source.label;

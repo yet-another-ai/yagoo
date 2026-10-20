@@ -22,13 +22,13 @@ Wide screens (and any width the browser has not measured yet):
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-The splitter between the board and the sidebar is keyboard-focusable (Left / Right). Dragging it changes the sidebar width (280–520px).
+The splitter between the board and the sidebar is keyboard-focusable (Left / Right). Those keys resize the sidebar and do not step the move. Dragging it changes the sidebar width (340–560px). On a wide page the sidebar starts near 36% of the reviewer, so the move inspector, groups, and comment are not clipped into a narrow column.
 
 Under 960px the splitter hides. The board stacks above one sidebar section at a time: Graph, Move, Groups, Tree, Notes. The same breakpoint is the CSS fallback when `ResizeObserver` reports a narrow box.
 
-Light and dark follow VitePress (`--vp-c-*`, `html.dark`). `theme="dark"` on `AnalysisReviewer` forces the dark palette for a screenshot or an embed that is not inside the docs theme. The board stays on the tatami ground in both themes. Stones keep Shudan fuzzy placement.
+Light and dark follow VitePress (`html.dark`). `theme="dark"` or `theme="light"` on `AnalysisReviewer` forces that palette even when the docs page is the other theme, using concrete colours rather than the page's `--vp-c-*` values. Dark mode uses a deep tatami so the wood board, stones, and translucent ownership wash stay readable. Stones keep Shudan fuzzy placement.
 
-Keyboard: Left / Right move through the game (or the try branch). `[` and `]` jump key moves. Candidate rows are a listbox (Up / Down, Enter to pin the PV). Inspector tabs are a tablist (Left / Right). Focus rings use the accent colour.
+Keyboard: Left / Right move through the game, or through the try branch when one is open. At the try anchor, Previous leaves try mode and steps to the previous game move. Next is enabled only when the try cursor has a child. `[` and `]` jump key moves. Candidate rows are a listbox (Up / Down, Enter to pin the PV). Inspector tabs are a tablist (Left / Right). Focus rings use the accent colour. Arrow keys aimed at the splitter, a tab, or a text field do not move the game.
 
 ## Component map
 
@@ -57,12 +57,12 @@ Keyboard: Left / Right move through the game (or the try branch). `[` and `]` ju
 - Open SGF (picker and drag-and-drop). Board size comes from `SZ` (default 19). The board fills its pane.
 - Import NDJSON (picker, drag-and-drop, bundled ear-reddening sample) and stream scan then deepen.
 - Winrate and score graph. Deepened plies are marked. Clicking the graph seeks.
-- Candidate ghosts, visit filtering, and Sabaki-style numbered PV preview on hover or click.
+- Candidate ghosts, visit filtering, and Sabaki-style numbered PV preview on hover or click. A winrate is shown only when that candidate's visits are at least 5% of the top move (the top move itself always qualifies). Thinner lines are left off the list and the analysis comment, and their winrate is not printed on the board.
 - Ownership paint and group (块) outlines / list. Chains (串) are not drawn as groups.
 - Bottom bar: players, captures, previous / next move.
 - Key-move previous / next, from `deepPliesSelected` only.
-- Try mode: click an empty point to grow a local branch and walk it in the tree. Analysis overlays hide off the main line. No engine call.
-- Report view: lists those same key moves and the deltas already on `deepReasons`.
+- Try mode: click an empty point to grow a local branch and walk it in the tree. The bottom bar's side to move and capture counts follow that branch. Analysis overlays hide off the main line. No engine call.
+- Report view: lists those same key moves and the deltas already on `deepReasons`, across the full width of the page.
 - Engine menu: NDJSON is usable. Live native and the browser engine stay disabled until their adapters connect.
 
 ## Stubs and the issue that fills them

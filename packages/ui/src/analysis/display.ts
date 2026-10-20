@@ -149,16 +149,24 @@ export function formatAnalysisComment(
   }
 
   if (info?.candidates?.length) {
-    const top = info.candidates
+    const topVisits = topCandidateVisits(info.candidates);
+    const reliable = info.candidates.filter((c) =>
+      candidateVisitsReliable(c, topVisits),
+    );
+    const hidden = info.candidates.length - reliable.length;
+    const top = reliable
       .slice(0, 4)
       .map((c, i) => {
-        const wr =
-          c.winrate != null ? `${(c.winrate * 100).toFixed(0)}%` : "?";
+        const wr = candidateWinrateAuthoritative(c, topVisits)
+          ? `${((c.winrate ?? 0) * 100).toFixed(0)}%`
+          : "low";
         const v = c.visits != null ? `${c.visits}v` : "";
         return `${i + 1}. ${c.move} ${wr} ${v}`.trim();
       })
       .join(" · ");
-    lines.push(`Candidates: ${top}`);
+    const suffix =
+      hidden > 0 ? `${top ? " · " : ""}${hidden} low-visit hidden` : "";
+    lines.push(`Candidates: ${top}${suffix}`);
   }
 
   if (state.lastError) lines.push(`Error: ${state.lastError}`);
@@ -300,6 +308,49 @@ export function candidateVisibleOnBoard(
   return v >= candidateBoardVisitThreshold(rootVisits);
 }
 
+/**
+ * Winrate is shown only when visits are in the same ballpark as the leading
+ * candidate. A handful of visits can print 80%+ before the search has
+ * settled; that number is not treated as a result.
+ */
+const CANDIDATE_AUTHORITATIVE_FRAC = 0.05;
+
+export function topCandidateVisits(
+  candidates: readonly CandidateSnapshot[],
+): number {
+  let top = 0;
+  for (const candidate of candidates) {
+    const visits = candidate.visits ?? 0;
+    if (visits > top) top = visits;
+  }
+  return top;
+}
+
+/** Visits are high enough, relative to the leading candidate, to trust a winrate. */
+export function candidateVisitsReliable(
+  candidate: CandidateSnapshot,
+  topVisits: number,
+): boolean {
+  const visits = candidate.visits ?? 0;
+  if (visits <= 0 || topVisits <= 0) return false;
+  if (visits >= topVisits) return true;
+  const threshold = Math.max(
+    MIN_CANDIDATE_VISIT_FLOOR,
+    Math.ceil(topVisits * CANDIDATE_AUTHORITATIVE_FRAC),
+  );
+  return visits >= threshold;
+}
+
+export function candidateWinrateAuthoritative(
+  candidate: CandidateSnapshot,
+  topVisits: number,
+): boolean {
+  return (
+    candidate.winrate != null &&
+    candidateVisitsReliable(candidate, topVisits)
+  );
+}
+
 function applyCandidates(
   candidates: CandidateSnapshot[],
   size: number,
@@ -312,6 +363,7 @@ function applyCandidates(
     candidateVisibleOnBoard(c, rootVisits),
   );
   const labeled = onBoard.slice(0, MAX_CANDIDATE_LABELS);
+  const topVisits = topCandidateVisits(candidates);
 
   labeled.forEach((c, idx) => {
     const v = parseGtpVertex(c.move, size);
@@ -324,7 +376,9 @@ function applyCandidates(
           : String(c.visits)
         : "";
     const wrLabel =
-      c.winrate != null ? `${(c.winrate * 100).toFixed(0)}%` : "";
+      candidateWinrateAuthoritative(c, topVisits) && c.winrate != null
+        ? `${(c.winrate * 100).toFixed(0)}%`
+        : "";
     const text = [wrLabel, visitsLabel].filter(Boolean).join("\n") || null;
     const isBest = idx === 0 || (c.order ?? idx) === 0;
     const isSelected = idx === selected;

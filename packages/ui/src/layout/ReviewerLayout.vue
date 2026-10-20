@@ -16,7 +16,7 @@ import type {
 } from "../analysis/modules";
 import type { CandidateSnapshot, EngineAnalysis, GroupSnapshot } from "../analysis/types";
 import { formatGtpVertex } from "../analysis/coords";
-import { useGame } from "../composables/useGame";
+import { useGame, type GamePlayerInfo } from "../composables/useGame";
 import Goban from "../goban/Goban.vue";
 import OverlayLayer from "../overlays/OverlayLayer.vue";
 import type { OverlayData } from "../overlays/OverlayRenderer";
@@ -174,7 +174,8 @@ const loaded = ref(false);
 const rootEl = ref<HTMLElement | null>(null);
 const mainEl = ref<HTMLElement | null>(null);
 const autoVertexSize = ref(22);
-const sidebarWidth = ref(340);
+const sidebarWidth = ref(420);
+const sidebarUserSized = ref(false);
 const compact = ref(false);
 const section = ref<CompactSection>("inspector");
 const lowerTab = ref<"groups" | "tree">("groups");
@@ -224,10 +225,20 @@ function updateAutoVertexSize() {
   autoVertexSize.value = Math.max(12, Math.min(40, vs));
 }
 
+const SIDEBAR_MIN = 340;
+const SIDEBAR_MAX = 560;
+
+function preferredSidebar(width: number): number {
+  return Math.min(SIDEBAR_MAX, Math.max(380, Math.round(width * 0.36)));
+}
+
 function updateCompact() {
   const width = rootEl.value?.clientWidth ?? 0;
   // Width 0 means the test environment has not laid the page out.
   compact.value = width > 0 && width < 960;
+  if (!compact.value && width > 0 && !sidebarUserSized.value) {
+    sidebarWidth.value = preferredSidebar(width);
+  }
 }
 
 const effectiveVertexSize = computed(
@@ -304,23 +315,47 @@ const emptySignMap = computed<BoardMap<Sign>>(() => {
   );
 });
 
-const tryOverlay = computed(() => {
-  if (!tryMode.value || tryCursor.value == null) return null;
+const tryPosition = computed(() => {
+  if (!tryMode.value) return null;
   const path = tryPath(tryNodes.value, tryCursor.value);
-  return (
-    applyTryMoves(
-      boardSize.value,
-      anchorSign.value,
-      anchorPlayer.value,
-      path.map((node) => node.vertex),
-    )?.signMap ?? null
+  return applyTryMoves(
+    boardSize.value,
+    anchorSign.value,
+    anchorPlayer.value,
+    path.map((node) => node.vertex),
   );
 });
 
 const displaySignMap = computed(() => {
-  if (tryOverlay.value) return tryOverlay.value;
+  if (tryPosition.value) return tryPosition.value.signMap;
   return loaded.value ? signMap.value : emptySignMap.value;
 });
+
+const displayPlayer = computed(
+  () => tryPosition.value?.toPlay ?? currentPlayer.value,
+);
+
+const displayPlayers = computed<[GamePlayerInfo, GamePlayerInfo]>(() => {
+  const extra = tryPosition.value?.captures;
+  if (extra == null) return players.value;
+  const [black, white] = players.value;
+  return [
+    { ...black, captures: black.captures + extra.black },
+    { ...white, captures: white.captures + extra.white },
+  ];
+});
+
+const tryHasChild = computed(() =>
+  tryNodes.value.some((node) => node.parentId === tryCursor.value),
+);
+
+const canStepBack = computed(
+  () => (tryMode.value && tryCursor.value != null) || canGoBack.value,
+);
+
+const canStepForward = computed(() =>
+  tryMode.value ? tryHasChild.value : canGoForward.value,
+);
 
 const displayComment = computed(() => {
   if (tryDepth.value > 0) {
@@ -414,8 +449,10 @@ function onBack() {
     tryCursor.value = node?.parentId ?? null;
     return;
   }
-  if (tryMode.value && tryNodes.value.some((node) => node.parentId == null)) {
-    return;
+  if (tryMode.value) {
+    // At the try anchor: leave the variation, then step to its parent ply.
+    tryMode.value = false;
+    clearTry();
   }
   goBack();
 }
@@ -425,11 +462,8 @@ function onForward() {
     const child = [...tryNodes.value]
       .reverse()
       .find((node) => node.parentId === tryCursor.value);
-    if (child) {
-      tryCursor.value = child.id;
-      return;
-    }
-    if (tryNodes.value.length > 0) return;
+    if (child) tryCursor.value = child.id;
+    return;
   }
   goForward();
 }
@@ -461,7 +495,13 @@ function onReportSelect(ply: number) {
 
 function onRootKey(event: KeyboardEvent) {
   const target = event.target as HTMLElement | null;
-  if (target?.closest("input, textarea, select, [role='tab']")) return;
+  if (
+    target?.closest(
+      "input, textarea, select, [role='tab'], [role='separator']",
+    )
+  ) {
+    return;
+  }
   if (event.key === "ArrowLeft") {
     event.preventDefault();
     onBack();
@@ -513,8 +553,9 @@ function onSplitterDown(event: PointerEvent) {
 
 function onSplitterMove(event: PointerEvent) {
   if (resizeDrag == null) return;
+  sidebarUserSized.value = true;
   const next = resizeDrag.width - (event.clientX - resizeDrag.x);
-  sidebarWidth.value = Math.min(520, Math.max(280, next));
+  sidebarWidth.value = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, next));
 }
 
 function onSplitterUp() {
@@ -525,10 +566,14 @@ function onSplitterUp() {
 }
 
 function onSplitterKey(event: KeyboardEvent) {
+  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+  event.preventDefault();
+  event.stopPropagation();
+  sidebarUserSized.value = true;
   if (event.key === "ArrowLeft") {
-    sidebarWidth.value = Math.min(520, sidebarWidth.value + 16);
-  } else if (event.key === "ArrowRight") {
-    sidebarWidth.value = Math.max(280, sidebarWidth.value - 16);
+    sidebarWidth.value = Math.min(SIDEBAR_MAX, sidebarWidth.value + 16);
+  } else {
+    sidebarWidth.value = Math.max(SIDEBAR_MIN, sidebarWidth.value - 16);
   }
 }
 
@@ -613,10 +658,10 @@ defineExpose({
         aria-label="Resize sidebar"
         tabindex="0"
         :aria-valuenow="sidebarWidth"
-        aria-valuemin="280"
-        aria-valuemax="520"
+        aria-valuemin="340"
+        aria-valuemax="560"
         @pointerdown="onSplitterDown"
-        @keydown="onSplitterKey"
+        @keydown.stop="onSplitterKey"
       />
 
       <aside class="yagoo-reviewer__sidebar">
@@ -643,7 +688,7 @@ defineExpose({
           v-show="panelVisible('graph')"
           :data="winrateData"
           :current-index="moveNumber"
-          :height="120"
+          :height="108"
           :show-score-lead="true"
           @select="onSelectPly"
         />
@@ -731,10 +776,10 @@ defineExpose({
 
     <BottomBar
       class="yagoo-reviewer__bar"
-      :players="players"
-      :current-player="currentPlayer"
-      :can-go-back="canGoBack || tryDepth > 0"
-      :can-go-forward="canGoForward || tryMode"
+      :players="displayPlayers"
+      :current-player="displayPlayer"
+      :can-go-back="canStepBack"
+      :can-go-forward="canStepForward"
       :move-number="moveNumber"
       :try-mode="tryMode"
       :report-mode="view === 'report'"

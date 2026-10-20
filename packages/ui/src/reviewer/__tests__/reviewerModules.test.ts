@@ -4,6 +4,7 @@ import { createInitialAnalysisState } from "../../analysis/types";
 import MoveInspector from "../MoveInspector.vue";
 import ReviewReport from "../ReviewReport.vue";
 import { keyMovesFromState } from "../keyMoves";
+import type { Sign } from "../../types";
 import { applyTryMoves } from "../tryBranch";
 
 describe("keyMovesFromState", () => {
@@ -52,9 +53,26 @@ describe("applyTryMoves", () => {
     const played = applyTryMoves(3, anchor.map((row) => [...row]), 1, [[0, 0]]);
     expect(played?.signMap[0]?.[0]).toBe(1);
     expect(played?.toPlay).toBe(-1);
+    expect(played?.captures).toEqual({ black: 0, white: 0 });
     expect(
       applyTryMoves(3, anchor.map((row) => [...row]), 1, [[1, 1]]),
     ).toBeNull();
+  });
+
+  it("counts captures made by the try sequence", () => {
+    const empty = Array.from({ length: 5 }, () =>
+      Array.from({ length: 5 }, () => 0 as Sign),
+    );
+    const played = applyTryMoves(5, empty, 1, [
+      [0, 1],
+      [0, 0],
+      [1, 0],
+    ]);
+    expect(played?.signMap[0]?.[0]).toBe(0);
+    expect(played?.signMap[1]?.[0]).toBe(1);
+    expect(played?.signMap[0]?.[1]).toBe(1);
+    expect(played?.toPlay).toBe(-1);
+    expect(played?.captures).toEqual({ black: 1, white: 0 });
   });
 });
 

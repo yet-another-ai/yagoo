@@ -6,9 +6,12 @@ import {
 import {
   buildBoardOverlays,
   buildPvPreview,
+  formatAnalysisComment,
   candidateBoardVisitThreshold,
   candidateVisibleOnBoard,
+  candidateWinrateAuthoritative,
   colorToSign,
+  topCandidateVisits,
 } from "../display";
 import {
   createInitialAnalysisState,
@@ -177,6 +180,37 @@ describe("buildBoardOverlays", () => {
     // Low-visit D4 = [5,3] must not get a board ghost/label.
     expect(overlays.ghostStoneMap[5]![3]).toBeNull();
     expect(overlays.markerMap[5]![3]).toBeNull();
+  });
+
+  it("withholds winrate when visits are far below the top move", () => {
+    const candidates = [
+      { move: "C7", order: 0, visits: 400, winrate: 0.58 },
+      { move: "D4", order: 1, visits: 12, winrate: 0.91 },
+    ];
+    expect(topCandidateVisits(candidates)).toBe(400);
+    expect(candidateWinrateAuthoritative(candidates[0]!, 400)).toBe(true);
+    expect(candidateWinrateAuthoritative(candidates[1]!, 400)).toBe(false);
+
+    const overlays = buildBoardOverlays(
+      stateWithCandidates(candidates, "B", undefined),
+      0,
+      { size: 9 },
+    );
+    // 12 visits clears the 2% board gate (root is 200) but not 5% of 400.
+    expect(overlays.markerMap[2]![2]?.label).toContain("%");
+    expect(overlays.ghostStoneMap[5]![3]).not.toBeNull();
+    expect(overlays.markerMap[5]![3]?.label ?? "").not.toContain("%");
+  });
+
+  it("omits low-visit winrates from the analysis comment", () => {
+    const state = stateWithCandidates([
+      { move: "C7", order: 0, visits: 400, winrate: 0.58 },
+      { move: "D4", order: 1, visits: 3, winrate: 0.91 },
+    ]);
+    const comment = formatAnalysisComment(state, 0, "");
+    expect(comment).toContain("C7 58%");
+    expect(comment).not.toContain("91%");
+    expect(comment).toContain("1 low-visit hidden");
   });
 });
 

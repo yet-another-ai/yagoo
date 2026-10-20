@@ -161,10 +161,10 @@ function onClick(evt: MouseEvent) {
       />
       <path v-if="pathD" class="yagoo-winrate__line" :d="pathD" />
       <circle
+        class="yagoo-winrate__marker"
         :cx="marker.x"
         :cy="marker.y"
-        r="3"
-        fill="#0082F0"
+        r="3.2"
       />
     </svg>
   </div>

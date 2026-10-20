@@ -41,10 +41,16 @@ const emit = defineEmits<{
       <span v-if="players[0].rank" class="yagoo-bottom-bar__rank">
         {{ players[0].rank }}
       </span>
-      <span class="yagoo-bottom-bar__captures">{{ players[0].captures }}</span>
+      <span class="yagoo-bottom-bar__captures" data-testid="captures-black">{{
+        players[0].captures
+      }}</span>
     </div>
 
-    <div class="yagoo-bottom-bar__turn" :title="`Move ${moveNumber}`">
+    <div
+      class="yagoo-bottom-bar__turn"
+      :title="`Move ${moveNumber}`"
+      :data-to-play="currentPlayer"
+    >
       <span
         class="yagoo-stone-icon yagoo-stone-icon--black"
         :class="{ 'yagoo-stone-icon--active': currentPlayer === 1 }"
@@ -56,7 +62,9 @@ const emit = defineEmits<{
     </div>
 
     <div class="yagoo-bottom-bar__player yagoo-bottom-bar__player--white">
-      <span class="yagoo-bottom-bar__captures">{{ players[1].captures }}</span>
+      <span class="yagoo-bottom-bar__captures" data-testid="captures-white">{{
+        players[1].captures
+      }}</span>
       <span v-if="players[1].rank" class="yagoo-bottom-bar__rank">
         {{ players[1].rank }}
       </span>

@@ -9,17 +9,30 @@ export interface TryNode {
   label: string;
 }
 
+/** Stones captured by the try moves themselves, not the anchor game. */
+export interface TryCaptures {
+  black: number;
+  white: number;
+}
+
+export interface TryPosition {
+  signMap: BoardMap<Sign>;
+  toPlay: Sign;
+  captures: TryCaptures;
+}
+
 /**
  * Replay anchor stones plus a try-move path.
  * Returns null when a move overwrites, is suicide, or repeats a simple ko.
  * This does not invent analysis; it only updates the local board.
+ * Capture counts are only those made by `moves` (`set` does not record them).
  */
 export function applyTryMoves(
   size: number,
   anchor: BoardMap<Sign>,
   toPlay: Sign,
   moves: readonly Vertex[],
-): { signMap: BoardMap<Sign>; toPlay: Sign } | null {
+): TryPosition | null {
   let board = Board.fromDimensions(size);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
@@ -45,6 +58,10 @@ export function applyTryMoves(
   return {
     signMap: board.signMap as BoardMap<Sign>,
     toPlay: player,
+    captures: {
+      black: board.getCaptures(1) ?? 0,
+      white: board.getCaptures(-1) ?? 0,
+    },
   };
 }
 

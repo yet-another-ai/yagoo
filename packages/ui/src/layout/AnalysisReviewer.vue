@@ -545,7 +545,7 @@ const phaseBadge = computed(() => {
 }
 
 .yagoo-analysis-app__btn:not(:disabled):hover {
-  border-color: #0082f0;
+  border-color: var(--yagoo-accent, #0082f0);
 }
 
 .yagoo-analysis-app__meta {
@@ -572,7 +572,7 @@ const phaseBadge = computed(() => {
 }
 
 .yagoo-analysis-app__drop {
-  color: #0082f0;
+  color: var(--yagoo-accent, #0082f0);
 }
 
 .yagoo-analysis-app__board {

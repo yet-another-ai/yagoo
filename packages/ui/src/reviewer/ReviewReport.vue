@@ -80,9 +80,12 @@ const emit = defineEmits<{
 
 <style scoped>
 .yagoo-report {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
   min-height: 0;
   overflow: auto;
-  padding: 1.1rem 1.25rem 1.5rem;
+  padding: 1.1rem 1.5rem 1.5rem;
   background: var(--yagoo-bg, #f6f6f7);
   color: var(--yagoo-text, #1a1a1a);
 }
@@ -137,7 +140,7 @@ const emit = defineEmits<{
 
 .yagoo-report__lead,
 .yagoo-report__empty {
-  max-width: 46rem;
+  max-width: none;
   color: var(--yagoo-muted, #4a4a55);
   line-height: 1.45;
   font-size: 0.92rem;
@@ -157,12 +160,13 @@ const emit = defineEmits<{
   padding: 0;
   display: grid;
   gap: 0.45rem;
-  max-width: 52rem;
+  width: 100%;
+  max-width: none;
 }
 
 .yagoo-report__row {
   display: grid;
-  grid-template-columns: 6.5rem 8.5rem 8rem 1fr;
+  grid-template-columns: minmax(6.5rem, 0.7fr) minmax(8.5rem, 0.9fr) minmax(8rem, 0.9fr) minmax(10rem, 1.4fr);
   gap: 0.15rem 0.75rem;
   width: 100%;
   text-align: left;

@@ -122,11 +122,11 @@ function statusClass(g: GroupSnapshot): string {
 
 .yagoo-groups__row {
   display: grid;
-  grid-template-columns: 0.7rem 2rem 1fr auto;
+  grid-template-columns: 0.8rem minmax(2.4rem, auto) minmax(0, 1fr) auto;
   grid-template-rows: auto auto;
-  gap: 0.1rem 0.45rem;
+  gap: 0.12rem 0.55rem;
   align-items: center;
-  padding: 0.3rem 0.65rem;
+  padding: 0.4rem 0.75rem;
   cursor: pointer;
   color: var(--yagoo-text, #ddd);
 }

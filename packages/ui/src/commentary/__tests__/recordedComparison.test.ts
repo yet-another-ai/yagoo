@@ -82,6 +82,37 @@ describe("commentary aligned with recorded historical comparisons", () => {
     expect(resolveCommentary(changed, notes).fallbackReason).toBeTruthy();
   });
 
+  it("rejects contradictory equal-move evidence before approving any comparison clause", () => {
+    const position = state.plies[43]!;
+    const comparison = position.comparison!;
+    for (const changed of [
+      { scoreLoss: 1 },
+      { winrateLoss: 0.01 },
+      { actualScoreLead: comparison.aiScoreLead - 1, scoreLoss: 1 },
+      { actualWinrate: comparison.aiWinrate - 0.01, winrateLoss: 0.01 },
+      { actualMove: "r2", actualScoreLead: comparison.aiScoreLead - 1, scoreLoss: 1 },
+    ]) {
+      const facts = buildCommentaryFacts({ ...position, comparison: { ...comparison, ...changed } });
+      expect(facts.some((fact) => fact.id.includes("/comparison-"))).toBe(false);
+      expect(facts.some((fact) => fact.id.endsWith("/ledger-search"))).toBe(true);
+    }
+  });
+
+  it("omits malformed branch classifications from imported comparison evidence", () => {
+    const position = state.plies[60]!;
+    const comparison = position.comparison!;
+    for (const groupTempo of [
+      {}, [null], [{ groupId: "D4", color: "B", actualStatus: "weak", preferredStatus: "settled" }],
+    ]) {
+      const facts = buildCommentaryFacts({
+        ...position,
+        comparison: { ...comparison, groupTempo } as typeof comparison,
+      });
+      expect(facts.some((fact) => fact.id.includes("/comparison-tempo-"))).toBe(false);
+      expect(facts.some((fact) => fact.id.endsWith("/comparison-score-loss"))).toBe(true);
+    }
+  });
+
   it("turns consent off when a replacement source emits snapshots without gameStarted", () => {
     const stream = useAnalysisStream();
     const snapshot = snapshots.find((item) => item.ply === 60)!;

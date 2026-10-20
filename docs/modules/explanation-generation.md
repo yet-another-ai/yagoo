@@ -21,14 +21,14 @@ The renderer selects one to three facts. Historical actual-versus-preferred scor
 
 Supported claims have explicit boundaries:
 
-- A played-move comparison at ply `p` must identify `rootPly = p - 1` and its `mover`. Comparison winrates use that mover's perspective; source score leads remain Black-positive. Loss fields must agree with the actual and preferred source values before becoming a difference sentence. Selection weights and unsigned `deepReasons` never become mistake judgments.
+- A played-move comparison at ply `p` must identify `rootPly = p - 1` and its `mover`. Comparison winrates use that mover's perspective; source score leads remain Black-positive. Loss fields must agree with the actual and preferred source values before becoming a difference sentence. When both choices name the same move, their score and winrate must be identical and both loss fields must be zero; contradictory comparisons produce no approved clauses. Selection weights and unsigned `deepReasons` never become mistake judgments.
 - A current-position ledger must match its root ply and mover. A comparison ledger must also match the played/preferred moves at the historical root. `value` is a mover-relative **search score difference**.
 - A ledger line is priced only when `consistent` is true, `scaling` is `"score"`, and its `points` is finite. Otherwise, a signed `proportion` is described as a share of the total absolute ownership-book contribution, explicitly unpriced. `bookValue` is never relabelled as points.
 - Current group status and comparison branch status are quoted as module classifications. Strength changes alone do not imply life, death, saving a group, sente, or gote.
 - Sacrifice observations cite the module's group and ownership-flip field. This implementation does not invent compensation when the underlying ledger cannot price it.
 - Opening names are catalogue labels, not claims of exhaustive recognition. No player names, SGF comments, or user prose become commentary instructions.
 
-Missing or invalid facts are omitted. Empty input produces a clear empty state. This module does not run Go analysis or decide tactical judgments.
+Missing or invalid facts, including malformed optional collections, are omitted. Empty input produces a clear empty state. This module does not run Go analysis or decide tactical judgments.
 
 ## Provider-independent selection
 

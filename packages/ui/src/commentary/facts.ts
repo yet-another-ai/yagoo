@@ -95,9 +95,16 @@ export function buildCommentaryFacts(input: CommentaryInput): CommentaryFact[] {
   });
 
   const comparison = input.comparison;
+  const equalMoveConsistent = !comparison || !coordinate(comparison.actualMove) ||
+    !coordinate(comparison.aiMove) || comparison.actualMove.toLowerCase() !== comparison.aiMove.toLowerCase() ||
+    (probability(comparison.actualWinrate) && probability(comparison.aiWinrate) &&
+      comparison.actualWinrate === comparison.aiWinrate &&
+      finite(comparison.actualScoreLead) && finite(comparison.aiScoreLead) &&
+      comparison.actualScoreLead === comparison.aiScoreLead &&
+      comparison.scoreLoss === 0 && comparison.winrateLoss === 0);
   if (input.ply > 0 && comparison?.ply === input.ply &&
       comparison.rootPly === input.ply - 1 && ["B", "W"].includes(comparison.mover ?? "") &&
-      coordinate(comparison.actualMove) && coordinate(comparison.aiMove)) {
+      coordinate(comparison.actualMove) && coordinate(comparison.aiMove) && equalMoveConsistent) {
     const mover = side(comparison.mover!);
     const refs = [
       evidence("/comparison/ply", comparison.ply),
@@ -152,8 +159,9 @@ export function buildCommentaryFacts(input: CommentaryInput): CommentaryFact[] {
       addLedger(comparison.ledgerDiff, "/comparison/ledgerDiff", "comparison-ledger",
         comparison.rootPly, comparison.mover, refs);
     }
-    for (const [i, tempo] of (comparison.groupTempo ?? []).entries()) {
-      if (!stoneCoordinate(tempo.groupId) || !["B", "W"].includes(tempo.color) ||
+    for (const [i, tempo] of (Array.isArray(comparison.groupTempo) ? comparison.groupTempo : []).entries()) {
+      if (!tempo || !Array.isArray(tempo.stones) ||
+          !stoneCoordinate(tempo.groupId) || !["B", "W"].includes(tempo.color) ||
           !statusName(tempo.actualStatus) || !statusName(tempo.preferredStatus)) continue;
       const path = `/comparison/groupTempo/${i}`;
       add(`comparison-tempo-${i}`, 95, [
@@ -198,7 +206,8 @@ export function buildCommentaryFacts(input: CommentaryInput): CommentaryFact[] {
           `The ownership attribution for ${ledger.move} versus ${ledger.referenceMove} at root ply ${ledger.rootPly} is unpriced; its line shares are not point values.`,
         ]);
       }
-      for (const [i, line] of ledger.ledger.entries()) {
+      for (const [i, line] of (Array.isArray(ledger.ledger) ? ledger.ledger : []).entries()) {
+        if (!line) continue;
         const kindNames: Record<string, string> = {
           own_territory: "Own territory", reduce_opponent: "Opponent territory reduction",
           other: "Other intersections",
@@ -211,7 +220,8 @@ export function buildCommentaryFacts(input: CommentaryInput): CommentaryFact[] {
           ...refs, ...scalingRefs, evidence(`${linePrefix}/kind`, line.kind),
           ...(line.id ? [evidence(`${linePrefix}/id`, line.id)] : []),
         ];
-        const intersections = line.intersections?.filter(stoneCoordinate) ?? [];
+        const intersections = Array.isArray(line.intersections)
+          ? line.intersections.filter(stoneCoordinate) : [];
         const target = { groupId: line.kind === "group" ? line.id : undefined, intersections };
         if (priced && finite(line.points)) {
           add(`${id}-line-${i}`, 70 + Math.min(10, Math.abs(line.points)), [
@@ -233,7 +243,8 @@ export function buildCommentaryFacts(input: CommentaryInput): CommentaryFact[] {
   }
   addLedger(input.ledger, "/ledger", "ledger", input.ply, input.toPlay);
 
-  for (const [i, group] of (input.groups ?? []).entries()) {
+  for (const [i, group] of (Array.isArray(input.groups) ? input.groups : []).entries()) {
+    if (!group) continue;
     const status = statusName(group.status);
     if (!stoneCoordinate(group.groupId) || !status) continue;
     add(`group-${i}-status`, group.status === "tempo_critical" ? 88 : 55, [
@@ -245,7 +256,8 @@ export function buildCommentaryFacts(input: CommentaryInput): CommentaryFact[] {
     ], { groupId: group.groupId });
   }
 
-  for (const [i, sacrifice] of (input.sacrifices ?? []).entries()) {
+  for (const [i, sacrifice] of (Array.isArray(input.sacrifices) ? input.sacrifices : []).entries()) {
+    if (!sacrifice) continue;
     if (!stoneCoordinate(sacrifice.groupId) || !finite(sacrifice.ownershipFlip)) continue;
     add(`sacrifice-${i}`, 75, [
       evidence(`/sacrifices/${i}/groupId`, sacrifice.groupId),
@@ -260,7 +272,8 @@ export function buildCommentaryFacts(input: CommentaryInput): CommentaryFact[] {
       `At ply ${input.ply}, the engine's Black-positive score lead is ${signed(input.root.scoreLead)} points.`,
     ]);
   }
-  for (const [i, candidate] of (input.candidates ?? []).entries()) {
+  for (const [i, candidate] of (Array.isArray(input.candidates) ? input.candidates : []).entries()) {
+    if (!candidate) continue;
     if (!coordinate(candidate.move) || !Number.isSafeInteger(candidate.visits) || candidate.visits! < 0) continue;
     add(`candidate-${i}`, 30 - i, [
       evidence(`/candidates/${i}/move`, candidate.move),

@@ -137,6 +137,21 @@ describe("commentary facts from the recorded ledger position", () => {
     expect(buildCommentaryFacts(malformed)).toEqual([]);
   });
 
+  it("omits malformed optional collections instead of crashing the notes panel", () => {
+    for (const invalid of [{}, [null]]) {
+      const facts = buildCommentaryFacts({
+        ...input,
+        groups: invalid,
+        sacrifices: invalid,
+        candidates: invalid,
+        ledger: { ...input.ledger!, ledger: invalid },
+        comparison: { ply: input.ply, actualMove: 42, aiMove: "D4" },
+      } as unknown as CommentaryInput);
+      expect(facts.some((fact) => fact.id.endsWith("/ledger-search"))).toBe(true);
+      expect(facts.some((fact) => /\/(?:group-|sacrifice-|candidate-|ledger-line-|comparison-)/.test(fact.id))).toBe(false);
+    }
+  });
+
   it("clears persisted notes when new authoritative evidence is reduced", () => {
     const before = structuredClone(state);
     before.plies[snapshot.ply]!.commentary = renderCommentary(buildCommentaryFacts(input));

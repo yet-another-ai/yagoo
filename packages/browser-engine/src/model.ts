@@ -1,3 +1,5 @@
+import { cacheDelete, cacheHas, cachePut, cacheRead } from './cache';
+
 export interface Artifact { url: string; bytes: number; sha256: string; integrity: string }
 export interface Manifest {
   schemaVersion: 1; model: string; swa: true; modelVersion: number; inputVersion: 7;
@@ -30,44 +32,134 @@ export function validateManifest(value: unknown): Manifest {
   return m;
 }
 
-async function verify(data: Uint8Array, a: Artifact): Promise<void> {
+export async function verify(data: Uint8Array, a: Artifact): Promise<void> {
   if (data.byteLength !== a.bytes) throw new Error(`Wrong size for ${a.url}.`);
   const hash = await crypto.subtle.digest('SHA-256', data as Uint8Array<ArrayBuffer>);
   const hex = Array.from(new Uint8Array(hash), x => x.toString(16).padStart(2, '0')).join('');
   if (hex !== a.sha256) throw new Error(`SHA-256 mismatch for ${a.url}.`);
 }
 
-// Content-addressed cache. A partially written file is never accepted as a model.
-// TODO(#14): HTTP range / resumable downloads for large model artifacts.
-export async function loadArtifact(base: string, a: Artifact, progress: (n: number, total: number) => void): Promise<Uint8Array> {
-  let directory: FileSystemDirectoryHandle | undefined;
-  try { directory = await navigator.storage.getDirectory(); } catch { /* storage optional */ }
-  try {
-    if (directory) {
-      const file = await (await directory.getFileHandle(a.sha256)).getFile();
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      await verify(bytes, a); progress(a.bytes, a.bytes); return bytes;
+export type LoadArtifactOptions = {
+  signal?: AbortSignal;
+  progress?: (loaded: number, total: number) => void;
+};
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new DOMException('Model download was cancelled.', 'AbortError');
+}
+
+/**
+ * Content-addressed OPFS cache + network fetch (jet/wllama-style).
+ * Cancel via AbortSignal (UI Cancel / Stop terminates the worker). Partial
+ * OPFS writes are never accepted as models.
+ * TODO(#14): HTTP Range / resumable downloads — cancel is supported; resume is not.
+ */
+export async function loadArtifact(
+  base: string,
+  a: Artifact,
+  progressOrOptions: ((n: number, total: number) => void) | LoadArtifactOptions = {},
+): Promise<Uint8Array> {
+  const options: LoadArtifactOptions = typeof progressOrOptions === 'function'
+    ? { progress: progressOrOptions }
+    : progressOrOptions;
+  const progress = options.progress ?? (() => {});
+  const signal = options.signal;
+  throwIfAborted(signal);
+
+  const cached = await cacheRead(a.sha256);
+  if (cached) {
+    try {
+      await verify(cached, a);
+      progress(a.bytes, a.bytes);
+      return cached;
+    } catch {
+      // Truncated / interrupted OPFS writes must not block forever — drop and refetch.
+      await cacheDelete(a.sha256);
     }
-  } catch { /* cache miss, eviction or corrupt partial file: refetch */ }
-  const response = await fetch(new URL(a.url, base), { mode: 'cors', credentials: 'same-origin' });
+  }
+
+  throwIfAborted(signal);
+  const response = await fetch(new URL(a.url, base), {
+    mode: 'cors',
+    credentials: 'same-origin',
+    signal,
+  });
   if (!response.ok || !response.body) throw new Error(`Model download failed (${response.status}): ${a.url}`);
   const reader = response.body.getReader();
   const bytes = new Uint8Array(a.bytes);
   let offset = 0;
   try {
     for (;;) {
+      throwIfAborted(signal);
       const { value, done } = await reader.read();
       if (done) break;
       if (offset + value.byteLength > bytes.byteLength) throw new Error('Model download exceeds manifest size.');
       bytes.set(value, offset); offset += value.byteLength; progress(offset, a.bytes);
     }
-  } finally { await reader.cancel(); }
+  } finally {
+    try { await reader.cancel(); } catch { /* ignore */ }
+  }
+  if (offset !== a.bytes) throw new Error(`Incomplete download for ${a.url}: got ${offset}, expected ${a.bytes}.`);
   await verify(bytes, a);
-  try {
-    if (directory) {
-      const writer = await (await directory.getFileHandle(a.sha256, { create: true })).createWritable();
-      await writer.write(bytes); await writer.close();
-    }
-  } catch { /* quota or private mode: verified in-memory model still works */ }
+  try { await cachePut(a.sha256, bytes); } catch { /* quota / private mode */ }
   return bytes;
+}
+
+/** Total bytes a validated session may need to download (fp32 or fp16 + warmup). */
+export function manifestDownloadBytes(manifest: Manifest, preferFp16: boolean): number {
+  const weights = preferFp16 && manifest.variants.fp16 ? manifest.variants.fp16 : manifest.variants.fp32;
+  return weights.bytes + manifest.warmup.bytes;
+}
+
+export async function artifactsCached(manifest: Manifest, preferFp16: boolean): Promise<boolean> {
+  const weights = preferFp16 && manifest.variants.fp16 ? manifest.variants.fp16 : manifest.variants.fp32;
+  return (await cacheHas(weights.sha256)) && (await cacheHas(manifest.warmup.sha256));
+}
+
+export type LocalBundle = { manifestUrl: string; revoke: () => void; manifest: Manifest };
+
+/**
+ * Stage user-picked local files (like wllama loadModel(File[])).
+ * Expects manifest.json plus the referenced onnx/warmup filenames.
+ */
+export async function bundleFromLocalFiles(files: Iterable<File>): Promise<LocalBundle> {
+  const byName = new Map<string, File>();
+  for (const file of files) byName.set(file.name, file);
+  const manifestFile = byName.get('manifest.json');
+  if (!manifestFile) throw new Error('Select files including manifest.json (plus the .onnx and warmup.json it names).');
+  const manifest = validateManifest(JSON.parse(await manifestFile.text()));
+  const objectUrls: string[] = [];
+  const revokeAll = () => { for (const url of objectUrls) URL.revokeObjectURL(url); objectUrls.length = 0; };
+  try {
+    const rewrite = async (artifact: Artifact): Promise<Artifact> => {
+      const name = artifact.url.split('/').pop()!;
+      const file = byName.get(name);
+      if (!file) throw new Error(`Missing local file for ${name} (listed in the manifest as ${artifact.url}).`);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      await verify(bytes, artifact);
+      try { await cachePut(artifact.sha256, bytes); } catch { /* optional */ }
+      const url = URL.createObjectURL(new Blob([bytes as Uint8Array<ArrayBuffer>]));
+      objectUrls.push(url);
+      return { ...artifact, url };
+    };
+    const rewritten: Manifest = {
+      ...manifest,
+      variants: {
+        fp32: await rewrite(manifest.variants.fp32),
+        ...(manifest.variants.fp16 ? { fp16: await rewrite(manifest.variants.fp16) } : {}),
+      },
+      warmup: await rewrite(manifest.warmup),
+    };
+    const manifestUrl = URL.createObjectURL(new Blob([JSON.stringify(rewritten)], { type: 'application/json' }));
+    objectUrls.push(manifestUrl);
+    const urls = [...objectUrls];
+    return {
+      manifestUrl,
+      manifest: rewritten,
+      revoke: () => { for (const url of urls) URL.revokeObjectURL(url); },
+    };
+  } catch (error) {
+    revokeAll();
+    throw error;
+  }
 }

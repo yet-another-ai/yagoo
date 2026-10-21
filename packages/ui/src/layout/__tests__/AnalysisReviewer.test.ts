@@ -79,9 +79,40 @@ describe("AnalysisReviewer", () => {
     expect(badge().text()).not.toContain("move 4");
     await wrapper.setProps({ initialSgf: "(;SZ[19];B[pd];W[dd];B[pp];W[dp];B[pj])" });
     expect(badge().text()).toContain("Sanrensei");
+    expect(badge().text()).not.toContain("outside the stored line");
     await wrapper.setProps({ initialSgf: "" });
     expect(badge().text()).toContain("No unique match");
     wrapper.unmount();
+  });
+
+  it.each([
+    { name: "Parallel 4-4 opening", prefix: ";B[pd];W[dd];B[pp];W[dp]",
+      deviation: ";B[jj]", move: 5, continuation: ";B[fc]", later: ";W[jj]" },
+    { name: "Diagonal 4-4 opening", prefix: ";B[pd];W[dd];B[dp];W[pp]",
+      deviation: ";B[jj]", move: 5, continuation: ";B[fc]", later: ";W[jj]" },
+    { name: "Sanrensei", prefix: ";B[pd];W[dd];B[pp];W[dp];B[pj]",
+      deviation: ";W[jj]", move: 6, continuation: ";W[qn]", later: ";B[jj]" },
+  ])("shows $name deviation and clears it for the stored leaf and later play", async ({ name, prefix, deviation, move, continuation, later }) => {
+    const wrapper = mount(AnalysisReviewer, {
+      props: { initialSgf: `(;SZ[19]${prefix}${deviation})`, vertexSize: 16 },
+    });
+    const badge = () => wrapper.get('[data-testid="opening-badge"]');
+    try {
+      expect(badge().get(".yagoo-opening__name").text()).toBe(name);
+      expect(badge().get(".yagoo-opening__dev").text()).toBe(`outside the stored line at move ${move}`);
+      expect(badge().find(".yagoo-opening__joseki").exists()).toBe(false);
+
+      // A stored leaf is the extent of this authored example, not a rule for
+      // what later moves must be played. Loading it also clears the prior warning.
+      await wrapper.setProps({ initialSgf: `(;SZ[19]${prefix}${continuation})` });
+      expect(badge().get(".yagoo-opening__name").text()).toBe(name);
+      expect(badge().find(".yagoo-opening__dev").exists()).toBe(false);
+      await wrapper.setProps({ initialSgf: `(;SZ[19]${prefix}${continuation}${later})` });
+      expect(badge().get(".yagoo-opening__name").text()).toBe(name);
+      expect(badge().find(".yagoo-opening__dev").exists()).toBe(false);
+    } finally {
+      wrapper.unmount();
+    }
   });
 
   it("does not show an unrelated NDJSON opening over the loaded SGF", async () => {

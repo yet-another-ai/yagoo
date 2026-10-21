@@ -60,28 +60,46 @@ fn shared_cases_cover_all_eight_symmetries_and_both_colors() {
 }
 
 #[test]
-fn every_catalogue_line_is_legal_and_recognized() {
+fn every_catalogue_line_is_legal_and_recognized_in_all_orientations_and_colors() {
     let book: serde_json::Value =
         serde_json::from_str(include_str!("../../../data/openings.json")).unwrap();
     for line in book["lines"].as_array().unwrap() {
         let raw: Vec<(String, u8, u8)> = serde_json::from_value(line["moves"].clone()).unwrap();
-        let moves: Vec<_> = raw
-            .iter()
-            .map(|(c, x, y)| {
-                (
-                    if c == "B" { Color::Black } else { Color::White },
-                    Some(Point::new(*x, *y)),
-                )
-            })
-            .collect();
-        let mut game = GameState::new(19, Ruleset::Chinese).unwrap();
-        for (color, point) in &moves {
-            assert_eq!(game.to_play(), *color);
-            game.play(point.unwrap()).unwrap();
+        if line["kind"] == "fuseki" {
+            assert!(line["minimum"].as_u64().unwrap() < raw.len() as u64);
         }
-        let matched = match_opening(19, false, &moves).unwrap();
-        assert_eq!(matched.name, line["name"].as_str().unwrap());
-        assert_eq!(matched.joseki.as_deref(), line["joseki"].as_str());
+        for symmetry in 0..8 {
+            for swap in [false, true] {
+                let context = format!("{} / symmetry {symmetry} / swapped {swap}", line["id"]);
+                let moves: Vec<_> = raw
+                    .iter()
+                    .map(|(c, x, y)| {
+                        (
+                            if (c == "B") == swap {
+                                Color::White
+                            } else {
+                                Color::Black
+                            },
+                            Some(oriented([*x, *y], symmetry)),
+                        )
+                    })
+                    .collect();
+                let mut game = GameState::new(19, Ruleset::Chinese).unwrap();
+                game.set_to_play(moves[0].0);
+                for (color, point) in &moves {
+                    assert_eq!(game.to_play(), *color, "{context}");
+                    game.play(point.unwrap()).expect(&context);
+                }
+                let matched = match_opening(19, false, &moves).expect(&context);
+                assert_eq!(matched.name, line["name"].as_str().unwrap(), "{context}");
+                assert_eq!(
+                    matched.joseki.as_deref(),
+                    line["joseki"].as_str(),
+                    "{context}"
+                );
+                assert_eq!(matched.deviation_ply, None, "{context}");
+            }
+        }
     }
 }
 

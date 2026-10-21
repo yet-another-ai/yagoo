@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { useGame } from "../useGame";
+import { getSgfRootError, useGame } from "../useGame";
 
 const SAMPLE = `(;FF[4]GM[1]SZ[9]PB[Alice]PW[Bob]BR[1d]WR[2d]C[Root comment]
 ;B[dd]C[Black opens]
@@ -9,6 +9,18 @@ const SAMPLE = `(;FF[4]GM[1]SZ[9]PB[Alice]PW[Bob]BR[1d]WR[2d]C[Root comment]
 (;W[cf]C[Variation]))`;
 
 describe("useGame", () => {
+  it("validates the same root as loading without rejecting later illegal moves", () => {
+    for (const [text, accepted] of [
+      ["(;SZ[5]AB[aa]B[aa])", false],
+      ["(;SZ[5]B[zz])", false],
+      ["(;SZ[9];B[dd](;W[dd])(;W[ff]))", true],
+      ["(;)", true],
+    ] as const) {
+      expect(getSgfRootError(text) == null).toBe(accepted);
+      expect(useGame().loadSgf(text)).toBe(accepted);
+    }
+  });
+
   it("keeps the valid position when a recorded move is illegal and allows another variation", () => {
     const g = useGame();
     g.loadSgf("(;SZ[9];B[dd](;W[dd])(;W[ff]))");

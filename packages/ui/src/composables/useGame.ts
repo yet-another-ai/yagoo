@@ -51,6 +51,29 @@ function createIdFactory(): () => number {
   return () => id++;
 }
 
+function parseGameTree(contents: string): GameTree {
+  const idFactory = createIdFactory();
+  const root = sgf.parse(contents, { getId: idFactory })[0];
+  if (root == null) throw new Error("SGF contained no game trees");
+  return new GameTree({
+    getId: idFactory,
+    // Parsed SGF roots match GameTree node objects.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    root: root as any,
+  });
+}
+
+/** Same root acceptance as loadSgf; later illegal moves remain navigable errors. */
+export function getSgfRootError(contents: string): string | null {
+  try {
+    const tree = parseGameTree(contents);
+    boardFromPath(tree, tree.root.id);
+    return null;
+  } catch (cause) {
+    return cause instanceof Error ? cause.message : String(cause);
+  }
+}
+
 function parseSize(sz: string | undefined): number {
   if (sz == null) return 19;
   const parts = sz.split(":");
@@ -211,18 +234,7 @@ export function useGame(): UseGameResult {
 
   function loadSgf(contents: string): boolean {
     try {
-      const idFactory = createIdFactory();
-      const roots = sgf.parse(contents, { getId: idFactory });
-      const root = roots[0];
-      if (root == null) {
-        throw new Error("SGF contained no game trees");
-      }
-      const gt = new GameTree({
-        getId: idFactory,
-        // Parsed SGF roots match GameTree node objects.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        root: root as any,
-      });
+      const gt = parseGameTree(contents);
       return syncFromNode(gt.root.id, gt);
     } catch (cause) {
       error.value = cause instanceof Error ? cause.message : String(cause);

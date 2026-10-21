@@ -16,6 +16,7 @@ import {
   resolveSgfRules,
   useAnalysisStream,
 } from "../analysis";
+import { getSgfRootError } from "../composables/useGame";
 import EngineSourcePanel from "../reviewer/EngineSourcePanel.vue";
 import { keyMovesFromState } from "../reviewer/keyMoves";
 import type { InspectorPerspective } from "../reviewer/MoveInspector.vue";
@@ -64,7 +65,9 @@ function parseBoardSize(sgf: string): number {
   return Number.isFinite(n) && n >= 2 ? n : 19;
 }
 
-const sgfText = ref(props.initialSgf ?? "");
+const sgfLoadError = ref(getSgfRootError(props.initialSgf?.trim() ? props.initialSgf : "(;)"));
+const hasAcceptedSgf = ref(sgfLoadError.value == null);
+const sgfText = ref(hasAcceptedSgf.value ? props.initialSgf ?? "" : "");
 const rulesLabel = computed(() => resolveSgfRules(sgfText.value));
 const boardSizeFromSgf = computed(() => parseBoardSize(sgfText.value));
 const dragOver = ref(false);
@@ -106,6 +109,15 @@ function reset() {
   stoppedByUser.value = false;
   statusMessage.value = "";
   resetStream();
+}
+
+function replaceSgf(text: string): boolean {
+  sgfLoadError.value = getSgfRootError(text.trim() ? text : "(;)");
+  if (sgfLoadError.value) return false;
+  reset();
+  sgfText.value = text;
+  hasAcceptedSgf.value = true;
+  return true;
 }
 
 function stopAnalysis() {
@@ -242,6 +254,7 @@ const browserAvailable = computed(() =>
   isBrowserEngineAvailable(props.browserEngine),
 );
 const positionSource = computed<PositionSourceFactory | null>(() => {
+  if (!hasAcceptedSgf.value) return null;
   // Explicit reconnects must restart the selected position even for the same engine.
   void sourceGeneration.value;
   if (activeNative.value) {
@@ -254,7 +267,7 @@ const positionSource = computed<PositionSourceFactory | null>(() => {
 });
 
 onMounted(() => {
-  if (props.initialNdjson) {
+  if (props.initialNdjson && hasAcceptedSgf.value) {
     loadNdjsonText(props.initialNdjson, "bundled sample analysis");
   } else {
     refreshOverlays();
@@ -267,8 +280,10 @@ watch(
     gameReadGeneration++;
     sourceReadGeneration++;
     if (v !== undefined && v !== sgfText.value) {
-      reset();
-      sgfText.value = v;
+      replaceSgf(v);
+    } else if (v !== undefined) {
+      sgfLoadError.value = null;
+      hasAcceptedSgf.value = true;
     }
   },
 );
@@ -291,14 +306,13 @@ function loadNdjsonText(text: string, label: string) {
   statusMessage.value = `Streaming from ${label}`;
 }
 
-async function onSgfFile(file: File) {
+async function onSgfFile(file: File): Promise<boolean> {
   const generation = ++gameReadGeneration;
   sourceReadGeneration++;
   const text = await file.text();
-  if (generation !== gameReadGeneration) return;
-  reset();
-  sgfText.value = text;
+  if (generation !== gameReadGeneration || !replaceSgf(text)) return false;
   statusMessage.value = `Loaded SGF ${file.name} (rules: ${resolveSgfRules(text)})`;
+  return true;
 }
 
 async function onNdjsonFile(file: File) {
@@ -328,13 +342,14 @@ async function onDrop(ev: DragEvent) {
   // Load paired files in order so the SGF reset cannot erase its analysis.
   if (game) {
     const generation = gameReadGeneration + 1;
-    await onSgfFile(game);
-    if (generation !== gameReadGeneration) return;
+    const accepted = await onSgfFile(game);
+    if (!accepted || generation !== gameReadGeneration) return;
   }
   if (analysis) await onNdjsonFile(analysis);
 }
 
 function tryLiveNative(url: string) {
+  if (!hasAcceptedSgf.value) return;
   sourceReadGeneration++;
   sourceGeneration.value++;
   nativeUrl.value = url;
@@ -349,6 +364,7 @@ function tryLiveNative(url: string) {
 }
 
 function tryBrowserEngine() {
+  if (!hasAcceptedSgf.value) return;
   if (!props.browserEngine) {
     statusMessage.value =
       "Load a local model bundle first. Recorded analysis stays on the board.";
@@ -534,6 +550,10 @@ const phaseBadge = computed(() => {
       @load-remote-manifest="emit('load-remote-manifest')"
     />
 
+    <p v-if="sgfLoadError" class="yagoo-analysis-app__status" role="alert">
+      Unable to load SGF: {{ sgfLoadError }}.
+      {{ hasAcceptedSgf ? 'The current game is unchanged.' : 'Load a valid SGF before starting analysis.' }}
+    </p>
     <p v-if="statusMessage" class="yagoo-analysis-app__status">
       {{ statusMessage }}
     </p>

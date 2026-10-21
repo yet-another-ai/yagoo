@@ -124,10 +124,17 @@ function reset() {
   resetStream();
 }
 
+function resetForSgf() {
+  reset();
+  // Recordings belong to one game; an explicit live engine choice remains until
+  // the user changes it. Loading an SGF still waits for Review before sending it.
+  if (chosenSource.value === "recorded") chosenSource.value = null;
+}
+
 function replaceSgf(text: string): boolean {
   sgfLoadError.value = getSgfRootError(text.trim() ? text : "(;)");
   if (sgfLoadError.value) return false;
-  reset();
+  resetForSgf();
   sgfText.value = text;
   hasAcceptedSgf.value = true;
   return true;
@@ -331,8 +338,7 @@ watch(
 );
 
 watch(sgfText, () => {
-  reset();
-  chosenSource.value = null;
+  resetForSgf();
   currentPly.value = 0;
 }, { flush: "sync" });
 
@@ -357,7 +363,6 @@ function loadNdjsonText(text: string, label: string) {
 
 async function onSgfFile(file: File): Promise<boolean> {
   const generation = ++fileGeneration;
-  sourceReadGeneration++;
   const text = await file.text();
   if (generation !== fileGeneration || !replaceSgf(text)) return false;
   statusMessage.value = `Loaded SGF ${file.name} (rules: ${resolveSgfRules(text)})`;

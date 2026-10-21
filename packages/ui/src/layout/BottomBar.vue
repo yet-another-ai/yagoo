@@ -1,6 +1,15 @@
 <script setup lang="ts">
+import { useYagooI18n } from "../i18n";
 import type { GamePlayerInfo } from "../composables/useGame";
 import type { Sign } from "../types";
+
+const { t } = useYagooI18n();
+
+function playerName(name: string): string {
+  if (name === "Black") return t("color.black");
+  if (name === "White") return t("color.white");
+  return name;
+}
 
 withDefaults(
   defineProps<{
@@ -37,7 +46,7 @@ const emit = defineEmits<{
 <template>
   <footer class="yagoo-bottom-bar">
     <div class="yagoo-bottom-bar__player yagoo-bottom-bar__player--black">
-      <span class="yagoo-bottom-bar__name">{{ players[0].name }}</span>
+      <span class="yagoo-bottom-bar__name">{{ playerName(players[0].name) }}</span>
       <span v-if="players[0].rank" class="yagoo-bottom-bar__rank">
         {{ players[0].rank }}
       </span>
@@ -48,7 +57,7 @@ const emit = defineEmits<{
 
     <div
       class="yagoo-bottom-bar__turn"
-      :title="`Move ${moveNumber}`"
+      :title="t('bottom.move', { n: moveNumber })"
       :data-to-play="currentPlayer"
     >
       <span
@@ -68,13 +77,13 @@ const emit = defineEmits<{
       <span v-if="players[1].rank" class="yagoo-bottom-bar__rank">
         {{ players[1].rank }}
       </span>
-      <span class="yagoo-bottom-bar__name">{{ players[1].name }}</span>
+      <span class="yagoo-bottom-bar__name">{{ playerName(players[1].name) }}</span>
     </div>
 
     <div class="yagoo-bottom-bar__nav">
       <button
         type="button"
-        aria-label="Previous move"
+        :aria-label="t('bottom.prev')"
         :disabled="!canGoBack"
         @click="emit('back')"
       >
@@ -82,7 +91,7 @@ const emit = defineEmits<{
       </button>
       <button
         type="button"
-        aria-label="Next move"
+        :aria-label="t('bottom.next')"
         :disabled="!canGoForward"
         @click="emit('forward')"
       >
@@ -94,7 +103,7 @@ const emit = defineEmits<{
         :aria-pressed="tryMode"
         @click="emit('toggle-try')"
       >
-        {{ tryMode ? "End try" : "Try" }}
+        {{ tryMode ? t("bottom.endTry") : t("bottom.try") }}
       </button>
       <button
         type="button"
@@ -102,7 +111,7 @@ const emit = defineEmits<{
         :aria-pressed="reportMode"
         @click="emit('toggle-report')"
       >
-        Report
+        {{ t("bottom.report") }}
       </button>
     </div>
   </footer>

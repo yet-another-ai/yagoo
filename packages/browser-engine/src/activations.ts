@@ -1,4 +1,5 @@
 import { Tensor, type InferenceSession } from 'onnxruntime-web/webgpu';
+import { coded } from './errors';
 
 export const ROOT_LAYERS = [...Array.from({ length: 18 }, (_, i) => `trunk_after_block${i}`), 'trunkfinal'];
 export type RootContext = { queryId: string; boardSize: number; toPlay: 'B' | 'W' };
@@ -32,10 +33,10 @@ export class RootActivationStore {
         const tensor = outputs[name];
         if (!tensor || tensor.location !== 'gpu-buffer' || !['float32', 'float16'].includes(tensor.type) ||
           tensor.dims.length !== 4 || tensor.dims[0] !== batch || tensor.dims[1] !== 384 || tensor.dims[2] !== 19 || tensor.dims[3] !== 19) {
-          throw new Error(`Invalid GPU root activation ${name}.`);
+          throw coded('engine.activationInvalid', `Invalid GPU root activation ${name}.`, { name });
         }
         const type = tensor.type as 'float32' | 'float16';
-        if (!(tensor.gpuBuffer.usage & GPUBufferUsage.COPY_SRC)) throw new Error(`GPU activation ${name} is not copyable.`);
+        if (!(tensor.gpuBuffer.usage & GPUBufferUsage.COPY_SRC)) throw coded('engine.activationCopy', `GPU activation ${name} is not copyable.`, { name });
         const dims = [1, 384, 19, 19];
         const bytes = 384 * 19 * 19 * (type === 'float32' ? 4 : 2);
         // Copy only identity row zero, entirely on the GPU. Other symmetry rows
@@ -59,7 +60,7 @@ export class RootActivationStore {
   }
 
   use(handle: string, consume: (tensors: Readonly<Record<string, Tensor>>) => void): void {
-    if (!this.current || this.current.lease.handle !== handle) throw new Error('Root activation handle has expired.');
+    if (!this.current || this.current.lease.handle !== handle) throw coded('engine.activationExpired', 'Root activation handle has expired.');
     consume(this.current.tensors);
   }
 }

@@ -1,5 +1,9 @@
+import { coded } from './errors';
+
 export const MAX_WASM_THREADS = 8;
-/** Shown beside Enable threads. Not an analysis error. */
+/** Stable key. The Vue reviewer translates `engine.singleThread`. */
+export const SINGLE_THREAD_CODE = 'engine.singleThread';
+/** English note for the non-Vue engine page. Not an analysis error. */
 export const SINGLE_THREAD_NOTE =
   'Wasm is running on one thread: cross-origin isolation and shared WebAssembly memory are required for multiple threads.';
 export type ThreadPlan = { ortThreads: number; searchThreads: 1; reason?: string };
@@ -10,12 +14,12 @@ export function threadPlan(options: {
 }): ThreadPlan {
   const { isolated, sharedMemory, requested, backend } = options;
   if (requested !== undefined && (!Number.isInteger(requested) || requested < 1)) {
-    throw new Error('Wasm thread count must be a positive integer.');
+    throw coded('engine.threadCount', 'Wasm thread count must be a positive integer.');
   }
   if (backend === 'webgpu') return { ortThreads: 1, searchThreads: 1 };
   if (!isolated || !sharedMemory) return {
     ortThreads: 1, searchThreads: 1,
-    reason: SINGLE_THREAD_NOTE,
+    reason: SINGLE_THREAD_CODE,
   };
   const cores = Number.isFinite(options.hardwareConcurrency) ? Math.max(1, Math.floor(options.hardwareConcurrency)) : 2;
   // ORT counts its calling engine worker as one of these threads. Rust MCTS runs

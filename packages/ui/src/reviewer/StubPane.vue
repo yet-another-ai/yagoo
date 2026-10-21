@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useYagooI18n } from "../i18n";
+
+const { t } = useYagooI18n();
 const props = defineProps<{
   /** Issue number without a hash, for example `24`. */
   issue: number;
@@ -11,11 +14,11 @@ const href = `https://github.com/yet-another-ai/yagoo/issues/${props.issue}`;
 
 <template>
   <section class="yagoo-stub" data-testid="module-stub" :data-issue="issue">
-    <p class="yagoo-stub__badge">Coming in #{{ issue }}</p>
+    <p class="yagoo-stub__badge">{{ t("stub.coming", { issue }) }}</p>
     <h3 class="yagoo-stub__title">{{ title }}</h3>
     <p class="yagoo-stub__summary">{{ summary }}</p>
     <p class="yagoo-stub__link">
-      <a :href="href">Issue #{{ issue }}</a>
+      <a :href="href">{{ t("stub.issue", { issue }) }}</a>
     </p>
   </section>
 </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useYagooI18n } from "../i18n";
 import {
   groupPrimaryColor,
   groupStatusLabel,
@@ -20,6 +21,14 @@ const props = withDefaults(
     embedded: false,
   },
 );
+
+const { t } = useYagooI18n();
+
+function kindLabel(kind: string): string {
+  const key = `groups.kind.${kind}`;
+  const via = t(key);
+  return via === key ? kind : via;
+}
 
 const emit = defineEmits<{
   (e: "preview", groupId: string): void;
@@ -45,7 +54,7 @@ function statusClass(g: GroupSnapshot): string {
     :class="{ 'yagoo-groups--embedded': embedded }"
     data-testid="groups-panel"
   >
-    <div class="yagoo-groups__title">Groups / 块</div>
+    <div class="yagoo-groups__title">{{ t("groups.title") }}</div>
     <ul v-if="groups.length" class="yagoo-groups__list">
       <li
         v-for="g in groups"
@@ -67,8 +76,8 @@ function statusClass(g: GroupSnapshot): string {
         <span class="yagoo-groups__swatch" :class="swatchClass(g)" />
         <span class="yagoo-groups__id">{{ g.groupId }}</span>
         <span class="yagoo-groups__meta">
-          <span class="yagoo-groups__kind">{{ g.kind }}</span>
-          <span class="yagoo-groups__size">{{ groupStoneCount(g) }}st</span>
+          <span class="yagoo-groups__kind">{{ kindLabel(g.kind) }}</span>
+          <span class="yagoo-groups__size">{{ t("groups.stones", { count: groupStoneCount(g) }) }}</span>
         </span>
         <span class="yagoo-groups__status" :class="statusClass(g)">
           {{ groupStatusLabel(g.status) }}
@@ -77,7 +86,7 @@ function statusClass(g: GroupSnapshot): string {
       </li>
     </ul>
     <p v-else class="yagoo-groups__empty">
-      No groups (块) at this ply — deepen a swing position for fate clustering.
+      {{ t("groups.empty") }}
     </p>
   </div>
 </template>

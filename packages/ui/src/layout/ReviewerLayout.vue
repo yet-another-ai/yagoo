@@ -54,7 +54,10 @@ import BottomBar from "./BottomBar.vue";
 import CommentBox from "./CommentBox.vue";
 import GroupsPanel from "./GroupsPanel.vue";
 import WinrateGraph, { type WinratePoint } from "./WinrateGraph.vue";
+import { presentError, useYagooI18n } from "../i18n";
 import "./styles/reviewer.css";
+
+const { t } = useYagooI18n();
 
 defineOptions({ name: "ReviewerLayout" });
 
@@ -221,13 +224,13 @@ const variationSelected = ref(0);
 let trySeq = 0;
 let resizeObserver: ResizeObserver | null = null;
 
-const sections: { id: CompactSection; label: string }[] = [
-  { id: "graph", label: "Graph" },
-  { id: "inspector", label: "Move" },
-  { id: "groups", label: "Groups" },
-  { id: "tree", label: "Tree" },
-  { id: "comment", label: "Notes" },
-];
+const sections = computed(() => [
+  { id: "graph" as const, label: t("sections.graph") },
+  { id: "inspector" as const, label: t("sections.move") },
+  { id: "groups" as const, label: t("sections.groups") },
+  { id: "tree" as const, label: t("sections.tree") },
+  { id: "comment" as const, label: t("sections.notes") },
+]);
 
 function load(contents: string | undefined) {
   if (!loadSgf(contents?.trim() ? contents : "(;)")) return;
@@ -380,12 +383,12 @@ const variationOverlays = computed(() => buildBoardOverlays(variation.state.valu
   previewCandidate: variationPinned.value ?? variationPreview.value,
 }));
 const variationStatus = computed(() => {
-  if (!props.positionSource) return "Load a browser model or connect a native engine to analyze this variation.";
+  if (!props.positionSource) return t("tree.needEngine");
   const state = variation.state.value;
-  if (state.status === "streaming") return "Analyzing this variation…";
-  if (state.status === "error") return state.lastError ?? "Variation analysis failed.";
-  if (state.status === "completed") return "Live analysis for this variation.";
-  return "Variation analysis stopped.";
+  if (state.status === "streaming") return t("tree.analyzing");
+  if (state.status === "error") return presentError(state.lastError) || t("tree.failed");
+  if (state.status === "completed") return t("tree.live");
+  return t("tree.stopped");
 });
 const variationKey = computed(() => suspendAnalysis.value
   ? `${tryMode.value ? anchorSgf.value : positionSgf.value}|${tryMode.value ? tryCursor.value ?? "anchor" : "sgf"}`
@@ -520,7 +523,12 @@ const canStepForward = computed(() =>
 const displayComment = computed(() => {
   if (activeComparison.value) {
     const comparison = activeComparison.value;
-    return `Move ${comparison.ply}: ${comparison.actualMove} versus ${comparison.aiMove}, evaluated at root ply ${comparison.rootPly}. The board shows the position before this move.`;
+    return t("comparison.boardComment", {
+      ply: comparison.ply,
+      actual: comparison.actualMove,
+      ai: comparison.aiMove,
+      root: comparison.rootPly,
+    });
   }
   if (suspendAnalysis.value) return variationInfo.value
     ? formatAnalysisComment(variation.state.value, variationPly.value, "")
@@ -879,11 +887,10 @@ defineExpose({
     <template v-else>
       <main ref="mainEl" class="yagoo-reviewer__main">
         <p v-if="gameError" class="yagoo-try-banner" role="alert">
-          Unable to show SGF position: {{ gameError }}. Choose another move or load a valid SGF.
+          {{ t("game.showError", { message: presentError(gameError) }) }}
         </p>
         <p v-if="activeComparison" class="yagoo-try-banner" data-testid="comparison-board-banner">
-          Move {{ activeComparison.ply }} comparison · board before the move (ply {{ activeComparison.rootPly }}).
-          A = actual {{ activeComparison.actualMove }} · AI = {{ activeComparison.aiMove }}.
+          {{ t("comparison.banner", { ply: activeComparison.ply, root: activeComparison.rootPly, actual: activeComparison.actualMove, ai: activeComparison.aiMove }) }}
         </p>
         <p
           v-if="suspendAnalysis"
@@ -926,7 +933,7 @@ defineExpose({
         class="yagoo-splitter"
         role="separator"
         aria-orientation="vertical"
-        aria-label="Resize sidebar"
+        :aria-label="t('sections.resize')"
         tabindex="0"
         :aria-valuenow="sidebarWidth"
         aria-valuemin="340"
@@ -940,7 +947,7 @@ defineExpose({
           v-if="compact"
           class="yagoo-section-tabs"
           role="tablist"
-          aria-label="Sidebar sections"
+          :aria-label="t('sections.aria')"
         >
           <button
             v-for="item in sections"
@@ -1007,7 +1014,7 @@ defineExpose({
             v-if="!compact"
             class="yagoo-subtabs"
             role="tablist"
-            aria-label="Groups and tree"
+            :aria-label="t('sections.groupsAndTree')"
           >
             <button
               type="button"
@@ -1016,7 +1023,7 @@ defineExpose({
               data-testid="lower-groups"
               @click="lowerTab = 'groups'"
             >
-              Groups
+              {{ t("sections.groups") }}
             </button>
             <button
               type="button"
@@ -1025,7 +1032,7 @@ defineExpose({
               data-testid="lower-tree"
               @click="lowerTab = 'tree'"
             >
-              Tree
+              {{ t("sections.tree") }}
             </button>
           </div>
           <GroupsPanel
@@ -1059,7 +1066,7 @@ defineExpose({
         <CommentBox
           v-show="panelVisible('comment')"
           dock
-          :title="commentTitle"
+          :title="commentTitle === 'Comment' ? t('comment.title') : commentTitle === 'Analysis' ? t('comment.analysis') : commentTitle"
           :comment="displayComment"
         />
       </aside>

@@ -2,6 +2,8 @@ import Board from "@sabaki/go-board";
 import GameTree from "@sabaki/immutable-gametree";
 import sgf from "@sabaki/sgf";
 import { computed, ref, shallowRef, type Ref } from "vue";
+import { coded } from "../i18n/coded";
+import { translate } from "../i18n/active";
 import { formatGtpVertex } from "../analysis/coords";
 import type { BoardMap, Sign, Vertex } from "../types";
 import { boardKey, playPosition, type GamePosition } from "./gamePosition";
@@ -54,7 +56,7 @@ function createIdFactory(): () => number {
 function parseGameTree(contents: string): GameTree {
   const idFactory = createIdFactory();
   const root = sgf.parse(contents, { getId: idFactory })[0];
-  if (root == null) throw new Error("SGF contained no game trees");
+  if (root == null) throw coded("game.noTrees", "SGF contained no game trees");
   return new GameTree({
     getId: idFactory,
     // Parsed SGF roots match GameTree node objects.
@@ -88,13 +90,13 @@ function childMoveLabel(
   const white = data.W?.[0];
   if (black != null) {
     const v = parsePoint(black, size);
-    return v ? `B ${formatGtpVertex(v, size)}` : "B pass";
+    return v ? `B ${formatGtpVertex(v, size)}` : `B ${translate("game.pass")}`;
   }
   if (white != null) {
     const v = parsePoint(white, size);
-    return v ? `W ${formatGtpVertex(v, size)}` : "W pass";
+    return v ? `W ${formatGtpVertex(v, size)}` : `W ${translate("game.pass")}`;
   }
-  return "node";
+  return translate("game.node");
 }
 
 function parsePoint(raw: string, size = 19): Vertex | null {
@@ -164,7 +166,9 @@ function boardFromPath(
       const raw = (data.B ?? data.W)?.[0] ?? "";
       const v = parsePoint(raw, size);
       const next = playPosition({ ...position, toPlay }, v ?? [-1, -1]);
-      if (next == null) throw new Error(`Illegal SGF move ${moveNumber + 1}`);
+      if (next == null) {
+        throw coded("game.illegal", `Illegal SGF move ${moveNumber + 1}`, { n: moveNumber + 1 });
+      }
       position = next;
       moveNumber += 1;
       currentPlayer = position.toPlay;

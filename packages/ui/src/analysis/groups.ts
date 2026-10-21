@@ -1,3 +1,4 @@
+import { translate } from "../i18n/active";
 import type { Vertex } from "../types";
 import { parseGtpVertex } from "./coords";
 import type {
@@ -39,29 +40,21 @@ export function groupStoneCount(group: GroupSnapshot): number {
 export function groupValueLabel(group: GroupSnapshot): string {
   const s = group.strength;
   if (s?.black != null && s?.white != null) {
-    return `B ${s.black.toFixed(2)} / W ${s.white.toFixed(2)}`;
+    return translate("groups.strengthBoth", {
+      black: s.black.toFixed(2),
+      white: s.white.toFixed(2),
+    });
   }
-  if (s?.black != null) return `g ${s.black.toFixed(2)}`;
-  if (s?.white != null) return `g ${s.white.toFixed(2)}`;
-  if (group.gPlus != null) return `g+ ${group.gPlus.toFixed(2)}`;
+  if (s?.black != null) return translate("groups.strengthBlack", { value: s.black.toFixed(2) });
+  if (s?.white != null) return translate("groups.strengthWhite", { value: s.white.toFixed(2) });
+  if (group.gPlus != null) return translate("groups.strengthPlus", { value: group.gPlus.toFixed(2) });
   return "—";
 }
 
 export function groupStatusLabel(status: GroupStatus | undefined): string {
-  switch (status) {
-    case "settled":
-      return "settled";
-    case "weak":
-      return "weak";
-    case "tempo_critical":
-      return "tempo-critical";
-    case "dead":
-      return "dead";
-    case "likely_seki":
-      return "likely seki";
-    default:
-      return "—";
-  }
+  const key = `groups.status.${status ?? "unknown"}`;
+  const via = translate(key);
+  return via === key ? "—" : via;
 }
 
 /** All board vertices belonging to the group (stones + empties). */

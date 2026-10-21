@@ -155,6 +155,23 @@ export type {
 } from "./types";
 
 export {
+  YAGOO_LOCALE_STORAGE_KEY,
+  YAGOO_LOCALES,
+  consumeMissingKeys,
+  flattenMessageKeys,
+  messageRef,
+  normalizeLocale,
+  presentError,
+  presentSource,
+  readStoredLocale,
+  resolveYagooLocale,
+  serializeError,
+  storeLocale,
+  useYagooI18n,
+} from "./i18n";
+export type { YagooLocale } from "./i18n";
+
+export {
   SAMPLE_GROUP_OUTLINE,
   SAMPLE_SGF,
   SAMPLE_WINRATE,

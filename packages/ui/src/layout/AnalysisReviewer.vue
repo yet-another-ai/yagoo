@@ -33,6 +33,7 @@ import type {
   Marker,
   Vertex,
 } from "../types";
+import { messageRef, presentError, presentSource, storeLocale, useYagooI18n, type YagooLocale } from "../i18n";
 import ReviewerLayout from "./ReviewerLayout.vue";
 import "./styles/reviewer.css";
 
@@ -58,6 +59,10 @@ const props = defineProps<{
   threadHint?: string | null;
   remoteManifestUrl?: string | null;
   modelStatus?: string | null;
+  /** Explicit locale (`?lang=`, tests). Wins over storage and the host locale. */
+  locale?: string | null;
+  /** VitePress site locale, used only when the docs site configures locales. */
+  hostLocale?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -69,6 +74,14 @@ const emit = defineEmits<{
 function parseBoardSize(sgf: string): number {
   const n = Number.parseInt(/SZ\[(\d+)/i.exec(sgf)?.[1] ?? "19", 10);
   return Number.isFinite(n) && n >= 2 ? n : 19;
+}
+
+const { t, locale } = useYagooI18n({ explicit: props.locale, host: props.hostLocale });
+
+function toggleLocale() {
+  const next: YagooLocale = locale.value === "zh-CN" ? "en" : "zh-CN";
+  locale.value = next;
+  storeLocale(next);
 }
 
 const sgfLoadError = ref(getSgfRootError(props.initialSgf?.trim() ? props.initialSgf : "(;)"));
@@ -143,7 +156,7 @@ function replaceSgf(text: string): boolean {
 function stopAnalysis() {
   stop();
   stoppedByUser.value = true;
-  statusMessage.value = "Analysis stopped.";
+  statusMessage.value = messageRef("status.stopped");
 }
 
 const emptyHeat = computed<BoardMap<HeatVertex | null>>(() => []);
@@ -228,7 +241,7 @@ function refreshOverlays() {
 }
 
 watch(
-  [() => state.value, currentPly, selectedCandidate, activePreview],
+  [() => state.value, currentPly, selectedCandidate, activePreview, locale],
   refreshOverlays,
   { deep: true },
 );
@@ -246,7 +259,7 @@ watch(
   () => state.value.status,
   (status) => {
     if (status === "completed" && sourceLabel.value) {
-      statusMessage.value = `Loaded ${sourceLabel.value}`;
+      statusMessage.value = messageRef("status.loaded", { label: sourceLabel.value });
     } else if (status === "error" && state.value.lastError) {
       statusMessage.value = state.value.lastError;
     }
@@ -350,7 +363,7 @@ function loadNdjsonText(text: string, label: string) {
   activeNative.value = false;
   reset();
   chosenSource.value = "recorded";
-  statusMessage.value = `Loading ${label}…`;
+  statusMessage.value = messageRef("status.loading", { label });
   attachSource(
     createNdjsonTextSource(text, {
       progressive: true,
@@ -358,14 +371,17 @@ function loadNdjsonText(text: string, label: string) {
       label,
     }),
   );
-  statusMessage.value = `Streaming from ${label}`;
+  statusMessage.value = messageRef("status.streaming", { label });
 }
 
 async function onSgfFile(file: File): Promise<boolean> {
   const generation = ++fileGeneration;
   const text = await file.text();
   if (generation !== fileGeneration || !replaceSgf(text)) return false;
-  statusMessage.value = `Loaded SGF ${file.name} (rules: ${resolveSgfRules(text)})`;
+  statusMessage.value = messageRef("status.loadedSgf", {
+    name: file.name,
+    rules: resolveSgfRules(text),
+  });
   return true;
 }
 
@@ -413,19 +429,18 @@ function tryLiveNative(url = nativeUrl.value) {
   nativeUrl.value = url;
   activeNative.value = true;
   if (variationActive.value) {
-    statusMessage.value = "Analyzing the selected variation with the native engine…";
+    statusMessage.value = messageRef("status.variationNative");
     return;
   }
   reset();
-  statusMessage.value = "Connecting to local native engine…";
+  statusMessage.value = messageRef("status.connectingNative");
   attachSource(createLiveNativeSource({ url, sgf: sgfText.value }));
 }
 
 function tryBrowserEngine() {
   if (!hasAcceptedSgf.value) return;
   if (!props.browserEngine) {
-    statusMessage.value =
-      "Load a local model bundle first. Recorded analysis stays on the board.";
+    statusMessage.value = messageRef("status.needModel");
     return;
   }
   sourceGeneration.value++;
@@ -433,11 +448,11 @@ function tryBrowserEngine() {
   fileGeneration++;
   chosenSource.value = "browser";
   if (variationActive.value && props.browserEngine.analyzePosition) {
-    statusMessage.value = "Analyzing the selected variation with the browser engine…";
+    statusMessage.value = messageRef("status.variationBrowser");
     return;
   }
   reset();
-  statusMessage.value = "Starting experimental browser engine…";
+  statusMessage.value = messageRef("status.startingBrowser");
   attachSource(
     createBrowserEngineSource({
       engine: props.browserEngine,
@@ -453,7 +468,7 @@ function reviewGame() {
     return;
   }
   if (!sgfText.value.trim()) {
-    statusMessage.value = "Open an SGF before starting a review.";
+    statusMessage.value = messageRef("status.needSgf");
     return;
   }
   if (chosenSource.value === "native" && liveAvailable) {
@@ -464,7 +479,7 @@ function reviewGame() {
     tryBrowserEngine();
   } else {
     sourceOpen.value = true;
-    statusMessage.value = "Choose an available engine or load recorded analysis to review this game.";
+    statusMessage.value = messageRef("status.chooseEngine");
     return;
   }
 }
@@ -552,16 +567,25 @@ function onVertexClick(evt: MouseEvent, vertex: Vertex) {
 
 const phaseBadge = computed(() => {
   const s = state.value;
-  if (s.status === "error") return `error: ${s.lastError ?? "?"}`;
-  if (stoppedByUser.value) return `stopped · ${s.eventCount} events`;
+  if (s.status === "error") return t("phase.error", { message: presentError(s.lastError ?? "?") });
+  if (stoppedByUser.value) return t("phase.stopped", { count: s.eventCount });
   if (s.currentPhase) {
-    return `${s.currentPhase} @ ply ${s.activePly ?? "—"} (${s.eventCount} events)`;
+    const named = t(`phase.name.${s.currentPhase}`);
+    const phase = named === `phase.name.${s.currentPhase}` ? s.currentPhase : named;
+    return t("phase.active", {
+      phase,
+      ply: s.activePly ?? "—",
+      count: s.eventCount,
+    });
   }
   if (s.status === "completed") {
-    return `complete · ${s.eventCount} events · deep [${s.deepPlies.join(",") || "—"}]`;
+    return t("phase.complete", {
+      count: s.eventCount,
+      deep: s.deepPlies.join(",") || "—",
+    });
   }
-  if (isStreaming.value) return `streaming · ${s.eventCount} events`;
-  return "idle";
+  if (isStreaming.value) return t("phase.streaming", { count: s.eventCount });
+  return t("phase.idle");
 });
 </script>
 
@@ -578,21 +602,21 @@ const phaseBadge = computed(() => {
       <div class="yagoo-analysis-app__brand">Yagoo</div>
       <OpeningBadge :match="effectiveOpening" />
       <div class="yagoo-analysis-app__meta">
-        <span>RU {{ rulesLabel }}</span>
-        <span v-if="sourceLabel">· {{ sourceLabel }}</span>
+        <span>{{ t("toolbar.rules", { rules: rulesLabel }) }}</span>
+        <span v-if="sourceLabel">· {{ presentSource(sourceLabel) }}</span>
         <span>· {{ phaseBadge }}</span>
       </div>
       <div class="yagoo-analysis-app__controls">
-        <button type="button" class="yagoo-analysis-app__btn" data-testid="review-game" @click="reviewGame">Review</button>
+        <button type="button" class="yagoo-analysis-app__btn" data-testid="review-game" @click="reviewGame">{{ t("toolbar.review") }}</button>
         <button
           v-if="isStreaming"
           type="button"
           class="yagoo-analysis-app__btn"
           data-testid="stop-analysis"
           @click="stopAnalysis"
-        >Stop analysis</button>
+        >{{ t("toolbar.stop") }}</button>
         <label class="yagoo-analysis-app__btn">
-          Open SGF
+          {{ t("toolbar.openSgf") }}
           <input
             type="file"
             accept=".sgf,text/plain"
@@ -607,7 +631,16 @@ const phaseBadge = computed(() => {
           :aria-expanded="sourceOpen"
           @click="sourceOpen = !sourceOpen"
         >
-          Engine
+          {{ t("toolbar.engine") }}
+        </button>
+        <button
+          type="button"
+          class="yagoo-analysis-app__btn"
+          data-testid="locale-toggle"
+          :aria-label="t('toolbar.language')"
+          @click="toggleLocale"
+        >
+          {{ locale === "zh-CN" ? t("toolbar.languageToEn") : t("toolbar.languageToZh") }}
         </button>
       </div>
     </header>
@@ -633,11 +666,11 @@ const phaseBadge = computed(() => {
     />
 
     <p v-if="sgfLoadError" class="yagoo-analysis-app__status" role="alert">
-      Unable to load SGF: {{ sgfLoadError }}.
-      {{ hasAcceptedSgf ? 'The current game is unchanged.' : 'Load a valid SGF before starting analysis.' }}
+      {{ t("status.sgfError", { message: presentError(sgfLoadError) }) }}
+      {{ hasAcceptedSgf ? t("status.sgfUnchanged") : t("status.sgfNeedValid") }}
     </p>
     <p v-if="statusMessage" class="yagoo-analysis-app__status">
-      {{ statusMessage }}
+      {{ presentError(statusMessage) }}
     </p>
     <p
       v-if="initialAnalysisNotice && sourceLabel === 'bundled sample analysis'"
@@ -648,7 +681,7 @@ const phaseBadge = computed(() => {
       {{ initialAnalysisNotice }}
     </p>
     <p v-if="dragOver" class="yagoo-analysis-app__drop">
-      Drop SGF and/or NDJSON analysis files…
+      {{ t("toolbar.drop") }}
     </p>
 
     <div class="yagoo-analysis-app__board">
@@ -675,7 +708,7 @@ const phaseBadge = computed(() => {
         :dimmed-vertices="dimmedVertices"
         :selected-vertices="selectedVertices"
         :comment-override="analysisComment"
-        comment-title="Analysis"
+        :comment-title="t('comment.analysis')"
         :root-analysis="currentPlyAnalysis?.root ?? null"
         :key-moves="keyMoves"
         :ledger="currentPlyAnalysis?.ledger ?? null"

@@ -1,3 +1,5 @@
+import { presentError } from "../i18n";
+import { translate } from "../i18n/active";
 import type { WinratePoint } from "../layout/WinrateGraph.vue";
 import type {
   BoardMap,
@@ -124,27 +126,29 @@ export function formatAnalysisComment(
         ? `${r.scoreLead >= 0 ? "+" : ""}${r.scoreLead.toFixed(1)}`
         : "—";
     const visits = r.visits != null ? String(r.visits) : "—";
-    const phase = info.phase ?? "?";
+    const rawPhase = info.phase ?? "?";
+    const phaseName = translate(`phase.name.${rawPhase}`);
+    const phase = phaseName === `phase.name.${rawPhase}` ? rawPhase : phaseName;
     const tag = info.rootPartial
-      ? "partial"
+      ? translate("comment.partial")
       : info.complete
-        ? "complete"
-        : "in progress";
-    lines.push(
-      `[${phase} · ${tag}] Black WR ${wr} · lead ${sl} · visits ${visits}`,
-    );
+        ? translate("comment.complete")
+        : translate("comment.inProgress");
+    lines.push(translate("comment.root", { phase, tag, wr, sl, visits }));
   } else if (state.status === "streaming" || state.status === "completed") {
-    lines.push("Waiting for analysis at this ply…");
+    lines.push(translate("comment.waiting"));
   }
 
   if (state.deepPlies.includes(ply)) {
     const reason = state.deepReasons.find((r) => r.ply === ply);
     if (reason) {
-      lines.push(
-        `Deepened (swing): ΔWR ${(reason.winrateDelta * 100).toFixed(1)}pp · ΔSL ${reason.scoreLeadDelta.toFixed(1)} · Δown ${reason.ownershipDelta.toFixed(3)}`,
-      );
+      lines.push(translate("comment.deepened", {
+        wr: (reason.winrateDelta * 100).toFixed(1),
+        sl: reason.scoreLeadDelta.toFixed(1),
+        own: reason.ownershipDelta.toFixed(3),
+      }));
     } else {
-      lines.push("Selected for deep analysis.");
+      lines.push(translate("comment.selectedDeep"));
     }
   }
 
@@ -159,17 +163,19 @@ export function formatAnalysisComment(
       .map((c, i) => {
         const wr = candidateWinrateAuthoritative(c, topVisits)
           ? `${((c.winrate ?? 0) * 100).toFixed(0)}%`
-          : "low";
+          : translate("candidates.low");
         const v = c.visits != null ? `${c.visits}v` : "";
         return `${i + 1}. ${c.move} ${wr} ${v}`.trim();
       })
       .join(" · ");
-    const suffix =
-      hidden > 0 ? `${top ? " · " : ""}${hidden} low-visit hidden` : "";
-    lines.push(`Candidates: ${top}${suffix}`);
+    const hiddenText = hidden > 0 ? translate("comment.lowHidden", { count: hidden }) : "";
+    const suffix = hidden > 0 ? `${top ? " · " : ""}${hiddenText}` : "";
+    lines.push(translate("comment.candidates", { body: `${top}${suffix}` }));
   }
 
-  if (state.lastError) lines.push(`Error: ${state.lastError}`);
+  if (state.lastError) {
+    lines.push(translate("comment.error", { message: presentError(state.lastError) }));
+  }
 
   return lines.join("\n") || "—";
 }
@@ -204,7 +210,7 @@ export function buildPvPreview(
     markerMap[y]![x] = {
       type: "label",
       label: String(n),
-      tooltip: `PV ${n}: ${move}`,
+      tooltip: translate("comment.pv", { n, move }),
     };
     sign = sign === 1 ? -1 : 1;
   }
@@ -392,7 +398,7 @@ function applyCandidates(
     markerMap[y]![x] = {
       type: "label",
       label: text,
-      tooltip: `${c.move} · order ${c.order ?? idx}`,
+      tooltip: translate("comment.order", { move: c.move, order: c.order ?? idx }),
     };
   });
 }

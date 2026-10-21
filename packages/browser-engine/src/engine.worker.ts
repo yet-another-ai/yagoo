@@ -2,6 +2,7 @@ import * as ort from 'onnxruntime-web/webgpu';
 import initRust, { analyze, analyze_position, default_config } from '../wasm/yagoo_web';
 import { loadArtifact, validateManifest, type Manifest } from './model';
 import { ROOT_LAYERS, RootActivationStore, type RootContext } from './activations';
+import { coded, errorFields } from './errors';
 
 let session: ort.InferenceSession | undefined;
 let manifest: Manifest;
@@ -13,7 +14,7 @@ function errorText(error: unknown): string {
   return String(error);
 }
 function reportWorkerError(error: unknown): void {
-  try { postMessage({ type: 'error', message: errorText(error) }); } catch { /* Worker is closing. */ }
+  try { postMessage({ type: 'error', ...errorFields(error) }); } catch { /* Worker is closing. */ }
 }
 const workerEvents = self as unknown as { addEventListener?: typeof addEventListener };
 if (typeof workerEvents.addEventListener === 'function') {
@@ -53,9 +54,9 @@ function beginRoot(json: string): void {
 }
 
 async function evaluate(spatial: Float32Array, globalInput: Float32Array, count = 1, rootIdentityBatch = false): Promise<string> {
-  if (!session) throw new Error('Neural session is not initialized.');
+  if (!session) throw coded('engine.sessionMissing', 'Neural session is not initialized.');
   const capacity = manifest.batch === 0 ? manifest.maxBatch! : 1;
-  if (!Number.isInteger(count) || count < 1 || count > capacity || spatial.length !== count * 22 * 361 || globalInput.length !== count * 19) throw new Error('Invalid neural batch shape.');
+  if (!Number.isInteger(count) || count < 1 || count > capacity || spatial.length !== count * 22 * 361 || globalInput.length !== count * 19) throw coded('engine.batchShape', 'Invalid neural batch shape.');
   const feeds = {
     spatial: new ort.Tensor('float32', spatial, [count, 22, 19, 19]),
     global_input: new ort.Tensor('float32', globalInput, [count, 19]),
@@ -79,14 +80,14 @@ async function evaluate(spatial: Float32Array, globalInput: Float32Array, count 
     for (const name of heads) {
       const tensor = output![name].data as Float32Array;
       const expected = [count, ...shapes[name]];
-      if (output![name].type !== 'float32' || output![name].dims.length !== expected.length || output![name].dims.some((v, i) => v !== expected[i])) throw new Error(`Wrong neural batch output: ${name}.`);
+      if (output![name].type !== 'float32' || output![name].dims.length !== expected.length || output![name].dims.some((v, i) => v !== expected[i])) throw coded('engine.outputWrong', `Wrong neural batch output: ${name}.`, { name });
       const bad = tensor.findIndex(v => !Number.isFinite(v));
-      if (bad !== -1) throw new Error(`Nonfinite neural output ${name}[${bad}]=${tensor[bad]} (${tensor.length} values).`);
+      if (bad !== -1) throw coded('engine.outputNonfinite', `Nonfinite neural output ${name}[${bad}]=${tensor[bad]} (${tensor.length} values).`, { name, index: bad, value: String(tensor[bad]), length: tensor.length });
       const width = tensor.length / count;
       for (let i = 0; i < count; i++) rows[i][name] = Array.from(tensor.subarray(i * width, (i + 1) * width));
     }
     if (keepRoot && activationEpoch === activationGeneration) {
-      if (!rootContext) throw new Error('Missing explicit root context.');
+      if (!rootContext) throw coded('engine.rootContext', 'Missing explicit root context.');
       try {
         const device = await ort.env.webgpu.device;
         if (activationEpoch === activationGeneration) {
@@ -97,7 +98,7 @@ async function evaluate(spatial: Float32Array, globalInput: Float32Array, count 
             await device.queue.onSubmittedWorkDone(); // GPU completion only, no readback.
           } finally {
             const error = await device.popErrorScope();
-            if (error) throw new Error(error.message);
+            if (error) throw coded('engine.unknown', error.message, { detail: error.message });
           }
           if (activationEpoch === activationGeneration) emit({ type: 'rootActivations', available: true, lease });
         }
@@ -123,18 +124,18 @@ function softmax(values: number[]): number[] {
 
 function compareWarmup(actual: Record<string, number[]>, expected: Record<string, number[]>, half: boolean): void {
   for (const name of heads) {
-    if (actual[name]?.length !== expected[name]?.length || actual[name].some(v => !Number.isFinite(v))) throw new Error(`Warmup output shape/value failure: ${name}`);
+    if (actual[name]?.length !== expected[name]?.length || actual[name].some(v => !Number.isFinite(v))) throw coded('engine.warmupShape', `Warmup output shape/value failure: ${name}`, { name });
   }
-  if (Math.abs(actual.scorebelief_logprobs.reduce((sum, x) => sum + Math.exp(x), 0) - 1) > 0.002) throw new Error('Score-belief warmup is not normalized.');
+  if (Math.abs(actual.scorebelief_logprobs.reduce((sum, x) => sum + Math.exp(x), 0) - 1) > 0.002) throw coded('engine.scoreBelief', 'Score-belief warmup is not normalized.');
   for (const name of ['value', 'scorebelief_logprobs', 'policy']) {
     const count = name === 'policy' ? 362 : expected[name].length;
     const a = softmax(actual[name].slice(0, count)); const e = softmax(expected[name].slice(0, count));
     const error = Math.max(...a.map((v, i) => Math.abs(v - e[i])));
-    if (error > (half ? 0.005 : 0.001)) throw new Error(`Model warmup differs from SWA reference: ${name}, max probability error ${error}.`);
+    if (error > (half ? 0.005 : 0.001)) throw coded('engine.warmupDiffers', `Model warmup differs from SWA reference: ${name}, max probability error ${error}.`, { name, error });
   }
-  if (actual.ownership.some((v, i) => Math.abs(Math.tanh(v) - Math.tanh(expected.ownership[i])) > (half ? 0.01 : 0.002))) throw new Error('Ownership warmup failed.');
+  if (actual.ownership.some((v, i) => Math.abs(Math.tanh(v) - Math.tanh(expected.ownership[i])) > (half ? 0.01 : 0.002))) throw coded('engine.ownershipWarmup', 'Ownership warmup failed.');
   const leadError = Math.abs(actual.miscvalue[2] - expected.miscvalue[2]) * manifest.postprocess.lead_multiplier;
-  if (leadError > (half ? 0.1 : 0.02)) throw new Error('Score lead warmup failed.');
+  if (leadError > (half ? 0.1 : 0.02)) throw coded('engine.scoreLeadWarmup', 'Score lead warmup failed.');
 }
 
 self.onmessage = async ({ data }: MessageEvent) => {
@@ -143,7 +144,7 @@ self.onmessage = async ({ data }: MessageEvent) => {
     activationReason = 'Root activations released. Reload with retention enabled to retain another root.';
     clearActivations(activationReason); return;
   }
-  if (busy) { emit({ type: 'error', message: 'Engine is busy.' }); return; }
+  if (busy) { emit({ type: 'error', code: 'engine.busy', params: {}, message: 'Engine is busy.' }); return; }
   busy = true;
   try {
     if (data.type === 'initialize') {
@@ -151,7 +152,7 @@ self.onmessage = async ({ data }: MessageEvent) => {
       activationNames = [];
       activationReason = 'Root activation retention is disabled.';
       const response = await fetch(data.manifestUrl);
-      if (!response.ok) throw new Error(`Manifest download failed (${response.status}). Export and serve a real model bundle first.`);
+      if (!response.ok) throw coded('engine.manifestDownloadFailed', `Manifest download failed (${response.status}). Export and serve a real model bundle first.`, { status: response.status });
       manifest = validateManifest(await response.json());
       activationNames = activationRequested && data.backend === 'webgpu' ? ROOT_LAYERS.filter(name => manifest.outputs.includes(name)) : [];
       activationReason = !activationRequested ? activationReason : data.backend !== 'webgpu'
@@ -159,7 +160,7 @@ self.onmessage = async ({ data }: MessageEvent) => {
       let precision: 'fp16' | 'fp32' = 'fp32';
       if (data.backend === 'webgpu') {
         const adapter = await navigator.gpu?.requestAdapter();
-        if (!adapter) throw new Error('No WebGPU adapter is available.');
+        if (!adapter) throw coded('engine.noWebGpu', 'No WebGPU adapter is available.');
         ort.env.webgpu.adapter = adapter;
         // TODO(#8): fp16 WebGPU policy warmup still fails (~0.00949 > 0.005); falls back to fp32.
         if (data.precision !== 'fp32' && adapter.features.has('shader-f16') && manifest.variants.fp16) precision = 'fp16';
@@ -169,9 +170,9 @@ self.onmessage = async ({ data }: MessageEvent) => {
       // Absolute file URLs, not a prefix. A prefix makes ORT dynamic-import the
       // pthread module; an object also pins the .wasm locateFile result. Both
       // files are staged at this directory with their original names.
-      if (typeof data.assetBase !== 'string' || !data.assetBase) throw new Error('ORT runtime asset base is missing.');
+      if (typeof data.assetBase !== 'string' || !data.assetBase) throw coded('engine.assetBaseMissing', 'ORT runtime asset base is missing.');
       const assetBase = new URL(data.assetBase);
-      if (!assetBase.pathname.endsWith('/')) throw new Error(`ORT asset base must be a directory URL, got ${data.assetBase}.`);
+      if (!assetBase.pathname.endsWith('/')) throw coded('engine.assetBaseDirectory', `ORT asset base must be a directory URL, got ${data.assetBase}.`, { url: data.assetBase });
       ort.env.wasm.wasmPaths = {
         wasm: new URL('ort-wasm-simd-threaded.asyncify.wasm', assetBase).href,
         mjs: new URL('ort-wasm-simd-threaded.asyncify.mjs', assetBase).href,
@@ -206,12 +207,12 @@ self.onmessage = async ({ data }: MessageEvent) => {
         searchThreads: 1, maxBatch, validated: true, rootActivationLayers: activationNames.length,
         rootActivationReason: activationNames.length ? undefined : activationReason, messages: [] } });
     } else if (data.type === 'analyze' || data.type === 'analyzePosition') {
-      if (!session) throw new Error('Initialize the engine first.');
+      if (!session) throw coded('engine.notInitialized', 'Initialize the engine first.');
       const defaults = JSON.parse(default_config());
       const config = { ...defaults, ...data.config, deepSelect: { ...defaults.deepSelect, ...data.config?.deepSelect } };
       const requestedBatch = data.searchOptions?.batchSize ?? 4;
       const rootSymmetries = data.searchOptions?.rootSymmetries ?? 1;
-      if (!Number.isInteger(requestedBatch) || requestedBatch < 1 || requestedBatch > 4 || ![1, 8].includes(rootSymmetries)) throw new Error('Batch size must be 1..4 and root symmetries must be 1 or 8.');
+      if (!Number.isInteger(requestedBatch) || requestedBatch < 1 || requestedBatch > 4 || ![1, 8].includes(rootSymmetries)) throw coded('engine.batchOptions', 'Batch size must be 1..4 and root symmetries must be 1 or 8.');
       const searchOptions = { rootSymmetries, batchSize: Math.min(requestedBatch, manifest.batch === 0 ? manifest.maxBatch! : 1) };
       stats = { evaluations: 0, batches: 0, maxBatch: 0 };
       activations.clear(); rootContext = undefined;
@@ -230,6 +231,6 @@ self.onmessage = async ({ data }: MessageEvent) => {
       emit({ type: 'stats', ...stats, ...searchOptions });
       emit({ type: 'done' });
     }
-  } catch (error) { clearActivations('Released after analysis or initialization failure.'); emit({ type: 'error', message: errorText(error) }); }
+  } catch (error) { clearActivations('Released after analysis or initialization failure.'); emit({ type: 'error', ...errorFields(error) }); }
   finally { busy = false; }
 };

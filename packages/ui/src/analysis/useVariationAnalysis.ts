@@ -1,4 +1,5 @@
 import { computed, getCurrentScope, onScopeDispose, ref, shallowRef } from "vue";
+import { coded, serializeError } from "../i18n";
 import { reducePipelineEvent } from "./reduce";
 import { createInitialAnalysisState, type AnalysisState } from "./types";
 import type { AnalysisSourceHandle, PositionAnalysisRequest, PositionSourceFactory } from "./sources/types";
@@ -41,15 +42,19 @@ export function useVariationAnalysis() {
       if (current !== generation || selectedKey.value !== key) return;
       entries.value = { ...entries.value, [key]: next };
     }
-    function fail(error: Error) {
-      update({ ...entries.value[key]!, status: "error", lastError: error.message });
+    function fail(error: unknown) {
+      update({
+        ...entries.value[key]!,
+        status: "error",
+        lastError: serializeError(error),
+      });
     }
     try {
       handle = source(request).start({
         onEvent(event) {
           if (current !== generation || selectedKey.value !== key) return;
           if (event.type === "positionCompleted" && event.snapshot.ply !== expectedPly) {
-            fail(new Error("The engine returned a different variation position."));
+            fail(coded("tree.mismatch", "The engine returned a different variation position."));
             return;
           }
           update(reducePipelineEvent(entries.value[key]!, event));
@@ -61,7 +66,7 @@ export function useVariationAnalysis() {
           const entry = entries.value[key]!;
           if (entry.status === "error") return;
           if (!entry.plies[expectedPly]?.complete) {
-            fail(new Error("The engine closed before completing this variation."));
+            fail(coded("tree.closedEarly", "The engine closed before completing this variation."));
           } else update({ ...entry, status: "completed" });
         },
       });

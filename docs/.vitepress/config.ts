@@ -104,6 +104,11 @@ export default defineConfig({
     },
   },
   vite: {
+    define: {
+      __VUE_I18N_FULL_INSTALL__: false,
+      __VUE_I18N_LEGACY_API__: false,
+      __INTLIFY_PROD_DEVTOOLS__: false,
+    },
     resolve: {
       alias: [
         {
@@ -125,6 +130,12 @@ export default defineConfig({
           find: /^@yagoo\/ui$/,
           replacement: fileURLToPath(
             new URL("../../packages/ui/src/index.ts", import.meta.url),
+          ),
+        },
+        {
+          find: "vue-i18n",
+          replacement: fileURLToPath(
+            new URL("../../packages/ui/node_modules/vue-i18n/dist/vue-i18n.esm-bundler.js", import.meta.url),
           ),
         },
         // @sabaki/sgf browser usage: parse only (see its README).

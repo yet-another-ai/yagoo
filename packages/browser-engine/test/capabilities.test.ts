@@ -7,7 +7,7 @@ describe('shared CPU thread budget', () => {
     for (const options of [{ isolated: false }, { sharedMemory: false }]) {
       const result = threadPlan({ ...capable, ...options, requested: 8 });
       expect(result.ortThreads).toBe(1);
-      expect(result.reason).toMatch(/cross-origin isolation/);
+      expect(result.reason).toBe('engine.singleThread');
     }
   });
   it('caps requested threads, leaves a core for the UI, and never adds a search pool', () => {

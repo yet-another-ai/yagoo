@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useYagooI18n } from "../i18n";
 import type { GameChildInfo } from "../composables/useGame";
 import type { TryNode } from "./tryBranch";
 import { tryPath, orderedTryNodes } from "./tryBranch";
@@ -14,6 +15,8 @@ const props = defineProps<{
   analyzing?: boolean;
 }>();
 
+const { t } = useYagooI18n();
+
 const emit = defineEmits<{
   (e: "select-try", id: string | null): void;
   (e: "select-variation", index: number): void;
@@ -28,22 +31,22 @@ function depthOf(id: string): number {
 </script>
 
 <template>
-  <section class="yagoo-tree" data-testid="variation-tree" aria-label="Variation tree">
-    <div class="yagoo-tree__title">Tree</div>
+  <section class="yagoo-tree" data-testid="variation-tree" :aria-label="t('tree.aria')">
+    <div class="yagoo-tree__title">{{ t("tree.title") }}</div>
 
     <p v-if="tryMode" class="yagoo-tree__note">
-      Try moves remain on their own branch. {{ analysisStatus }}
+      {{ t("tree.tryNote", { status: analysisStatus }) }}
     </p>
     <p v-else-if="variationActive" class="yagoo-tree__note">
       {{ analysisStatus }}
     </p>
     <p v-else class="yagoo-tree__note">
-      Use Try to explore an alternative. Select a node to revisit its position.
+      {{ t("tree.idle") }}
     </p>
     <div v-if="tryMode || variationActive" class="yagoo-tree__note">
-      <button v-if="tryMode" type="button" data-testid="try-pass" @click="emit('pass')">Pass</button>
-      <button v-if="analyzing" type="button" data-testid="stop-variation" @click="emit('stop')">Stop analysis</button>
-      <button v-else-if="canAnalyze" type="button" data-testid="analyze-variation" @click="emit('analyze')">Analyze position</button>
+      <button v-if="tryMode" type="button" data-testid="try-pass" @click="emit('pass')">{{ t("tree.pass") }}</button>
+      <button v-if="analyzing" type="button" data-testid="stop-variation" @click="emit('stop')">{{ t("tree.stop") }}</button>
+      <button v-else-if="canAnalyze" type="button" data-testid="analyze-variation" @click="emit('analyze')">{{ t("tree.analyze") }}</button>
     </div>
 
     <ol v-if="tryMode" class="yagoo-tree__list">
@@ -55,7 +58,7 @@ function depthOf(id: string): number {
           :aria-current="cursorId == null ? 'true' : undefined"
           @click="emit('select-try', null)"
         >
-          Anchor
+          {{ t("tree.anchor") }}
         </button>
       </li>
       <li v-for="node in orderedTryNodes(nodes)" :key="node.id" :data-parent-id="node.parentId ?? 'anchor'">
@@ -72,7 +75,7 @@ function depthOf(id: string): number {
       </li>
     </ol>
     <p v-if="tryMode && nodes.length === 0" class="yagoo-tree__empty">
-      Click an empty intersection to try a move.
+      {{ t("tree.emptyTry") }}
     </p>
 
     <template v-if="!tryMode">
@@ -83,12 +86,12 @@ function depthOf(id: string): number {
             class="yagoo-tree__node"
             @click="emit('select-variation', child.index)"
           >
-            {{ child.index === 0 ? "Main" : `Var ${child.index}` }}
+            {{ child.index === 0 ? t("tree.main") : t("tree.variation", { index: child.index }) }}
             · {{ child.label }}
           </button>
         </li>
       </ul>
-      <p v-else class="yagoo-tree__empty">No variation at this node.</p>
+      <p v-else class="yagoo-tree__empty">{{ t("tree.none") }}</p>
     </template>
   </section>
 </template>

@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { presentError, presentSource, useYagooI18n } from "../i18n";
+
+const { t } = useYagooI18n();
 
 const props = defineProps<{
   nativeAvailable: boolean;
@@ -63,25 +66,23 @@ function onFile(kind: "sgf" | "ndjson", ev: Event) {
     aria-labelledby="yagoo-source-title"
   >
     <header class="yagoo-source__header">
-      <h2 id="yagoo-source-title">Engine source</h2>
+      <h2 id="yagoo-source-title">{{ t("engine.title") }}</h2>
       <button type="button" class="yagoo-source__close" @click="emit('close')">
-        Close
+        {{ t("engine.close") }}
       </button>
     </header>
     <p v-if="sourceLabel" class="yagoo-source__current">
-      Current: {{ sourceLabel }}
+      {{ t("engine.current", { label: presentSource(sourceLabel) }) }}
     </p>
 
     <section class="yagoo-source__card" data-source="ndjson">
-      <h3>NDJSON import</h3>
+      <h3>{{ t("engine.ndjsonTitle") }}</h3>
       <p>
-        Open an SGF, then import a <code>yagoo analyze</code> event stream.
-        You can also drop both files on the board. Analysis streams in as the
-        file is read.
+        {{ t("engine.ndjsonBody") }}
       </p>
       <div class="yagoo-source__actions">
         <label class="yagoo-btn">
-          Open SGF
+          {{ t("engine.openSgf") }}
           <input
             type="file"
             accept=".sgf,text/plain"
@@ -91,7 +92,7 @@ function onFile(kind: "sgf" | "ndjson", ev: Event) {
           />
         </label>
         <label class="yagoo-btn">
-          Import NDJSON
+          {{ t("engine.importNdjson") }}
           <input
             type="file"
             accept=".ndjson,.jsonl,.json,text/plain"
@@ -104,13 +105,10 @@ function onFile(kind: "sgf" | "ndjson", ev: Event) {
     </section>
 
     <section class="yagoo-source__card" data-source="live-native">
-      <h3>Live native</h3>
-      <p>
-        Start <code>yagoo analyze --serve</code> locally, then connect to analyze
-        the loaded SGF. Scan and deepen results appear as they finish.
-      </p>
+      <h3>{{ t("engine.nativeTitle") }}</h3>
+      <p>{{ t("engine.nativeBody") }}</p>
       <label>
-        Local engine URL
+        {{ t("engine.nativeUrl") }}
         <input v-model="nativeUrl" type="url" data-testid="native-url" />
       </label>
       <button
@@ -119,14 +117,14 @@ function onFile(kind: "sgf" | "ndjson", ev: Event) {
         :disabled="!nativeAvailable"
         @click="emit('connect-native', nativeUrl)"
       >
-        Connect to local engine
+        {{ t("engine.connect") }}
       </button>
     </section>
 
     <section class="yagoo-source__card" data-source="browser-engine">
       <h3>
-        Browser engine
-        <span class="yagoo-source__issue">Experimental</span>
+        {{ t("engine.browserTitle") }}
+        <span class="yagoo-source__issue">{{ t("engine.experimental") }}</span>
       </h3>
       <div
         class="yagoo-model-island"
@@ -136,24 +134,20 @@ function onFile(kind: "sgf" | "ndjson", ev: Event) {
         @dragover.stop.prevent
         @drop.stop.prevent="onModelDrop"
       >
-        <p class="yagoo-model-island__title">Local model</p>
+        <p class="yagoo-model-island__title">{{ t("engine.localModel") }}</p>
         <p>
-          This site does not host KataGo weights, and nothing is fetched until
-          you choose a bundle. Export or obtain a b18 SWA bundle
-          (<a :href="docsHref">how to export</a>), then load
-          <code>manifest.json</code> plus the <code>.onnx</code> and
-          <code>warmup.json</code> it names. You can also drop those files here.
-          Recorded sample analysis stays on the board until you start the engine.
+          {{ t("engine.localBodyBefore") }}
+          (<a :href="docsHref">{{ t("engine.howToExport") }}</a>){{ t("engine.localBodyAfter") }}
         </p>
         <p v-if="modelStatus" class="yagoo-model-island__status" data-testid="model-status">
-          {{ modelStatus }}
+          {{ presentError(modelStatus) }}
         </p>
         <p v-if="threadHint" class="yagoo-thread-hint" data-testid="thread-hint">
-          {{ threadHint }}
+          {{ presentError(threadHint) }}
         </p>
         <div class="yagoo-source__actions">
           <label class="yagoo-btn">
-            Load local model
+            {{ t("engine.loadLocal") }}
             <input
               type="file"
               multiple
@@ -169,14 +163,11 @@ function onFile(kind: "sgf" | "ndjson", ev: Event) {
             data-testid="enable-threads"
             @click="emit('enable-threads')"
           >
-            Enable threads
+            {{ t("engine.enableThreads") }}
           </button>
         </div>
         <div v-if="remoteManifestUrl" class="yagoo-source__remote">
-          <p>
-            A manifest URL is configured for this build. It is not fetched
-            until you ask.
-          </p>
+          <p>{{ t("engine.remoteBody") }}</p>
           <p><code>{{ remoteManifestUrl }}</code></p>
           <button
             type="button"
@@ -184,7 +175,7 @@ function onFile(kind: "sgf" | "ndjson", ev: Event) {
             data-testid="load-remote-manifest"
             @click="emit('load-remote-manifest')"
           >
-            Load configured manifest
+            {{ t("engine.loadRemote") }}
           </button>
         </div>
       </div>
@@ -195,7 +186,7 @@ function onFile(kind: "sgf" | "ndjson", ev: Event) {
         :disabled="!browserAvailable"
         @click="emit('connect-browser')"
       >
-        Use browser engine
+        {{ t("engine.useBrowser") }}
       </button>
     </section>
   </div>

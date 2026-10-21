@@ -2,6 +2,9 @@
 import { computed } from "vue";
 import type { MoveComparison } from "../analysis/modules";
 import { alignedSacrificeAssessment } from "../analysis/sacrifices";
+import { useYagooI18n } from "../i18n";
+
+const { t } = useYagooI18n();
 
 const props = defineProps<{ comparison: MoveComparison | null; ply: number }>();
 const emit = defineEmits<{
@@ -17,91 +20,76 @@ function signed(value: number) { return `${value > 0 ? "+" : ""}${value.toFixed(
 <template>
   <section class="sacrifice-panel" data-testid="sacrifice-panel">
     <p v-if="!assessment" data-testid="sacrifice-unavailable">
-      Sacrifice assessment is unavailable for this move. It needs the historical
-      pre-move root, saving alternatives and a legal preferred PV with endpoint analysis.
+      {{ t("sacrifice.unavailable") }}
     </p>
     <template v-else>
       <p class="sacrifice-context">
-        Preferred {{ assessment.preferredMove }} ·
-        {{ assessment.mover === "B" ? "Black" : "White" }} ·
-        before-move board (ply {{ assessment.rootPly }}).
+        {{ t("sacrifice.context", { move: assessment.preferredMove, mover: assessment.mover === "B" ? t("color.black") : t("color.white"), root: assessment.rootPly }) }}
       </p>
       <p v-if="assessment.status === 'unassessed'" data-testid="sacrifice-unassessed">
-        Unassessed: the required evidence is incomplete or has too few visits.
+        {{ t("sacrifice.unassessed") }}
       </p>
       <p v-else-if="assessment.annotations.length === 0" data-testid="sacrifice-none">
-        No supported sacrifice candidate among the retained branches.
-        This does not rule out sacrifices outside the sampled alternatives or PV horizon.
+        {{ t("sacrifice.none") }}
       </p>
       <ol v-else data-testid="sacrifice-body" class="sacrifices">
         <li v-for="item in assessment.annotations" :key="item.groupId">
-          <strong>Supported sacrifice candidate</strong>
+          <strong>{{ t("sacrifice.supported") }}</strong>
           <p>
             <button type="button" :data-sacrifice-group="item.groupId"
               @mouseenter="emit('preview-stones', item.stones)" @focus="emit('preview-stones', item.stones)"
               @mouseleave="emit('clear-preview')" @blur="emit('clear-preview')">
-              Group {{ item.groupId }} · {{ item.stones.length }} original stones
+              {{ t("sacrifice.captured", { group: item.groupId, count: item.stones.length, offset: item.evidence.preferredCapturePlyOffset }) }}
             </button>
-            is captured by PV move {{ item.evidence.preferredCapturePlyOffset }}.
           </p>
           <p>
-            Saving alternative {{ item.referenceMove }} retains these stones through that horizon.
-            Own-color ownership: {{ item.referenceOwnership.toFixed(2) }} saving →
-            {{ item.preferredOwnership.toFixed(2) }} preferred
-            (flip {{ item.ownershipFlip.toFixed(2) }}).
+            {{ t("sacrifice.saving", { move: item.referenceMove, saving: item.referenceOwnership.toFixed(2), preferred: item.preferredOwnership.toFixed(2), flip: item.ownershipFlip.toFixed(2) }) }}
           </p>
           <p>
-            Group cost {{ item.costBook.toFixed(2) }}; net benefit elsewhere
-            {{ item.compensationBook.toFixed(2) }} ownership-book units.
+            {{ t("sacrifice.cost", { cost: item.costBook.toFixed(2), benefit: item.compensationBook.toFixed(2) }) }}
             <template v-if="item.compensationPoints != null">
-              Search-scaled benefit elsewhere: {{ signed(item.compensationPoints) }} points.
+              {{ t("sacrifice.priced", { points: signed(item.compensationPoints) }) }}
             </template>
-            <template v-else>The exchange is unpriced in points.</template>
+            <template v-else>{{ t("sacrifice.unpriced") }}</template>
           </p>
           <ul class="exchange-list">
             <li v-for="(exchange, index) in item.exchanges" :key="index">
               <button type="button" :data-sacrifice-exchange="index"
                 @mouseenter="emit('preview-stones', exchange.intersections)" @focus="emit('preview-stones', exchange.intersections)"
                 @mouseleave="emit('clear-preview')" @blur="emit('clear-preview')">
-                {{ exchange.id ?? exchange.kind.replaceAll("_", " ") }}
-                · {{ signed(exchange.bookValue) }} book units
+                {{ t("sacrifice.book", { label: exchange.id ?? exchange.kind.replaceAll("_", " "), value: signed(exchange.bookValue) }) }}
               </button>
             </li>
           </ul>
           <p class="evidence">
-            Preferred versus saving: mover score {{ signed(item.evidence.scoreAdvantage) }},
-            winrate {{ signed(item.evidence.winrateAdvantage * 100) }} percentage points.
-            Visits: {{ item.evidence.preferredVisits }} preferred /
-            {{ item.evidence.referenceVisits }} saving /
-            {{ item.evidence.endpointVisits }} endpoint.
+            {{ t("sacrifice.advantage", { score: signed(item.evidence.scoreAdvantage), winrate: signed(item.evidence.winrateAdvantage * 100), preferred: item.evidence.preferredVisits, reference: item.evidence.referenceVisits, endpoint: item.evidence.endpointVisits }) }}
           </p>
           <details>
-            <summary>PV and evidence</summary>
-            <p>Preferred: {{ item.pv.join(" → ") }}</p>
-            <p>Saving: {{ item.evidence.referencePv.join(" → ") }}</p>
-            <p>Queries: {{ item.evidence.rootQueryId }}, {{ item.evidence.referenceQueryId }},
-              {{ item.evidence.preferredPvQueryId }}.</p>
-            <p>Saving evidence: {{ (item.evidence.referenceSource ?? 'root_candidate').replaceAll('_', ' ') }}.
-              Root hash: {{ item.evidence.referenceRootHash ?? item.evidence.rootHash ?? 'unavailable' }}.</p>
+            <summary>{{ t("sacrifice.pv") }}</summary>
+            <p>{{ t("sacrifice.preferredPv", { pv: item.pv.join(" → ") }) }}</p>
+            <p>{{ t("sacrifice.savingPv", { pv: item.evidence.referencePv.join(" → ") }) }}</p>
+            <p>{{ t("sacrifice.queries", { root: item.evidence.rootQueryId, reference: item.evidence.referenceQueryId, preferred: item.evidence.preferredPvQueryId }) }}</p>
+            <p>{{ t("sacrifice.savingEvidence", { source: (item.evidence.referenceSource ?? "root_candidate").replaceAll("_", " "), hash: item.evidence.referenceRootHash ?? item.evidence.rootHash ?? "unavailable" }) }}</p>
           </details>
         </li>
       </ol>
       <details class="criteria">
-        <summary>Criteria and limitations</summary>
+        <summary>{{ t("sacrifice.criteria") }}</summary>
         <p>
-          At least {{ assessment.parameters.minimumStones }} original stones and
-          {{ assessment.parameters.minimumVisits }} visits per branch and endpoint.
-          Saving ownership ≥ {{ assessment.parameters.savingOwnershipMinimum }};
-          preferred ≤ {{ assessment.parameters.preferredOwnershipMaximum }};
-          endpoint ≤ {{ assessment.parameters.endpointOwnershipMaximum }}.
-          All original group stones must be captured in the preferred PV.
+          {{ t("sacrifice.criteriaBody", {
+            stones: assessment.parameters.minimumStones,
+            visits: assessment.parameters.minimumVisits,
+            saving: assessment.parameters.savingOwnershipMinimum,
+            preferred: assessment.parameters.preferredOwnershipMaximum,
+            endpoint: assessment.parameters.endpointOwnershipMaximum,
+          }) }}
         </p>
         <ul>
           <li v-for="limitation in assessment.limitations" :key="limitation">{{ limitation }}</li>
         </ul>
         <ul v-if="assessment.checks.length" data-testid="sacrifice-checks">
           <li v-for="check in assessment.checks" :key="check.groupId">
-            {{ check.groupId }}: {{ check.reason.replaceAll("_", " ") }}
+            {{ t("sacrifice.check", { group: check.groupId, reason: check.reason.replaceAll("_", " ") }) }}
           </li>
         </ul>
       </details>

@@ -1,3 +1,4 @@
+import { coded } from "../../i18n/coded";
 import { parsePipelineEventLine } from "../reduce";
 import type {
   AnalysisEventSource,
@@ -41,11 +42,11 @@ export function createLiveNativeSource(
             !["http:", "https:"].includes(url.protocol) ||
             !["127.0.0.1", "localhost", "[::1]"].includes(url.hostname) ||
             url.username || url.password
-          ) throw new Error("Native engine URL must use HTTP(S) on localhost.");
+          ) throw coded("engine.nativeLocalhost", "Native engine URL must use HTTP(S) on localhost.");
           if (options.position) {
             url.pathname = "/analyze-position";
             url.search = "";
-            if (options.sgf == null) throw new Error("Position analysis requires an SGF.");
+            if (options.sgf == null) throw coded("engine.nativeSgf", "Position analysis requires an SGF.");
           }
           const transport = options.fetch ?? globalThis.fetch;
           const response = await transport(url.href, {
@@ -60,11 +61,17 @@ export function createLiveNativeSource(
             cache: "no-store",
           });
           if (stopped) { await response.body?.cancel(); return; }
-          if (!response.ok) throw new Error(`Native engine HTTP ${response.status}: ${await response.text()}`);
-          if (!response.headers.get("content-type")?.startsWith("text/event-stream")) {
-            throw new Error("Native engine did not return an SSE event stream.");
+          if (!response.ok) {
+            const body = await response.text();
+            throw coded("engine.nativeHttp", `Native engine HTTP ${response.status}: ${body}`, {
+              status: response.status,
+              body,
+            });
           }
-          if (!response.body) throw new Error("Native engine response has no body.");
+          if (!response.headers.get("content-type")?.startsWith("text/event-stream")) {
+            throw coded("engine.nativeSse", "Native engine did not return an SSE event stream.");
+          }
+          if (!response.body) throw coded("engine.nativeNoBody", "Native engine response has no body.");
           reader = response.body.getReader();
           const decoder = new TextDecoder();
           let buffer = "";
@@ -85,7 +92,9 @@ export function createLiveNativeSource(
               }
             } else if (value.startsWith("data:")) {
               eventLength += value.length;
-              if (eventLength > 16 * 1024 * 1024) throw new Error("Native engine event exceeds 16 MiB.");
+              if (eventLength > 16 * 1024 * 1024) {
+                throw coded("engine.nativeTooLarge", "Native engine event exceeds 16 MiB.");
+              }
               data.push(value.slice(5).replace(/^ /, ""));
             }
           };
@@ -93,7 +102,9 @@ export function createLiveNativeSource(
             const chunk = await reader.read();
             if (stopped) return;
             buffer += decoder.decode(chunk.value, { stream: !chunk.done });
-            if (buffer.length > 16 * 1024 * 1024) throw new Error("Native engine event exceeds 16 MiB.");
+            if (buffer.length > 16 * 1024 * 1024) {
+              throw coded("engine.nativeTooLarge", "Native engine event exceeds 16 MiB.");
+            }
             let newline: number;
             while ((newline = buffer.indexOf("\n")) >= 0) {
               line(buffer.slice(0, newline).replace(/\r$/, ""));
@@ -101,7 +112,12 @@ export function createLiveNativeSource(
               if (stopped || terminal) break;
             }
             if (chunk.done) {
-              if (!terminal) throw new Error("Native engine disconnected before analysis completed.");
+              if (!terminal) {
+                throw coded(
+                  "engine.nativeDisconnected",
+                  "Native engine disconnected before analysis completed.",
+                );
+              }
               break;
             }
           }

@@ -27,7 +27,7 @@ it('replaces a page-scoped isolation worker even when the page is already isolat
       ready: Promise.resolve(),
     },
   });
-  await expect(enableIsolation('/yagoo/demo/')).resolves.toMatch(/page-scoped/);
+  await expect(enableIsolation('/yagoo/demo/')).resolves.toBe('engine.isolationUpgrade');
   expect(unregistered).toEqual(['/yagoo/demo/']);
   expect(scopes).toEqual(['/yagoo/']);
   vi.unstubAllGlobals();

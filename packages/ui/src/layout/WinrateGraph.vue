@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useYagooI18n } from "../i18n";
+const { t } = useYagooI18n();
 
 export interface WinratePoint {
   /** Black winrate in percent, or null if unknown. */
@@ -122,7 +124,7 @@ function onClick(evt: MouseEvent) {
 </script>
 
 <template>
-  <div class="yagoo-winrate" role="img" aria-label="Winrate and score lead graph">
+  <div class="yagoo-winrate" role="img" :aria-label="t('graph.aria')">
     <svg
       class="yagoo-winrate__svg"
       :viewBox="`0 0 ${width} ${height}`"

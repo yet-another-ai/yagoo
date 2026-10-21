@@ -204,7 +204,7 @@ const section = ref<CompactSection>("inspector");
 const lowerTab = ref<"groups" | "tree">("groups");
 const view = ref<"board" | "report">("board");
 const tryMode = ref(false);
-const ledgerPreview = ref<Vertex[] | null>(null);
+const ledgerPreview = ref<{ vertices: Vertex[] } | { groupId: string } | null>(null);
 const inspectorPerspective = ref<InspectorPerspective>(props.initialPerspective);
 const comparisonDifference = ref(true);
 const tryNodes = ref<TryNode[]>([]);
@@ -326,7 +326,10 @@ const tryDepth = computed(() =>
 const suspendAnalysis = computed(
   () => tryMode.value || (loaded.value && !onMainLine.value),
 );
-watch([() => props.ledger, () => props.comparison, suspendAnalysis, inspectorPerspective], () => {
+watch([
+  () => props.ledger, () => props.comparison, () => props.groups,
+  () => props.commentaryContextKey, suspendAnalysis, inspectorPerspective,
+], () => {
   ledgerPreview.value = null;
 });
 watch(() => props.initialPerspective, (value) => { inspectorPerspective.value = value; });
@@ -340,15 +343,25 @@ const activeComparison = computed(() =>
   ["why", "sacrifice"].includes(inspectorPerspective.value) ? alignedComparison.value : null,
 );
 const displayedGroups = computed(() => activeComparison.value?.context.groups ?? props.groups);
+const citedGroup = computed(() => {
+  const preview = ledgerPreview.value;
+  return preview && "groupId" in preview
+    ? props.groups.find((group) => group.groupId === preview.groupId) ?? null : null;
+});
+const previewVertices = computed(() => {
+  const preview = ledgerPreview.value;
+  if (preview && "vertices" in preview) return preview.vertices;
+  return citedGroup.value ? groupMemberVertices(citedGroup.value, boardSize.value) : null;
+});
 
 function previewLedger(line: GainLossLine) {
   previewStones(line.intersections);
 }
 
 function previewStones(stones: string[]) {
-  ledgerPreview.value = stones
+  ledgerPreview.value = { vertices: stones
     .map((coordinate) => parseGtpVertex(coordinate, boardSize.value))
-    .filter((vertex): vertex is Vertex => vertex != null);
+    .filter((vertex): vertex is Vertex => vertex != null) };
 }
 watch(suspendAnalysis, (active) => emit("variation-change", active), { immediate: true });
 const variationPly = computed(() => moveNumber.value + tryDepth.value);
@@ -393,28 +406,29 @@ watch(() => props.positionSource, () => { variation.clear(); analyzeVariation();
 watch(variationKey, () => analyzeVariation());
 
 function previewDisplayedGroup(id: string) {
+  ledgerPreview.value = null;
   if (!activeComparison.value) { emit("preview-group", id); return; }
   const group = displayedGroups.value.find((entry) => entry.groupId === id);
-  ledgerPreview.value = group ? groupMemberVertices(group, boardSize.value) : null;
+  ledgerPreview.value = group ? { vertices: groupMemberVertices(group, boardSize.value) } : null;
 }
 function clearDisplayedGroup() {
   ledgerPreview.value = null;
   emit("clear-group-preview");
 }
 function selectDisplayedGroup(id: string) {
+  ledgerPreview.value = null;
   if (activeComparison.value) previewDisplayedGroup(id);
   else emit("select-group", id);
 }
 
 function citeCommentary(target: CommentaryTarget) {
-  if (suspendAnalysis.value) return;
+  if (suspendAnalysis.value || inspectorPerspective.value !== "notes") return;
   clearCommentaryCitation();
   if (target.intersections?.length) {
-    ledgerPreview.value = target.intersections
-      .map((coordinate) => parseGtpVertex(coordinate, boardSize.value))
-      .filter((vertex): vertex is Vertex => vertex != null);
+    previewStones(target.intersections);
   } else if (target.groupId) {
-    emit("preview-group", target.groupId);
+    // A citation temporarily overrides the board; the parent retains its pin.
+    ledgerPreview.value = { groupId: target.groupId };
   }
 }
 
@@ -427,6 +441,9 @@ const overlayData = computed<OverlayData>(() => {
   if (suspendAnalysis.value) return { groupOutlines: [] };
   if (activeComparison.value) return {
     groupOutlines: buildGroupOutlines(activeComparison.value.context.groups, boardSize.value),
+  };
+  if (citedGroup.value) return {
+    groupOutlines: buildGroupOutlines(props.groups, boardSize.value, citedGroup.value.groupId),
   };
   if (props.groupOutlines.length > 0) {
     return { groupOutlines: props.groupOutlines };
@@ -529,8 +546,8 @@ const boardLines = computed(() =>
 );
 const boardDimmed = computed(() => {
   if (suspendAnalysis.value) return [];
-  if (ledgerPreview.value == null) return activeComparison.value ? [] : props.dimmedVertices;
-  const included = new Set(ledgerPreview.value.map(([x, y]) => `${x},${y}`));
+  if (previewVertices.value == null) return activeComparison.value ? [] : props.dimmedVertices;
+  const included = new Set(previewVertices.value.map(([x, y]) => `${x},${y}`));
   const dimmed: Vertex[] = [];
   for (let y = 0; y < boardSize.value; y += 1) {
     for (let x = 0; x < boardSize.value; x += 1) {
@@ -540,7 +557,7 @@ const boardDimmed = computed(() => {
   return dimmed;
 });
 const boardSelected = computed(() =>
-  suspendAnalysis.value ? [] : (ledgerPreview.value ?? (activeComparison.value ? [] : props.selectedVertices)),
+  suspendAnalysis.value ? [] : (previewVertices.value ?? (activeComparison.value ? [] : props.selectedVertices)),
 );
 
 function clearTry() {

@@ -78,6 +78,12 @@ The unrestricted root and probe must provide the same nonempty position hash.
 Failures, missing hashes and insufficient or illegal probe evidence remain
 limitations, never fabricated alternatives. No additional engine is started.
 
+The experimental browser engine supports these depth-one forced queries and
+provides a stable browser-specific root hash. A model-free synthetic fixture
+checks that discovery executes the bounded probes through real search and
+retains their provenance. This is functional coverage, not real-model browser
+validation or a calibrated positive sacrifice example.
+
 These direct liberty extensions are a limited source of saving alternatives;
 they do not cover distant tactical defenses. Query selection is independent of
 probe outcomes and does not select a special move for a particular fixture.

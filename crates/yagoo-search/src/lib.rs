@@ -4,6 +4,8 @@
 use futures::future::LocalBoxFuture;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+mod restrictions;
+mod root_identity;
 mod search;
 mod symmetry;
 mod terminal;
@@ -156,10 +158,36 @@ fn softmax(values: &[f32]) -> Result<Vec<f64>, String> {
     Ok(result)
 }
 
+fn legal_softmax(logits: &[f32], legal: &[bool]) -> Result<Vec<f64>, String> {
+    if legal.len() != logits.len() {
+        return Err("Legal policy mask has the wrong length".into());
+    }
+    let allowed: Vec<_> = logits
+        .iter()
+        .zip(legal)
+        .filter_map(|(&value, &legal)| legal.then_some(value))
+        .collect();
+    let mut probabilities = softmax(&allowed)?.into_iter();
+    // Never approximate a forbidden logit with a finite sentinel: an allowed
+    // finite model logit can be even smaller, particularly in forced searches.
+    Ok(legal
+        .iter()
+        .map(|legal| {
+            if *legal {
+                probabilities
+                    .next()
+                    .expect("one probability per allowed move")
+            } else {
+                0.0
+            }
+        })
+        .collect())
+}
+
 #[allow(clippy::too_many_lines)]
 fn replay(query: &AnalysisQuery) -> Result<(GameState, FeatureRules), String> {
-    if query.avoid_moves.is_some() || query.allow_moves.is_some() || query.focus_moves.is_some() {
-        return Err("Browser search does not implement move restriction queries".into());
+    if query.avoid_moves.is_some() || query.focus_moves.is_some() {
+        return Err("Browser search does not implement avoidMoves or focusMoves".into());
     }
     if let Some(overrides) = &query.override_settings {
         for (key, value) in overrides {
@@ -283,12 +311,7 @@ fn process(
         .map(|i| raw.policy[Point::from_index(i, size).expect("point").index(NN_LEN)])
         .collect();
     logits.push(raw.policy[NN_AREA]);
-    for (value, valid) in logits.iter_mut().zip(legal) {
-        if !valid {
-            *value = -1e30;
-        }
-    }
-    let policy = softmax(&logits)?;
+    let policy = legal_softmax(&logits, legal)?;
     // Positional-superko area rules cannot produce no-result games. Upstream
     // excludes that logit before normalizing, not after the three-way softmax.
     let value = softmax(if rules == FeatureRules::ChineseOgs {

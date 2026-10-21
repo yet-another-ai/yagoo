@@ -168,6 +168,7 @@ impl<E: NnEvaluator> SearchEngine<E> {
         rules: FeatureRules,
         komi: f32,
         query_id: &str,
+        root_mask: Option<&[bool]>,
     ) -> Result<Evaluation, String> {
         self.evaluator.begin_root(&super::RootContext {
             query_id: query_id.into(),
@@ -178,6 +179,15 @@ impl<E: NnEvaluator> SearchEngine<E> {
             return Ok(value);
         }
         let input = encode_v7(game, rules, komi, false)?;
+        // Restrict search priors before softmax, after inverse symmetry. This
+        // preserves relative allowed logits even if an excluded move dominates
+        // so strongly that unrestricted probabilities would underflow to zero.
+        let legal: Vec<_> = input
+            .legal
+            .iter()
+            .enumerate()
+            .map(|(index, &legal)| legal && root_mask.is_none_or(|mask| mask[index]))
+            .collect();
         let inputs: Vec<_> = (0..self.options.root_symmetries)
             .map(|s| symmetry::input(&input, game.board().size(), s))
             .collect();
@@ -194,7 +204,7 @@ impl<E: NnEvaluator> SearchEngine<E> {
             for (row, raw) in rows.into_iter().enumerate() {
                 let symmetry = chunk_index * self.options.batch_size + row;
                 let raw = symmetry::output(raw, game.board().size(), symmetry)?;
-                evaluations.push(process(raw, game, rules, &input.legal, &self.postprocess)?);
+                evaluations.push(process(raw, game, rules, &legal, &self.postprocess)?);
             }
         }
         let weight = 1.0 / evaluations.len() as f64;
@@ -348,15 +358,33 @@ impl<E: NnEvaluator> AnalysisEngine for SearchEngine<E> {
             let error = |e| fail(&query.id, e);
             let visits = self.validate(query).map_err(error)?;
             let (game, rules) = replay(query).map_err(error)?;
-            let komi = query.komi.unwrap_or(7.5) as f32;
+            let requested_komi = query.komi.unwrap_or(7.5);
+            let komi = requested_komi as f32;
+            if !requested_komi.is_finite() || !komi.is_finite() {
+                return Err(error(
+                    "Browser komi must be finite and representable as f32".into(),
+                ));
+            }
+            let root_mask =
+                super::restrictions::root_mask(query, &game, rules, komi).map_err(error)?;
+            let root_hash =
+                super::root_identity::root_identity(&game, rules, requested_komi).map_err(error)?;
+            let identified_response =
+                |nodes: &[Node], partial| -> KatagoResult<super::AnalysisResponse> {
+                    let mut value = response(nodes, query, partial)?;
+                    if let Some(root) = value.root_info.as_mut() {
+                        root.this_hash = Some(root_hash.clone());
+                    }
+                    Ok(value)
+                };
             let root = self
-                .evaluate_root(&game, rules, komi, &query.id)
+                .evaluate_root(&game, rules, komi, &query.id, root_mask.as_deref())
                 .await
                 .map_err(error)?;
             let mut nodes = vec![Node::new(game, root.clone())];
             backup(&mut nodes, &[0], &root);
             if root.raw.is_none() {
-                return on_update(AnalysisUpdate::Final(response(&nodes, query, false)?));
+                return on_update(AnalysisUpdate::Final(identified_response(&nodes, false)?));
             }
             let mut cache = Cache::default();
             let mut last_partial = 1;
@@ -394,11 +422,11 @@ impl<E: NnEvaluator> AnalysisEngine for SearchEngine<E> {
                     && nodes[0].visits >= last_partial + 8
                     && nodes[0].visits < visits
                 {
-                    on_update(AnalysisUpdate::Partial(response(&nodes, query, true)?))?;
+                    on_update(AnalysisUpdate::Partial(identified_response(&nodes, true)?))?;
                     last_partial = nodes[0].visits;
                 }
             }
-            on_update(AnalysisUpdate::Final(response(&nodes, query, false)?))
+            on_update(AnalysisUpdate::Final(identified_response(&nodes, false)?))
         })
     }
 }

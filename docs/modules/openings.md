@@ -32,6 +32,14 @@ is incorporated.
   Reaching a short catalogue leaf does not label later moves deviations.
 
 The short corner entries are joseki **starts**, not complete balanced lines.
+Each of the three whole-board entries includes one original illustrative move
+after its recognition prefix: parallel and diagonal 4-4 recognize four plies
+and store five; Sanrensei recognizes five and stores six. A different next move
+can therefore show where play leaves that stored example. The name describes
+the prefix, and the sample continuation is not a recommended reply. The longer
+Sanrensei prefix still takes precedence over parallel 4-4. See the provenance
+table for the exact sample moves and their authorship.
+
 The catalogue is intentionally limited: “No unique match in starter catalogue”
 does not imply that the game used an unusual or incorrect opening.
 
@@ -64,7 +72,11 @@ replace that SGF's opening. The header renders a pipeline label only when no
 SGF is loaded. No engine or network request is needed to recognize the SGF.
 
 Rust and TypeScript run the same committed cases under all sixteen
-symmetry/color combinations. Tests cover ambiguity, strict order, tenuki,
+symmetry/color combinations, including all seven completed entries and all
+three whole-board deviations. Tests cover ambiguity, strict order, tenuki,
 global deviation numbering, stored leaves, passes, horizon, unsupported
 inputs, pipeline range filtering, and loading another game. Every catalogue
-entry is replayed through the Go rules in a model-free Rust test.
+entry is also replayed through the Go rules under every symmetry/color
+combination in a model-free Rust test. Reviewer tests exercise each whole-board
+label and deviation marker, then clear the marker when a loaded game follows
+the stored continuation.

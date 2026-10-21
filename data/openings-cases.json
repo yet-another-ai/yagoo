@@ -43,6 +43,20 @@
     "deviation": null
   },
   {
+    "description": "small-knight response resolves the shared low-approach prefix",
+    "moves": [["B", [3, 3]], ["W", [5, 2]], ["B", [2, 5]]],
+    "name": "4-4 point",
+    "joseki": "Low approach: small-knight response",
+    "deviation": null
+  },
+  {
+    "description": "3-4 low approach with diagonal defense",
+    "moves": [["B", [3, 2]], ["W", [5, 2]], ["B", [4, 3]]],
+    "name": "3-4 point",
+    "joseki": "Low approach: diagonal defense",
+    "deviation": null
+  },
+  {
     "description": "same stones in a transposed order do not establish a sequence",
     "moves": [["B", [3, 2]], ["W", [2, 2]], ["B", [3, 3]], ["W", [2, 3]]],
     "name": null
@@ -65,6 +79,69 @@
     "description": "whole-board diagonal stars",
     "moves": [["B", [15, 3]], ["W", [3, 3]], ["B", [3, 15]], ["W", [15, 15]]],
     "name": "Diagonal 4-4 opening",
+    "joseki": null,
+    "deviation": null
+  },
+  {
+    "description": "parallel stars reaches its illustrative continuation",
+    "moves": [["B", [15, 3]], ["W", [3, 3]], ["B", [15, 15]], ["W", [3, 15]], ["B", [5, 2]]],
+    "name": "Parallel 4-4 opening",
+    "joseki": null,
+    "deviation": null
+  },
+  {
+    "description": "diagonal stars reaches its illustrative continuation",
+    "moves": [["B", [15, 3]], ["W", [3, 3]], ["B", [3, 15]], ["W", [15, 15]], ["B", [5, 2]]],
+    "name": "Diagonal 4-4 opening",
+    "joseki": null,
+    "deviation": null
+  },
+  {
+    "description": "Sanrensei reaches its illustrative continuation",
+    "moves": [["B", [15, 3]], ["W", [3, 3]], ["B", [15, 15]], ["W", [3, 15]], ["B", [15, 9]], ["W", [16, 13]]],
+    "name": "Sanrensei",
+    "joseki": null,
+    "deviation": null
+  },
+  {
+    "description": "parallel stars reports a different fifth move without judging its quality",
+    "moves": [["B", [15, 3]], ["W", [3, 3]], ["B", [15, 15]], ["W", [3, 15]], ["B", [9, 9]]],
+    "name": "Parallel 4-4 opening",
+    "joseki": null,
+    "deviation": 5
+  },
+  {
+    "description": "diagonal stars reports a different fifth move without judging its quality",
+    "moves": [["B", [15, 3]], ["W", [3, 3]], ["B", [3, 15]], ["W", [15, 15]], ["B", [9, 9]]],
+    "name": "Diagonal 4-4 opening",
+    "joseki": null,
+    "deviation": 5
+  },
+  {
+    "description": "Sanrensei reports a different sixth move without judging its quality",
+    "moves": [["B", [15, 3]], ["W", [3, 3]], ["B", [15, 15]], ["W", [3, 15]], ["B", [15, 9]], ["W", [9, 9]]],
+    "name": "Sanrensei",
+    "joseki": null,
+    "deviation": 6
+  },
+  {
+    "description": "completed parallel stars does not judge subsequent play",
+    "moves": [["B", [15, 3]], ["W", [3, 3]], ["B", [15, 15]], ["W", [3, 15]], ["B", [5, 2]], ["W", [9, 9]]],
+    "name": "Parallel 4-4 opening",
+    "joseki": null,
+    "deviation": null
+  },
+  {
+    "description": "completed diagonal stars does not judge subsequent play",
+    "moves": [["B", [15, 3]], ["W", [3, 3]], ["B", [3, 15]], ["W", [15, 15]], ["B", [5, 2]], ["W", [9, 9]]],
+    "name": "Diagonal 4-4 opening",
+    "joseki": null,
+    "deviation": null
+  },
+  {
+    "description": "completed Sanrensei does not judge subsequent play",
+    "moves": [["B", [15, 3]], ["W", [3, 3]], ["B", [15, 15]], ["W", [3, 15]], ["B", [15, 9]], ["W", [16, 13]], ["B", [9, 9]]],
+    "name": "Sanrensei",
     "joseki": null,
     "deviation": null
   },

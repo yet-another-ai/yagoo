@@ -12,13 +12,31 @@ The canonical corner is the upper left, coordinates are zero-based `[x, y]`,
 and each move records its actual color. Whole-board records deliberately spell
 out both players' moves: these are examples of an opening, not recognition of
 every possible opposing reply or move order. Tests replay every line through
-Yagoo's Go rules. The matcher generates the eight square symmetries and both
-color assignments at runtime; these transformed entries are not separate data.
+Yagoo's Go rules under all eight square symmetries and both color assignments.
+The matcher generates those transformations at runtime; they are not separate
+catalogue entries.
 
 ## Coverage and limits
 
-There are three whole-board examples: parallel 4-4, diagonal 4-4, and one
-five-ply Sanrensei. The four corner examples are short starts of familiar
+There are three whole-board examples: parallel 4-4, diagonal 4-4, and Sanrensei.
+Each has a recognition prefix followed by one author-defined sample move:
+
+| Entry | Recognition prefix | Illustrative next move (zero-based) | Stored length |
+| --- | --- | --- | --- |
+| Parallel 4-4 | 4 plies | Black `[5, 2]` (`B[fc]` in SGF) | 5 plies |
+| Diagonal 4-4 | 4 plies | Black `[5, 2]` (`B[fc]` in SGF) | 5 plies |
+| Sanrensei | 5 plies | White `[16, 13]` (`W[qn]` in SGF) | 6 plies |
+
+These three continuations were composed for this catalogue on 2026-10-21,
+under the same Apache-2.0 license and original-source provenance above. They
+make it possible to identify where play leaves a stored whole-board example.
+The existing names describe the recognized prefix only. The extra moves are
+legal illustrations, not prescribed continuations, evaluated recommendations,
+or a claim that another move is bad. They do not enumerate all valid replies.
+A fifth move forming the stored Sanrensei prefix takes precedence over the
+shorter parallel 4-4 example and does not receive its deviation marker.
+
+The four corner examples are short starts of familiar
 sequences: 4-4/3-3 block-and-extend, two 4-4 low-approach replies, and 3-4
 low-approach diagonal defense. The latter are **recognizable joseki starts**,
 not complete balanced joseki or recommendations for the current board.
@@ -36,6 +54,11 @@ stays recognized without labeling subsequent play a deviation. Playing outside
 the corner is not a local deviation. A pass ends an unfinished corner line
 without asserting a deviation. Nothing beyond the 30-ply horizon is judged.
 Leaving this tiny catalogue does not imply a mistake or an inferior move.
+
+Shared Rust/browser cases cover every completed entry, each whole-board
+recognition prefix, all three whole-board deviations, and play after their
+stored leaves under all sixteen symmetry/color combinations. Existing corner
+ambiguity, tenuki, pass, and deviation cases retain the same expected results.
 
 ## Source review
 

@@ -113,6 +113,53 @@ async fn opening_precedes_analysis_and_uses_full_game_outside_requested_range() 
 }
 
 #[tokio::test]
+async fn whole_board_deviation_uses_full_game_before_filtered_analysis() {
+    let client = Arc::new(AnalysisClient::scripted(vec![
+        root_line("p7-deep-root", 10),
+        root_line("p7-deep-pass", 10),
+    ]));
+    let config = PipelineConfig {
+        strategy: PipelineStrategy::DeepOnly,
+        from_ply: 7,
+        to_ply: Some(7),
+        include_pv_ends: false,
+        include_comparison: false,
+        emit_game_aggregate: true,
+        ..PipelineConfig::default()
+    };
+    // W[jj] at move 6 differs from the authored W[qn] sample continuation.
+    // The opening prefix and its deviation both precede the analyzed range.
+    let events = analyze_game_collected(
+        "(;SZ[19];B[pd];W[dd];B[pp];W[dp];B[pj];W[jj];B[fc])",
+        client,
+        config,
+    )
+    .await
+    .unwrap();
+    assert!(matches!(&events[0], PipelineEvent::GameStarted { .. }));
+    let PipelineEvent::OpeningMatched {
+        match_: Some(opening),
+        ..
+    } = &events[1]
+    else {
+        panic!("whole-board opening must precede engine analysis");
+    };
+    assert_eq!(opening.name, "Sanrensei");
+    assert_eq!(opening.joseki, None);
+    assert_eq!(opening.deviation_ply, Some(6));
+    assert_eq!(opening.source, "yagoo-starter-1 (Apache-2.0)");
+    let PipelineEvent::GameCompleted {
+        game: Some(game), ..
+    } = events.last().unwrap()
+    else {
+        panic!("expected aggregate");
+    };
+    assert_eq!(game.opening.as_ref(), Some(opening));
+    assert_eq!(game.positions.len(), 1);
+    assert_eq!(game.positions[0].ply, 7);
+}
+
+#[tokio::test]
 async fn deep_only_emits_ordered_events_and_black_positive() {
     // ply 0 and 1; each: root + pass → 4 queries. Include one partial on first root.
     let mut lines = Vec::new();

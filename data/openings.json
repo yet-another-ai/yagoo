@@ -9,21 +9,21 @@
       "name": "Parallel 4-4 opening",
       "kind": "fuseki",
       "minimum": 4,
-      "moves": [["B", 15, 3], ["W", 3, 3], ["B", 15, 15], ["W", 3, 15]]
+      "moves": [["B", 15, 3], ["W", 3, 3], ["B", 15, 15], ["W", 3, 15], ["B", 5, 2]]
     },
     {
       "id": "diagonal-stars",
       "name": "Diagonal 4-4 opening",
       "kind": "fuseki",
       "minimum": 4,
-      "moves": [["B", 15, 3], ["W", 3, 3], ["B", 3, 15], ["W", 15, 15]]
+      "moves": [["B", 15, 3], ["W", 3, 3], ["B", 3, 15], ["W", 15, 15], ["B", 5, 2]]
     },
     {
       "id": "sanrensei",
       "name": "Sanrensei",
       "kind": "fuseki",
       "minimum": 5,
-      "moves": [["B", 15, 3], ["W", 3, 3], ["B", 15, 15], ["W", 3, 15], ["B", 15, 9]]
+      "moves": [["B", 15, 3], ["W", 3, 3], ["B", 15, 15], ["W", 3, 15], ["B", 15, 9], ["W", 16, 13]]
     },
     {
       "id": "star-three-three",

@@ -327,7 +327,10 @@ const suspendAnalysis = computed(
   () => tryMode.value || (loaded.value && !onMainLine.value),
 );
 watch([
-  () => props.ledger, () => props.comparison, () => props.groups,
+  () => props.ledger, () => props.comparison,
+  // The reducer copies groups on unrelated events; only changed evidence
+  // invalidates a preview. Preserve order because fact paths use indices.
+  () => JSON.stringify(props.groups),
   () => props.commentaryContextKey, suspendAnalysis, inspectorPerspective,
 ], () => {
   ledgerPreview.value = null;

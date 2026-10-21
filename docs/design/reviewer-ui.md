@@ -1,6 +1,6 @@
 # Reviewer UI
 
-The `/app/` page is the game-review workspace from [issue #30](https://github.com/yet-another-ai/yagoo/issues/30). It stays a client-only VitePress page (`layout: page`, no sidebar) and renders `@yagoo/ui`. `/demo/` embeds the same reviewer. The experimental browser engine loads from the **Engine** panel on both pages. There is no separate engine UI; `/engine/` redirects to `/demo/`.
+The `/app/` page is the game-review workspace from [issue #30](https://github.com/yet-another-ai/yagoo/issues/30). It stays a client-only VitePress page (`layout: page`, no sidebar) and renders `@yagoo/ui`. `/demo/` is that same reviewer full page (`layout: false`), with no docs sidebar, outline, or footer, and a small Docs link back to the site. The experimental browser engine loads from the **Engine** panel on both pages. There is no separate engine UI; `/engine/` redirects to `/demo/`.
 
 The event-stream reducer (`AnalysisState`) is the source of analysis. Panels do not estimate winrate, groups, or ledgers. Opt-in commentary renders approved sentences from those structured values, with exact source citations.
 

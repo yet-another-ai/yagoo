@@ -42,8 +42,7 @@ await oneOf("sample ndjson", ["app/sample-scan-deep.ndjson"]);
 await oneOf("browser-engine docs", ["browser-engine.html", "browser-engine/index.html"]);
 await oneOf("demo", ["demo/index.html", "demo.html"]);
 await oneOf("engine redirect", ["engine/index.html"]);
-await oneOf("demo isolation worker", ["demo/coi-serviceworker.js"]);
-await oneOf("app isolation worker", ["app/coi-serviceworker.js"]);
+await oneOf("isolation worker", ["coi-serviceworker.js"]);
 
 const siteFiles = await walk(site);
 const ortWasm = siteFiles.filter((path) => path.split(sep).includes("ort") && path.endsWith(".wasm"));
@@ -88,6 +87,43 @@ for (const path of reviewerJs) {
   if (inlined || literal) fixtureFetch = true;
 }
 if (!fixtureFetch) failures.push("no built script fetches the sample SGF and NDJSON under /yagoo/");
+
+const workerFiles = siteFiles.filter((path) => /[/\\]engine\.worker-[^/\\]+\.js$/.test(path));
+if (workerFiles.length !== 1) failures.push(`expected one engine worker bundle, found ${workerFiles.length}`);
+const workerText = workerFiles.length === 1 ? await readFile(workerFiles[0], "utf8") : "";
+for (const name of ["ort-wasm-simd-threaded.asyncify.mjs", "ort-wasm-simd-threaded.asyncify.wasm"]) {
+  if (!workerText.includes(name)) failures.push(`engine worker does not reference ${name}`);
+  if (!(await exists(join(site, "ort", name)))) failures.push(`missing ort/${name}, which the engine worker requests`);
+}
+for (const match of workerText.matchAll(/\/yagoo\/assets\/(ort[^"'`\s)]+\.(?:mjs|wasm))/g)) {
+  if (!(await exists(join(site, "assets", match[1])))) {
+    failures.push(`engine worker requests /yagoo/assets/${match[1]}, which was not emitted`);
+  }
+}
+
+const swPath = join(site, "coi-serviceworker.js");
+if (await exists(swPath)) {
+  const sw = await readFile(swPath, "utf8");
+  const swChecks = [
+    ["Cross-Origin-Embedder-Policy", sw.includes("Cross-Origin-Embedder-Policy")],
+    ["engine worker", sw.includes("engine\\.worker") || sw.includes("engine.worker")],
+    ["demo", sw.includes("demo")],
+    ["app", sw.includes("app")],
+  ];
+  for (const [label, ok] of swChecks) {
+    if (!ok) failures.push(`coi-serviceworker.js does not mention ${label}`);
+  }
+}
+let rootRegistration = false;
+for (const path of reviewerJs) {
+  const text = await readFile(path, "utf8");
+  const rel = relative(site, path);
+  if (text.includes("demo/coi-serviceworker.js") || text.includes("app/coi-serviceworker.js")) {
+    failures.push(`${rel} still registers a page-scoped isolation worker`);
+  }
+  if (text.includes("coi-serviceworker.js") && text.includes('"/yagoo/"')) rootRegistration = true;
+}
+if (!rootRegistration) failures.push("no built script registers coi-serviceworker.js at /yagoo/");
 
 if (failures.length > 0) {
   console.error("Pages assembly failed:");

@@ -1,4 +1,5 @@
 import { sharedMemoryAvailable, threadPlan } from './capabilities';
+import engineWorkerHref from './engine.worker.ts?worker&url';
 
 export type EngineStatus = {
   backend: 'webgpu' | 'wasm'; precision: 'fp16' | 'fp32'; ortThreads: number;
@@ -8,6 +9,34 @@ export type EngineStatus = {
 };
 export type EngineMessage = { type: string; [key: string]: unknown };
 export type PositionAnalysisRequest = { sgf: string; ply: number; moves?: string[]; visits?: number };
+
+type WorkerFailure = { message?: string; filename?: string; lineno?: number; colno?: number; error?: unknown };
+
+/** Text from a Worker error event. Empty when Chrome hides a module-worker load failure. */
+export function formatWorkerError(event: WorkerFailure): string {
+  const thrown = event.error instanceof Error
+    ? (event.error.stack || event.error.message)
+    : event.error ? String(event.error) : '';
+  const where = event.filename ? `${event.filename}:${event.lineno ?? 0}:${event.colno ?? 0}` : '';
+  return [event.message, thrown, where].map(part => part?.trim()).filter(Boolean).join('\n');
+}
+
+async function describeEmptyWorkerError(workerUrl: string): Promise<string> {
+  try {
+    const response = await fetch(workerUrl);
+    const coep = response.headers.get('cross-origin-embedder-policy');
+    const coop = response.headers.get('cross-origin-opener-policy');
+    const headers = `HTTP ${response.status}, COEP ${coep ?? 'absent'}, COOP ${coop ?? 'absent'}`;
+    if (!response.ok) return `Engine worker failed to load (${workerUrl}, ${headers}).`;
+    if (crossOriginIsolated && coep !== 'require-corp') {
+      return `Engine worker failed to load: ${workerUrl} was blocked because this page is cross-origin isolated and the script was served without Cross-Origin-Embedder-Policy (${headers}). The isolation service worker must cover this script.`;
+    }
+    return `Engine worker failed to load (${workerUrl}, ${headers}).`;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return `Engine worker failed to load (${workerUrl}): ${detail}`;
+  }
+}
 
 /** Owns a dedicated engine worker and its ORT pthreads. terminate() cancels all. */
 export class BrowserEngine {
@@ -32,12 +61,18 @@ export class BrowserEngine {
         ? [{ threads: 1, precision: 'auto' }, { threads: 1, precision: 'fp32' }]
         : (plan.ortThreads > 1 ? [plan.ortThreads, 1] : [1]).map(threads => ({ threads, precision: 'fp32' }));
       for (const { threads, precision } of attempts) {
-        const worker = new Worker(new URL('./engine.worker.ts', import.meta.url), { type: 'module' });
+        const workerUrl = new URL(engineWorkerHref, import.meta.url);
+        const worker = new Worker(workerUrl, { type: 'module' });
         this.worker = worker;
         try {
           const result = await new Promise<EngineStatus>((resolve, reject) => {
             this.cancelInitialization = () => reject(new DOMException('Engine initialization was cancelled.', 'AbortError'));
-            worker.onerror = event => reject(new Error(event.message || 'Engine worker failed to load.'));
+            const fail = (error: Error) => reject(error);
+            worker.onerror = event => {
+              const message = formatWorkerError(event);
+              if (message) fail(new Error(message));
+              else void describeEmptyWorkerError(workerUrl.href).then(text => fail(new Error(text)));
+            };
             worker.onmessage = ({ data }: MessageEvent<EngineMessage>) => {
               if (data.type === 'ready') resolve(data.status as EngineStatus);
               else if (data.type === 'error') reject(new Error(String(data.message)));
@@ -55,7 +90,12 @@ export class BrowserEngine {
             if (data.type === 'done' || data.type === 'error') this.running = false;
             this.onMessage(data);
           };
-          worker.onerror = event => { this.running = false; this.onMessage({ type: 'error', message: event.message }); };
+          worker.onerror = event => {
+            this.running = false;
+            const message = formatWorkerError(event);
+            if (message) this.onMessage({ type: 'error', message });
+            else void describeEmptyWorkerError(workerUrl.href).then(text => this.onMessage({ type: 'error', message: text }));
+          };
           return result;
         } catch (error) {
           worker.terminate();

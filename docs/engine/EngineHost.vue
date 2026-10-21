@@ -7,7 +7,7 @@ import "@yagoo/ui/styles.css";
 import type { ReviewerBrowserEngine } from "@yagoo/browser-engine/reviewer-adapter";
 
 const props = defineProps<{
-  layout?: "page" | "embed";
+  layout?: "page" | "embed" | "full";
 }>();
 
 const sgf = ref("");
@@ -35,6 +35,8 @@ onMounted(async () => {
   if (requested === "dark" || requested === "light") theme.value = requested;
   threadHint.value = crossOriginIsolated ? null : SINGLE_THREAD_NOTE;
   remoteManifestUrl.value = configuredManifestUrl();
+  const { replaceStaleIsolation } = await import("@yagoo/browser-engine/isolation");
+  void replaceStaleIsolation();
   try {
     const base = import.meta.env.BASE_URL;
     const [sgfRes, ndjsonRes] = await Promise.all([
@@ -103,12 +105,18 @@ async function onThreads() {
   const scope = pageIsolationScope();
   modelStatus.value = scope
     ? await enableIsolation(scope)
-    : "Enable threads from the demo or reviewer page so the service worker stays scoped to that page.";
+    : "Enable threads from the demo or reviewer page.";
 }
 </script>
 
 <template>
-  <div class="yagoo-docs-app" :class="{ 'yagoo-docs-app--embed': props.layout === 'embed' }">
+  <div
+    class="yagoo-docs-app"
+    :class="{
+      'yagoo-docs-app--embed': props.layout === 'embed',
+      'yagoo-docs-app--full': props.layout === 'full',
+    }"
+  >
     <p v-if="error" class="yagoo-docs-app__error">{{ error }}</p>
     <p v-else-if="!ready" class="yagoo-docs-app__loading">Loading sample…</p>
     <AnalysisReviewer
@@ -141,6 +149,12 @@ async function onThreads() {
   border-radius: 6px;
   overflow: hidden;
   border: 1px solid var(--vp-c-divider);
+}
+
+.yagoo-docs-app--full {
+  height: 100%;
+  min-height: 0;
+  margin: 0;
 }
 
 .yagoo-docs-app__loading,

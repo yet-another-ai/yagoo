@@ -573,9 +573,7 @@ function clearTry() {
 function openReport() {
   // Stop the old position request before the parent starts a full-game run on
   // the same adapter. Queued variation watchers will then see a main-line key.
-  clearTry();
-  tryMode.value = false;
-  if (!onMainLine.value) goToPly(moveNumber.value);
+  leaveVariation();
   view.value = "report";
 }
 

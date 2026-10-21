@@ -26,6 +26,49 @@ const sse = (events: PipelineEvent[]) => events.map((event) => `data: ${JSON.str
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Review leaves live variations before starting a full-game request", () => {
+  it("reviews the full game from the root when a legal sibling cannot return to its mainline ply", async () => {
+    const sgf = "(;SZ[9];B[dd](;W[dd])(;W[ff]))";
+    const cancel = vi.fn();
+    const analyzePosition = vi.fn(() => new ReadableStream<string>({ cancel }));
+    // Controlled full-game response; no model or engine runs in this test.
+    const analyzeSgf = vi.fn(async function* () {
+      yield JSON.stringify({ ...start, size: 9, moveCount: 2, positionCount: 3 });
+      yield JSON.stringify({
+        type: "positionCompleted", v: 1, phase: "scan", snapshot: {
+          schemaVersion: 1, ply: 0, toPlay: "B", ownershipConvention: "black_positive",
+          board: { size: 9, black: [], white: [] }, chains: [], root: { visits: 120 },
+        },
+      });
+      yield JSON.stringify(finished);
+    });
+    const wrapper = mount(AnalysisReviewer, {
+      props: { initialSgf: sgf, vertexSize: 12, browserEngine: { analyzeSgf, analyzePosition } },
+    });
+    try {
+      await flushPromises();
+      const layout = wrapper.getComponent(ReviewerLayout);
+      layout.vm.goToPly(1);
+      layout.vm.goForward(1);
+      await flushPromises();
+      expect(analyzePosition).toHaveBeenCalledOnce();
+
+      await wrapper.get('[data-testid="review-game"]').trigger("click");
+      await flushPromises();
+      expect(analyzeSgf).toHaveBeenCalledExactlyOnceWith(sgf);
+      expect(cancel).toHaveBeenCalledOnce();
+      expect(analyzePosition).toHaveBeenCalledOnce();
+      expect(layout.vm.moveNumber).toBe(0);
+      expect(wrapper.find('[data-testid="review-report"]').exists()).toBe(true);
+      await wrapper.findAll("button").find((button) => button.text() === "Back to board")!.trigger("click");
+      expect(wrapper.find('[data-testid="try-banner"]').exists()).toBe(false);
+      expect(wrapper.get('[role="alert"]').text()).toContain("Illegal SGF move 2");
+      expect(layout.props("rootAnalysis")?.visits).toBe(120);
+      expect(analyzePosition).toHaveBeenCalledOnce();
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
   it("cancels pending browser Try work before one full-game run and retains the stopped report", async () => {
     const variationRuns: Array<{ request: PositionAnalysisRequest; finish: () => void }> = [];
     const calls: string[] = [];

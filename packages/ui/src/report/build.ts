@@ -8,6 +8,7 @@ import {
   type CommentaryFact,
 } from "../commentary";
 import { isReportComparison, summarizeReview } from "./summary";
+import { buildReportEvidenceSections, buildReportSacrificeFacts } from "./evidence";
 import type {
   ReviewCategory, ReviewRecommendation, ReviewReportDocument, ReviewReportMove,
 } from "./types";
@@ -93,14 +94,16 @@ export function buildReviewReport(
     const sacrifices = assessment?.status === "assessed" ? assessment.annotations : null;
     // The comparison registry resolves p-1 context itself. In particular, do
     // not pass snapshot p's next-mover ledger/groups as reasons for move p.
-    const facts = buildCommentaryFacts({
+    const comparisonFacts = buildCommentaryFacts({
       ply: reference.ply,
       comparison: row.comparison,
-      sacrifices,
-    }).filter((f) => f.id.includes("/comparison-") || f.id.includes("/sacrifice-"));
+    }).filter((f) => f.id.includes("/comparison-"));
+    const facts = [...comparisonFacts, ...buildReportSacrificeFacts(reference.ply, assessment, row.comparison.context)]
+      .sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id));
     moves.push({
       ...reference, rank: moves.length + 1, comparison: row.comparison,
       facts, explanation: resolveCommentary(facts, row.commentary),
+      evidenceSections: buildReportEvidenceSections(facts, assessment),
       categories: categories(facts, reference.actualMove, reference.aiMove, !!sacrifices?.length),
       recommendations: recommendations(facts),
       missingEvidence: [

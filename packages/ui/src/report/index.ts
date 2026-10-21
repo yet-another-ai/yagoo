@@ -9,4 +9,5 @@ export type { ReviewExportFile, ReviewExportFormat } from "./export";
 export type {
   ReviewSummary, ReviewReportDocument, ReviewReportMove,
   ReviewMoveReference, ReviewCategory, ReviewRecommendation,
+  ReviewEvidenceSection,
 } from "./types";

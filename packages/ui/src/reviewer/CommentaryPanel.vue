@@ -65,24 +65,36 @@ const cited = computed(() => state.value.result?.sentences.map((sentence) => ({
 })) ?? []);
 
 function enable(event: Event) {
-  const enabled = (event.target as HTMLInputElement).checked;
+  const checkbox = event.target as HTMLInputElement;
+  if (props.active === false) {
+    checkbox.checked = state.value.enabled;
+    return;
+  }
+  const enabled = checkbox.checked;
   session.setEnabled(enabled);
   if (!enabled) {
     configureProvider(null);
     emit("clear-citation");
   }
 }
+function exportSelection() {
+  if (props.active === false) return;
+  session.exportRequest();
+}
 function runProvider() {
+  if (props.active === false) return;
   if (effectiveProvider.value) void session.request(effectiveProvider.value);
 }
 function importSelection() {
+  if (props.active === false) return;
   session.importResponse(response.value);
   response.value = "";
 }
 </script>
 
 <template>
-  <section v-if="active !== false" class="yagoo-commentary" data-testid="commentary-panel">
+  <!-- Branch suspension must retain page-memory endpoint settings. -->
+  <section v-show="active !== false" class="yagoo-commentary" data-testid="commentary-panel">
     <label>
       <input data-testid="commentary-enable" type="checkbox" :checked="state.enabled" @change="enable" />
       Show grounded notes
@@ -121,7 +133,7 @@ function importSelection() {
         <p v-if="state.result.fallbackReason" role="status">{{ state.result.fallbackReason }}</p>
       </div>
       <div class="yagoo-commentary__actions">
-        <button type="button" :disabled="!facts.length" @click="session.exportRequest()">Prepare prompt JSON</button>
+        <button type="button" :disabled="!facts.length" @click="exportSelection">Prepare prompt JSON</button>
         <button v-if="effectiveProvider" data-testid="commentary-provider" type="button" :disabled="!facts.length" @click="runProvider">
           Send selected facts to {{ effectiveProvider.id }}
         </button>

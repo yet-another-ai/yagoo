@@ -112,7 +112,7 @@ describe("grounded Notes panel", () => {
     expect(wrapper.get('[data-testid="commentary-verification"]').text()).toContain("mock saved provider");
     await wrapper.setProps({ active: false });
     expect(signal.aborted).toBe(true);
-    expect(wrapper.find('[data-testid="commentary-body"]').exists()).toBe(false);
+    expect(wrapper.get<HTMLElement>('[data-testid="commentary-panel"]').element.style.display).toBe("none");
     finish("late rejected response");
     await flushPromises();
     await wrapper.setProps({ active: true });
@@ -120,5 +120,25 @@ describe("grounded Notes panel", () => {
     expect(wrapper.emitted("result")).toHaveLength(writes);
     wrapper.unmount();
     expect(onResult).toHaveBeenCalledTimes(writes);
+  });
+
+  it("ignores a queued manual import after branch entry cancels the prompt", async () => {
+    const wrapper = mount(CommentaryPanel, { props: { input, contextKey: "game-a" } });
+    try {
+      await wrapper.get('[data-testid="commentary-enable"]').setValue(true);
+      await wrapper.findAll("button").find((button) => button.text() === "Prepare prompt JSON")!.trigger("click");
+      const request = JSON.parse(wrapper.get<HTMLTextAreaElement>('[data-testid="commentary-prompt"]').element.value) as CommentaryRequest;
+      await wrapper.get('[data-testid="commentary-response"]').setValue(JSON.stringify(request.responseExample));
+      const apply = wrapper.get('[data-testid="commentary-import"]');
+      const writes = wrapper.emitted("result")!.length;
+      await wrapper.setProps({ active: false });
+      await apply.trigger("click");
+      await wrapper.setProps({ active: true });
+      expect(wrapper.find('[data-testid="commentary-prompt"]').exists()).toBe(false);
+      expect(wrapper.get('[data-testid="commentary-verification"]').text()).toContain("Deterministic templates");
+      expect(wrapper.emitted("result")).toHaveLength(writes);
+    } finally {
+      wrapper.unmount();
+    }
   });
 });

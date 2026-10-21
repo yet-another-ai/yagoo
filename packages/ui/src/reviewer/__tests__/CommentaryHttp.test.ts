@@ -92,6 +92,64 @@ describe("configured HTTP commentary in the reviewer (mock endpoint)", () => {
     wrapper.unmount();
   });
 
+  it("retains page-memory configuration while hidden, but blocks actions and ignores aborted replies", async () => {
+    const pending: Array<{ options: RequestInit; resolve: (value: Response) => void }> = [];
+    const fetch = vi.fn((_: string, options: RequestInit) => new Promise<Response>((resolve) => {
+      pending.push({ options, resolve });
+    }));
+    vi.stubGlobal("fetch", fetch);
+    const wrapper = mountPanel();
+    try {
+      await configure(wrapper);
+      const settings = wrapper.get('[data-testid="commentary-provider-settings"]').element;
+      const writes = wrapper.emitted("result")!.length;
+      await wrapper.get('[data-testid="commentary-provider"]').trigger("click");
+      await wrapper.setProps({ active: false });
+      expect(pending[0]!.options.signal!.aborted).toBe(true);
+      expect(wrapper.find('[data-testid="commentary-provider-settings"]').exists()).toBe(true);
+      expect(wrapper.get<HTMLElement>('[data-testid="commentary-panel"]').element.style.display).toBe("none");
+
+      // Hidden DOM handlers can still receive queued/programmatic events.
+      await wrapper.get('[data-testid="commentary-provider"]').trigger("click");
+      await wrapper.findAll("button").find((button) => button.text() === "Prepare prompt JSON")!.trigger("click");
+      await wrapper.get('[data-testid="commentary-enable"]').setValue(false);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(wrapper.find('[data-testid="commentary-prompt"]').exists()).toBe(false);
+      pending[0]!.resolve(reply(pending[0]!.options));
+      await flushPromises();
+      expect(wrapper.emitted("result")).toHaveLength(writes);
+
+      await wrapper.setProps({ active: true });
+      expect(wrapper.get<HTMLElement>('[data-testid="commentary-panel"]').element.style.display).toBe("");
+      expect(wrapper.get('[data-testid="commentary-provider-settings"]').element).toBe(settings);
+      expect(wrapper.get<HTMLInputElement>('[data-testid="commentary-enable"]').element.checked).toBe(true);
+      expect(wrapper.get<HTMLInputElement>('[data-testid="commentary-endpoint"]').element.value).toBe(endpoint);
+      expect(wrapper.get<HTMLInputElement>('[data-testid="commentary-model"]').element.value).toBe("local-model");
+      expect(wrapper.get<HTMLInputElement>('[data-testid="commentary-token"]').element.value).toBe("test-only-token");
+      expect(wrapper.get('[data-testid="commentary-verification"]').text()).toContain("Deterministic templates");
+      expect(fetch).toHaveBeenCalledTimes(1);
+      await wrapper.get('[data-testid="commentary-provider"]').trigger("click");
+      expect(fetch).toHaveBeenCalledTimes(2);
+      pending[1]!.resolve(reply(pending[1]!.options));
+      await flushPromises();
+      expect(wrapper.get('[data-testid="commentary-verification"]').text()).toContain("Approved clause selection");
+
+      // A real game/source change still revokes consent and clears credentials,
+      // including when that change happens while the panel is hidden.
+      await wrapper.setProps({ active: false });
+      await wrapper.setProps({ contextKey: "game-b" });
+      await wrapper.setProps({ active: true });
+      expect(wrapper.get<HTMLInputElement>('[data-testid="commentary-enable"]').element.checked).toBe(false);
+      await wrapper.get('[data-testid="commentary-enable"]').setValue(true);
+      expect(wrapper.get<HTMLInputElement>('[data-testid="commentary-endpoint"]').element.value).toBe("");
+      expect(wrapper.get<HTMLInputElement>('[data-testid="commentary-token"]').element.value).toBe("");
+      expect(wrapper.find('[data-testid="commentary-provider"]').exists()).toBe(false);
+      expect(fetch).toHaveBeenCalledTimes(2);
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
   it("cancels, disables, and forgets without sending a request or persisting settings", async () => {
     let signal!: AbortSignal;
     const fetch = vi.fn((_: string, options: RequestInit) => {

@@ -119,7 +119,7 @@ describe("commentary reviewer integration", () => {
     if (transition === "Try") {
       await wrapper.get('[data-testid="try-move-toggle"]').trigger("click");
       expect(layout.props("commentary")).toEqual(saved);
-      expect(wrapper.find('[data-testid="commentary-body"]').exists()).toBe(false);
+      expect(wrapper.get<HTMLElement>('[data-testid="commentary-panel"]').element.style.display).toBe("none");
       await wrapper.get('[data-testid="try-move-toggle"]').trigger("click");
     } else if (transition === "navigation") {
       layout.vm.goToPly(1);
@@ -130,7 +130,7 @@ describe("commentary reviewer integration", () => {
       layout.vm.goForward(1);
       await settle();
       expect(layout.props("commentary")).toEqual(saved);
-      expect(wrapper.find('[data-testid="commentary-body"]').exists()).toBe(false);
+      expect(wrapper.get<HTMLElement>('[data-testid="commentary-panel"]').element.style.display).toBe("none");
       layout.vm.leaveVariation();
     } else {
       layout.vm.view = "report";

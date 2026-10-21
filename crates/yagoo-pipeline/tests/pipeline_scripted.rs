@@ -181,6 +181,12 @@ async fn deep_only_emits_ordered_events_and_black_positive() {
     assert_ne!(completed[0].candidates.len(), 0);
     assert_eq!(completed[1].board.black.len(), 1);
 
+    let PipelineEvent::ReportCompleted { report, .. } = &events[events.len() - 2] else {
+        panic!("report metadata must precede gameCompleted");
+    };
+    assert_eq!(report.completed_position_plies, vec![0, 1]);
+    assert_eq!(report.missing_comparison_plies, vec![1]);
+    assert_eq!(report.ranked_moves.len(), 0);
     assert!(matches!(
         events.last(),
         Some(PipelineEvent::GameCompleted { game: Some(_), .. })

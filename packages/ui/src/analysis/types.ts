@@ -1,5 +1,6 @@
 /** Wire types for `yagoo analyze` / `yagoo-pipeline` NDJSON events (schema v1). */
 
+import type { ReviewSummary } from "../report/types";
 import type {
   GainLossLedger,
   LlmCommentary,
@@ -213,6 +214,11 @@ export type PipelineEvent =
       snapshot: PositionSnapshot;
     }
   | {
+      type: "reportCompleted";
+      v: number;
+      report: ReviewSummary;
+    }
+  | {
       type: "gameCompleted";
       v: number;
       game?: GameSnapshot | null;
@@ -257,6 +263,8 @@ export type StreamStatus =
 
 export interface AnalysisState {
   status: StreamStatus;
+  /** True only after gameCompleted, not merely transport EOF. */
+  pipelineCompleted: boolean;
   schemaVersion: number | null;
   size: number | null;
   komi: number | null;
@@ -281,11 +289,14 @@ export interface AnalysisState {
   opening: OpeningMatch | null;
   /** Automatic review document (#29). */
   report: ReviewReportDocument | null;
+  /** Deterministic pipeline metadata; UI enrichment uses current source facts. */
+  reportSummary: ReviewSummary | null;
 }
 
 export function createInitialAnalysisState(): AnalysisState {
   return {
     status: "idle",
+    pipelineCompleted: false,
     schemaVersion: null,
     size: null,
     komi: null,
@@ -306,5 +317,6 @@ export function createInitialAnalysisState(): AnalysisState {
     game: null,
     opening: null,
     report: null,
+    reportSummary: null,
   };
 }

@@ -51,6 +51,7 @@ export default defineConfig({
             text: "Explanation generation",
             link: "/modules/explanation-generation",
           },
+          { text: "Automatic game review", link: "/modules/review-report" },
         ],
       },
       {

@@ -154,6 +154,7 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
+  (e: "cancel-review"): void;
   (e: "ply-change", ply: number): void;
   (e: "select-ply", ply: number): void;
   (e: "vertex-mouseenter", evt: MouseEvent, vertex: Vertex): void;
@@ -366,7 +367,7 @@ function previewStones(stones: string[]) {
     .map((coordinate) => parseGtpVertex(coordinate, boardSize.value))
     .filter((vertex): vertex is Vertex => vertex != null) };
 }
-watch(suspendAnalysis, (active) => emit("variation-change", active), { immediate: true });
+watch(suspendAnalysis, (active) => emit("variation-change", active), { immediate: true, flush: "sync" });
 const variationPly = computed(() => moveNumber.value + tryDepth.value);
 const variationInfo = computed(() => variation.state.value.plies[variationPly.value] ?? null);
 const displayCandidates = computed(() => suspendAnalysis.value ? variationInfo.value?.candidates ?? [] : props.candidates);
@@ -396,13 +397,16 @@ function analyzeVariation(force = false) {
   variationPinned.value = null;
   variationSelected.value = 0;
   if (key == null) { variation.stop(); return; }
-  if (props.positionSource) emit("variation-analysis");
+  // Keep selection/cache aligned when keys or adapters change behind a report,
+  // but leave canceled work stopped until a board action requests analysis.
+  const source = view.value === "board" ? props.positionSource : null;
+  if (source) emit("variation-analysis");
   variation.select(key, {
     sgf: tryMode.value ? anchorSgf.value : positionSgf.value,
     ply: moveNumber.value,
     moves: tryMode.value ? tryPath(tryNodes.value, tryCursor.value).map((node) => node.label) : [],
     visits: 200,
-  }, props.positionSource, force);
+  }, source, force);
 }
 
 watch(() => props.positionSource, () => { variation.clear(); analyzeVariation(); });
@@ -567,6 +571,28 @@ function clearTry() {
   variation.clear();
   tryNodes.value = [];
   tryCursor.value = null;
+}
+
+function prepareReview() {
+  // Stop the old position request before the parent starts a full-game run on
+  // the same adapter. Queued variation watchers will then see a main-line key.
+  leaveVariation();
+  view.value = "report";
+}
+
+function openReport() {
+  // Reusing existing results only cancels the position request owned here.
+  // Preserve the local branch/tree and leave any parent's full-game run alone.
+  variation.stop();
+  view.value = "report";
+}
+
+function toggleReport() {
+  if (view.value === "report") {
+    view.value = "board";
+  } else {
+    openReport();
+  }
 }
 
 function captureAnchor() {
@@ -812,6 +838,8 @@ function onSplitterKey(event: KeyboardEvent) {
 }
 
 defineExpose({
+  openReport,
+  prepareReview,
   boardSize,
   moveNumber,
   goToPly,
@@ -845,6 +873,7 @@ defineExpose({
       :current-ply="moveNumber"
       @select="onReportSelect"
       @close="view = 'board'"
+      @cancel="emit('cancel-review')"
     />
 
     <template v-else>
@@ -1048,7 +1077,7 @@ defineExpose({
       @back="onBack"
       @forward="onForward"
       @toggle-try="toggleTry"
-      @toggle-report="view = view === 'report' ? 'board' : 'report'"
+      @toggle-report="toggleReport"
     />
   </div>
 </template>

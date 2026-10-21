@@ -161,3 +161,4 @@ export {
   sampleHeatMap,
 } from "./demo/sampleData";
 export * from "./commentary";
+export * from "./report";

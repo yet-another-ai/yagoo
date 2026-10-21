@@ -223,7 +223,7 @@ describe("AnalysisReviewer", () => {
 
       await wrapper.get('[data-testid="report-toggle"]').trigger("click");
       expect(wrapper.get('[data-testid="review-report"]').text()).toMatch(
-        /Coming in #29/,
+        /Partial coverage/,
       );
       expect(wrapper.get('[data-testid="review-report"]').text()).toMatch(
         /Move 50/,

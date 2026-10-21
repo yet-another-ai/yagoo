@@ -109,13 +109,17 @@ describe("accepted SGF replacement", () => {
         await flushPromises();
       }
       await replace(rejected);
+      // Local paired files may be read concurrently, but rejected evidence must
+      // never attach to the retained game, even after queued recording frames.
+      frames.splice(0).forEach(callback => callback(0));
+      await flushPromises();
       expect(layout.props("sgf")).toBe(accepted);
       expect(layout.vm.boardSize).toBe(9);
       expect(layout.vm.moveNumber).toBe(1);
       expect(layout.vm.tryMode).toBe(true);
       expect(layout.props("rootAnalysis")?.visits).toBe(65);
       expect(cancelTry).not.toHaveBeenCalled();
-      expect(pairedRecordingRead).not.toHaveBeenCalled();
+
       expect(wrapper.text()).toContain("bundled sample analysis");
       expect(wrapper.get('[role="alert"]').text()).toContain("Illegal SGF move 1");
       layout.vm.leaveVariation();

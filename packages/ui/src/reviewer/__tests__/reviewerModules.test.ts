@@ -124,7 +124,7 @@ describe("MoveInspector contracts", () => {
 });
 
 describe("ReviewReport", () => {
-  it("shows real key-move deltas and a #29 placeholder when no document is attached", () => {
+  it("does not turn unsigned scan rows into played-move claims without a report", () => {
     const wrapper = mount(ReviewReport, {
       props: {
         report: null,
@@ -140,10 +140,10 @@ describe("ReviewReport", () => {
       },
     });
     const text = wrapper.text();
-    expect(text).toMatch(/Coming in #29/);
-    expect(text).toMatch(/Move 50/);
-    expect(text).toMatch(/R14/);
-    expect(text).toMatch(/\+50\.0 pp/);
+    expect(text).toMatch(/No analysis loaded/);
+    expect(text).not.toMatch(/Move 50/);
+    expect(text).not.toMatch(/R14/);
+    expect(text).not.toMatch(/\+50\.0 pp/);
     expect(text).not.toMatch(/this move is a mistake because/i);
   });
 });

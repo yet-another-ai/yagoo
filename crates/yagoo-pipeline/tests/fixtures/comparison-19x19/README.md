@@ -40,6 +40,15 @@ Means use only the root group's mover-colored stone coordinates, even after capt
 
 ## Files
 
+The implemented conservative detector replays this unchanged corpus with no
+supported sacrifice annotations. Moves 43/44 contain mixed groups, move 60's
+own group is not captured in the preferred PV, and move 96 has only a single
+own stone or mixed group. Move 50 is unassessed at the default 16-visit guard
+because the preferred candidate has 15 visits. These are scoped regression
+outcomes, not expert-labelled accuracy measurements. Positive calibration,
+false-positive rate and recall remain unverified. See
+`docs/modules/sacrifices.md` for thresholds and exclusions.
+
 - `queries.ndjson`: exact ordered KataGo requests, including visit limits, full histories and restrictions.
 - `responses.ndjson`: unmodified final KataGo stdout response lines.
 - `responses.json.gz`: compressed JSON array of those same raw response strings for scripted replay.

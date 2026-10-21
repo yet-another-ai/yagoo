@@ -1,0 +1,38 @@
+[
+  {
+    "id": "jowa1835-p59",
+    "sgf": "akaboshi-jowa-1835.chinese.sgf",
+    "ply": 59,
+    "reason": "Historical Black J8 allows White G4 to capture E4/F4. Test preferred continuation without asserting the actual decision was correct."
+  },
+  {
+    "id": "chitetsu1668-p131",
+    "sgf": "chitetsu-dosaku-1668.chinese.sgf",
+    "ply": 131,
+    "reason": "Historical Black J6 allows White F7 to capture the connected F8/G8/G7 group. Test preferred continuation and same-root saving alternatives without asserting the decision was correct. Archive notes uncertainty in player names/results; exact moves are retained."
+  },
+  {
+    "id": "dosaku1669-p113",
+    "sgf": "dosaku-santetsu-1669.chinese.sgf",
+    "ply": 113,
+    "reason": "Offline scan finds the existing connected Black K7/J6/K6/L6 group has only J5/L5 liberties while historical Black plays G8. The group is not captured in the recorded game, so this is only a threatened-group candidate for preferred-PV testing."
+  },
+  {
+    "id": "dosaku1669-p35",
+    "sgf": "dosaku-santetsu-1669.chinese.sgf",
+    "ply": 35,
+    "reason": "Historical Black D18 allows White D17 to capture existing C17, a compact shape-sacrifice candidate."
+  },
+  {
+    "id": "dosaku1669-p71",
+    "sgf": "dosaku-santetsu-1669.chinese.sgf",
+    "ply": 71,
+    "reason": "Historical Black E13 allows White E16 to capture existing F16. Ko-associated candidate; must not be labelled a clean positive without separate ko assessment."
+  },
+  {
+    "id": "dosaku1669-p137",
+    "sgf": "dosaku-santetsu-1669.chinese.sgf",
+    "ply": 137,
+    "reason": "Historical Black M7 throw-in is immediately captured by White N7, followed by Black N8. Tests the known newly-played-stone limitation of root-only lineage."
+  }
+]

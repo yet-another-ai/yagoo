@@ -117,6 +117,28 @@ Paths such as `comparison.scoreLoss`, `comparison.ledgerDiff.ledger[i]`,
 `comparison.evidence` provide grounded facts for later explanation modules.
 Omitted/null is unavailable, not zero loss.
 
+## Optional sacrifice assessment
+
+`comparison.sacrificeAssessment` is additive in schema v1. Its root/mover and
+preferred move must match the enclosing comparison. It carries assessment
+status, supported annotations, per-group rejection reasons, parameters and
+limitations. `comparison.context.rootCandidates`, `savingProbes` and
+`pvLineages` retain same-root alternatives, explicitly forced saving candidates
+with query/root-hash provenance, and legal original-stone capture lineage.
+See [Sacrifice candidates](../modules/sacrifices.md) for the complete criterion.
+
+`annotations[i].ownershipFlip` means saving-alternative own-color mean minus
+preferred mean, **not** root-to-end deterioration. `compensationBook` is net
+benefit elsewhere in uncalibrated ownership units; `compensationPoints` may be
+null. Query IDs, achieved visits and mover-value differences live in
+`annotations[i].evidence`. Reports/commentary may cite these fields only from an
+aligned `assessed` assessment. Empty assessed results do not prove that all
+possible sacrifice lines were excluded; unassessed is never converted to zero.
+`referenceSource` distinguishes unrestricted root candidates, forced actual
+moves and forced saving probes; `referenceRootHash` records the reference root.
+Saving probes require a nonempty hash matching the unrestricted root and do not
+alter its preferred move or candidate ranking.
+
 ## Optional browser neural sample
 
 `EngineAnalysis.neural` is an additive optional schema-v1 field, available on

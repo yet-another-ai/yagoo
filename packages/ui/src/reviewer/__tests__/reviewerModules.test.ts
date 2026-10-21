@@ -117,7 +117,7 @@ describe("MoveInspector contracts", () => {
       .trigger("click")
       .then(() => {
         expect(wrapper.get("#yagoo-panel-sacrifice").text()).toMatch(
-          /Coming in #25/,
+          /Sacrifice assessment is unavailable/,
         );
       });
   });

@@ -12,6 +12,7 @@ import CandidatesPanel from "../layout/CandidatesPanel.vue";
 import StubPane from "./StubPane.vue";
 import LedgerPanel from "./LedgerPanel.vue";
 import ComparisonPanel from "./ComparisonPanel.vue";
+import SacrificePanel from "./SacrificePanel.vue";
 
 export type InspectorPerspective =
   | "ai"
@@ -256,42 +257,9 @@ defineExpose({ perspective });
       aria-labelledby="yagoo-tab-sacrifice"
       class="yagoo-inspector__panel"
     >
-      <ul
-        v-if="sacrifices && sacrifices.length"
-        class="yagoo-ledger"
-        data-testid="sacrifice-body"
-      >
-        <li v-for="item in sacrifices" :key="item.groupId">
-          <button
-            type="button"
-            class="yagoo-ledger__link"
-            @mouseenter="emit('preview-group', item.groupId)"
-            @focus="emit('preview-group', item.groupId)"
-          >
-            {{ item.groupId }}
-          </button>
-          <span>flip {{ item.ownershipFlip.toFixed(2) }}</span>
-          <span v-if="item.compensationPoints != null">
-            exchange {{ points(item.compensationPoints) }}
-          </span>
-          <span v-if="item.exchangedWith.length">
-            via {{ item.exchangedWith.join(", ") }}
-          </span>
-        </li>
-      </ul>
-      <p
-        v-else-if="sacrifices && sacrifices.length === 0"
-        class="yagoo-inspector__wait"
-        data-testid="sacrifice-none"
-      >
-        The pipeline reported no sacrifice on the preferred line.
-      </p>
-      <StubPane
-        v-else
-        :issue="25"
-        title="Sacrifice (弃子)"
-        summary="When KataGo's preferred line gives up a group and the winrate holds, that group will be marked here with what is gained in exchange. No sacrifice detector is running."
-      />
+      <SacrificePanel :comparison="comparison" :ply="ply"
+        @preview-stones="emit('preview-stones', $event)"
+        @clear-preview="emit('clear-ledger-preview')" />
     </div>
 
     <div

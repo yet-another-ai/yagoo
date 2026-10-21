@@ -99,6 +99,7 @@ export interface MoveComparison {
   context: ComparisonContext;
   evidence: ComparisonEvidence;
   groupTempo: ComparisonGroupTempo[];
+  sacrificeAssessment?: SacrificeAssessment | null;
 }
 
 export interface ComparisonEvidence {
@@ -138,6 +139,23 @@ export interface ComparisonContext {
   preferredBranch: ComparisonBranch | null;
   preferredPvEnd: PvEndSnapshot | null;
   preferredPvQueryId: string | null;
+  rootCandidates?: CandidateSnapshot[];
+  pvLineages?: CandidatePvLineage[];
+  savingProbes?: SavingCandidateProbe[];
+}
+
+export interface SavingCandidateProbe {
+  queryId: string;
+  rootHash: string | null;
+  candidate: CandidateSnapshot;
+}
+
+export interface CandidatePvLineage {
+  rootPly: number;
+  move: string;
+  pv: string[];
+  board: BoardSnapshot;
+  captures: { color: ColorToken; stone: string; plyOffset: number }[];
 }
 
 export interface ComparisonGroupTempo {
@@ -153,20 +171,89 @@ export interface ComparisonGroupTempo {
   preferredGMinus: number;
 }
 
-/** A sacrifice (弃子) along the preferred line (#25). */
+/** A supported sacrifice candidate; not proof of intention or calibrated value. */
 export interface SacrificeAnnotation {
+  rootPly: number;
+  mover: ColorToken;
   groupId: string;
-  /**
-   * How far the group's ownership flips toward the opponent along the PV.
-   * Positive means the mover gives the group away.
-   */
+  stones: string[];
+  capturedStones: string[];
+  preferredMove: string;
+  referenceMove: string;
+  /** Saving-alternative own-color mean minus preferred own-color mean. */
   ownershipFlip: number;
-  /** Points gained elsewhere, when the ledger can price the exchange. */
+  rootOwnership: number | null;
+  referenceOwnership: number;
+  preferredOwnership: number;
+  endpointOwnership: number;
+  costBook: number;
+  /** NET elsewhere benefit in uncalibrated ownership-book units. */
+  compensationBook: number;
+  /** Net elsewhere points only with consistent, sign-preserving scaling. */
   compensationPoints: number | null;
-  /** Group ids (or region labels) that receive the compensation. */
   exchangedWith: string[];
-  /** PV moves along which the sacrifice shows up. */
+  exchanges: SacrificeExchange[];
   pv: string[];
+  evidence: SacrificeEvidence;
+}
+
+export interface SacrificeExchange {
+  kind: LedgerLineKind;
+  id: string | null;
+  intersections: string[];
+  /** Preferred minus saving, mover-positive; negative means another cost. */
+  bookValue: number;
+  proportion: number;
+  points: number | null;
+}
+
+export interface SacrificeEvidence {
+  rootQueryId: string;
+  referenceQueryId: string;
+  /** Omitted by legacy producers, where the reference was a retained root candidate. */
+  referenceSource?: "root_candidate" | "actual_forced" | "saving_forced";
+  referenceRootHash?: string | null;
+  preferredPvQueryId: string;
+  rootHash: string | null;
+  preferredVisits: number;
+  referenceVisits: number;
+  endpointVisits: number;
+  preferredCapturePlyOffset: number;
+  referencePv: string[];
+  scoreAdvantage: number;
+  winrateAdvantage: number;
+  endpointScoreChange: number;
+  endpointWinrateChange: number;
+}
+
+export interface SacrificeParams {
+  minimumStones: number;
+  minimumVisits: number;
+  savingOwnershipMinimum: number;
+  preferredOwnershipMaximum: number;
+  endpointOwnershipMaximum: number;
+  ownershipFlipMinimum: number;
+  minimumCompensationBook: number;
+  maximumScoreDecline: number;
+  maximumWinrateDecline: number;
+  maximumEndpointScoreDecline: number;
+  maximumEndpointWinrateDecline: number;
+}
+
+export type SacrificeReason = "supported" | "invalid_evidence" | "missing_preferred_pv"
+  | "insufficient_visits" | "mixed_or_opponent_group" | "too_few_stones"
+  | "original_stones_not_captured" | "ownership_not_lost" | "saving_alternative_unavailable"
+  | "global_value_declines" | "compensation_unavailable";
+
+export interface SacrificeAssessment {
+  rootPly: number;
+  mover: ColorToken;
+  preferredMove: string;
+  status: "assessed" | "unassessed";
+  annotations: SacrificeAnnotation[];
+  checks: { groupId: string; reason: SacrificeReason; referenceMove: string | null }[];
+  parameters: SacrificeParams;
+  limitations: string[];
 }
 
 /** Opening or joseki match for the header (#27). */

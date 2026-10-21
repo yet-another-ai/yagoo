@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "state": "complete",
+  "startedAt": "2026-10-20T23:39:39.571Z",
+  "recorderRuntime": {
+    "node": "v24.19.0",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "purpose": "Supplemental genuine queries for fixed-default pipeline replay; not expert-labelled calibration.",
+  "sourceRecording": "screen-64-20261020",
+  "sourceManifestSha256": "7e6909c1c7b04ac4613567fce68047989ff0b7196ba62ff61cde52128e2bac0c",
+  "engine": {
+    "path": "C:\\Users\\dsh04\\Documents\\Codex\\2026-10-18\\task\\yagoo-issue5\\.yagoo-data\\native-katago\\katago.exe",
+    "sha256": "bad55cf31ec42f58dec821a2e428c8d45d9e4697f9e2741b8aa644d03a37acfc",
+    "version": "KataGo v1.16.4\r\nGit revision: 4b8de63bea2bd8790db96cd6f8daf86dc87be6f7\r\nCompile Time: Oct 20 2025 09:47:37\r\nUsing Eigen(CPU) backend\r\nCompiled with AVX2 and FMA instructions\r\nCompiled to support contributing to online distributed selfplay"
+  },
+  "model": {
+    "path": "C:\\Users\\dsh04\\Documents\\Codex\\2026-10-18\\task\\yagoo-issue5\\.yagoo-data\\native-katago\\official-swa.bin",
+    "sha256": "46a623a366ef6ef423fa2055f1b094fd8f64c518c065e7d254a9e0829c192c5c"
+  },
+  "rules": "chinese",
+  "komi": 0,
+  "boardSize": 19,
+  "perspective": "BLACK",
+  "fullHistory": true,
+  "queryPlanSha256": "2b427cfbfd771335bb56de640e04ef50fa219cc63dc545ffd38a0f161877aa94",
+  "queryCount": 2,
+  "completedIds": [
+    "jowa1835-p59-actual-forced",
+    "dosaku1669-p71-actual-forced"
+  ],
+  "sourceRoots": {
+    "jowa1835-p59-actual-forced": {
+      "sourceRootId": "jowa1835-p59-root",
+      "rootHash": "BE0C33D60FACDC508B3F7B1C1E32886E",
+      "forcedMove": "J8"
+    },
+    "dosaku1669-p71-actual-forced": {
+      "sourceRootId": "dosaku1669-p71-root",
+      "rootHash": "81B3EDC24CB53B2FD23767581AAFF746",
+      "forcedMove": "E13"
+    }
+  },
+  "enginePid": 30960,
+  "engineExit": {
+    "code": 0,
+    "signal": null
+  },
+  "finishedAt": "2026-10-20T23:40:35.318Z",
+  "files": {
+    "analysis.cfg": {
+      "sha256": "104027dae6852a2531727a57eb77ff19eded6076f97ebfd7a709cf89b0b1d893",
+      "bytes": 409
+    },
+    "process-running.json": {
+      "sha256": "eceb99da30b0bbe820e3fc2a676b17a56a8420aa59ca72216b32073310595a96",
+      "bytes": 559
+    },
+    "queries.ndjson": {
+      "sha256": "e7fb1d1c61653291e4cb2cf55786b8b58071e9171c04e9f9193f94e1e8bba366",
+      "bytes": 2333
+    },
+    "query-plan.json": {
+      "sha256": "2b427cfbfd771335bb56de640e04ef50fa219cc63dc545ffd38a0f161877aa94",
+      "bytes": 7400
+    },
+    "record-supplement.mjs": {
+      "sha256": "97efe7fb29b75703a94d6fd77e71ef4806cb00edd6878ab3f12cb5f7c27bf971",
+      "bytes": 8209
+    },
+    "responses.ndjson": {
+      "sha256": "bbb667720a02f9916152d63b0503cc65e110cbcd3704f3f2a969fb860686394a",
+      "bytes": 38027
+    },
+    "stderr.log": {
+      "sha256": "90b796d8d6c322b4894dde7b21cbdfab6a119d7547619c81e1407a5884ae2031",
+      "bytes": 466
+    }
+  }
+}

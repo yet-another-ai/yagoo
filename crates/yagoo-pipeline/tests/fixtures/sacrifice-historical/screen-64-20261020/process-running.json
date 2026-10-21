@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-10-20T23:26:00.4844862Z",
+  "count": 1,
+  "engines": [
+    {
+      "ProcessId": 17568,
+      "ParentProcessId": 17668,
+      "CommandLine": "C:\\Users\\dsh04\\Documents\\Codex\\2026-10-18\\task\\yagoo-issue5\\.yagoo-data\\native-katago\\katago.exe analysis -model C:\\Users\\dsh04\\Documents\\Codex\\2026-10-18\\task\\yagoo-issue5\\.yagoo-data\\native-katago\\official-swa.bin -config C:\\Users\\dsh04\\Documents\\Codex\\2026-10-21\\task\\fixture-work\\sacrifice-candidates\\screen-64-20261020\\analysis.cfg"
+    }
+  ]
+}

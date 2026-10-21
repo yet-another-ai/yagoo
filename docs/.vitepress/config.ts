@@ -45,6 +45,7 @@ export default defineConfig({
           { text: "Positional zoning", link: "/modules/positional-zoning" },
           { text: "Gain / loss ledger", link: "/modules/gain-loss-ledger" },
           { text: "Actual vs preferred", link: "/modules/move-comparison" },
+            { text: "Sacrifice candidates", link: "/modules/sacrifices" },
           { text: "Concept heads", link: "/modules/concept-heads" },
           {
             text: "Explanation generation",

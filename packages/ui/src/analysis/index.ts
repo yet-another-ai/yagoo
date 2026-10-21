@@ -17,10 +17,17 @@ export type {
   ReviewReportDocument,
   ReviewReportMove,
   SacrificeAnnotation,
+  SacrificeAssessment,
+  SacrificeEvidence,
+  SacrificeExchange,
+  SacrificeParams,
+  SacrificeReason,
+  CandidatePvLineage,
   TempoChange,
 } from "./modules";
 
 export { isAlignedComparison } from "./comparison";
+export { alignedSacrificeAssessment, sacrificesFromComparison } from "./sacrifices";
 
 export {
   PIPELINE_SCHEMA_VERSION,

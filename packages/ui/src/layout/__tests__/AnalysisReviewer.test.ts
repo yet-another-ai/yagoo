@@ -139,7 +139,6 @@ describe("AnalysisReviewer", () => {
       for (const [tab, issue] of [
         ["why", "#24"],
         ["ledger", "#23"],
-        ["sacrifice", "#25"],
         ["notes", "#28"],
       ] as const) {
         await wrapper.get(`[data-testid="perspective-${tab}"]`).trigger("click");
@@ -147,6 +146,10 @@ describe("AnalysisReviewer", () => {
           `Coming in ${issue}`,
         );
       }
+      await wrapper.get('[data-testid="perspective-sacrifice"]').trigger("click");
+      expect(wrapper.get("#yagoo-panel-sacrifice").text()).toContain(
+        "Sacrifice assessment is unavailable",
+      );
 
       await wrapper.get('[data-testid="perspective-ai"]').trigger("click");
       await wrapper.get('[data-testid="next-key-move"]').trigger("click");

@@ -5,6 +5,7 @@ import {
   createInitialAnalysisState,
 } from "./types";
 import { isAlignedComparison } from "./comparison";
+import { sacrificesFromComparison } from "./sacrifices";
 
 function ensurePly(state: AnalysisState, ply: number): PlyAnalysis {
   const existing = state.plies[ply];
@@ -106,6 +107,7 @@ export function reducePipelineEvent(
         ply.complete = false;
         ply.rootPartial = false;
         ply.comparison = null;
+        ply.sacrifices = null;
       }
       break;
     }
@@ -149,6 +151,7 @@ export function reducePipelineEvent(
       ply.ledger = snap.ledger ?? null;
       ply.comparison = isAlignedComparison(snap.comparison, snap.ply, snap.board.size)
         ? snap.comparison : null;
+      ply.sacrifices = sacrificesFromComparison(ply.comparison, snap.ply, snap.board.size);
       ply.complete = true;
       break;
     }

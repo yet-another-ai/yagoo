@@ -1,0 +1,333 @@
+{
+  "valid": true,
+  "engineShutdownConfirmed": true,
+  "queries": 18,
+  "finalResponses": 18,
+  "warningEnvelopes": 0,
+  "sourceCount": 3,
+  "cases": [
+    {
+      "id": "jowa1835-p59",
+      "actualMove": "J8",
+      "preferredMove": "O3",
+      "preferredVisits": 15,
+      "rootScoreBlack": 8.01684476,
+      "preferredScoreBlack": 8.24420516,
+      "preferredWinrateBlack": 0.966341909,
+      "endpointScoreBlack": 8.41894625,
+      "endpointWinrateBlack": 0.964597548,
+      "pv": [
+        "O3",
+        "K7",
+        "Q9"
+      ],
+      "pvVisits": [
+        15,
+        3,
+        1
+      ],
+      "capturedRootGroups": [],
+      "capturedMoverNewStones": [],
+      "assessment": "Unlabelled candidate evidence; threshold contrast is not expert ground truth or a confirmed sacrifice."
+    },
+    {
+      "id": "chitetsu1668-p131",
+      "actualMove": "J6",
+      "preferredMove": "J6",
+      "preferredVisits": 63,
+      "rootScoreBlack": -1.47667984,
+      "preferredScoreBlack": -1.5310186,
+      "preferredWinrateBlack": 0.351719263,
+      "endpointScoreBlack": -3.36786829,
+      "endpointWinrateBlack": 0.0878926586,
+      "pv": [
+        "J6",
+        "F7",
+        "M7",
+        "G3",
+        "G2",
+        "F2",
+        "H2",
+        "N7",
+        "M8",
+        "O6",
+        "O3",
+        "G4",
+        "K2",
+        "J12",
+        "J10"
+      ],
+      "pvVisits": [
+        63,
+        62,
+        60,
+        58,
+        55,
+        54,
+        30,
+        25,
+        9,
+        7,
+        6,
+        4,
+        3,
+        2,
+        1
+      ],
+      "capturedRootGroups": [
+        {
+          "stones": [
+            "F8",
+            "G8",
+            "G7"
+          ],
+          "rootMean": -0.9831396666666666,
+          "preferredMean": -0.9833173333333334,
+          "endpointMean": -0.987909,
+          "captured": [
+            {
+              "point": "F8",
+              "pvPly": 2,
+              "capturingMove": "F7",
+              "rootOwn": -0.982752,
+              "preferredOwn": -0.982813,
+              "endpointOwn": -0.987492
+            },
+            {
+              "point": "G8",
+              "pvPly": 2,
+              "capturingMove": "F7",
+              "rootOwn": -0.984192,
+              "preferredOwn": -0.984509,
+              "endpointOwn": -0.988676
+            },
+            {
+              "point": "G7",
+              "pvPly": 2,
+              "capturingMove": "F7",
+              "rootOwn": -0.982475,
+              "preferredOwn": -0.98263,
+              "endpointOwn": -0.987559
+            }
+          ],
+          "minimumPvVisitsThroughCapture": 62,
+          "alternatives": []
+        }
+      ],
+      "capturedMoverNewStones": [],
+      "assessment": "Unlabelled candidate evidence; threshold contrast is not expert ground truth or a confirmed sacrifice."
+    },
+    {
+      "id": "dosaku1669-p113",
+      "actualMove": "G8",
+      "preferredMove": "G8",
+      "preferredVisits": 36,
+      "rootScoreBlack": 1.41098798,
+      "preferredScoreBlack": 1.5580615,
+      "preferredWinrateBlack": 0.611165048,
+      "endpointScoreBlack": 15.7434695,
+      "endpointWinrateBlack": 0.894128885,
+      "pv": [
+        "G8",
+        "G9",
+        "F6",
+        "E7",
+        "L10",
+        "J9",
+        "N9",
+        "N10",
+        "M9",
+        "L9"
+      ],
+      "pvVisits": [
+        36,
+        35,
+        34,
+        32,
+        17,
+        8,
+        4,
+        3,
+        2,
+        1
+      ],
+      "capturedRootGroups": [],
+      "capturedMoverNewStones": [],
+      "assessment": "Unlabelled candidate evidence; threshold contrast is not expert ground truth or a confirmed sacrifice."
+    },
+    {
+      "id": "dosaku1669-p35",
+      "actualMove": "D18",
+      "preferredMove": "D18",
+      "preferredVisits": 49,
+      "rootScoreBlack": 3.49080281,
+      "preferredScoreBlack": 3.46094956,
+      "preferredWinrateBlack": 0.80520806,
+      "endpointScoreBlack": 1.02402809,
+      "endpointWinrateBlack": 0.598123885,
+      "pv": [
+        "D18",
+        "D17",
+        "H16",
+        "D15",
+        "C17",
+        "D3"
+      ],
+      "pvVisits": [
+        49,
+        48,
+        9,
+        4,
+        3,
+        1
+      ],
+      "capturedRootGroups": [
+        {
+          "stones": [
+            "C17"
+          ],
+          "rootMean": -0.832446,
+          "preferredMean": -0.85578,
+          "endpointMean": -0.457453,
+          "captured": [
+            {
+              "point": "C17",
+              "pvPly": 2,
+              "capturingMove": "D17",
+              "rootOwn": -0.832446,
+              "preferredOwn": -0.85578,
+              "endpointOwn": -0.457453
+            }
+          ],
+          "minimumPvVisitsThroughCapture": 48,
+          "alternatives": [
+            {
+              "move": "O4",
+              "order": 1,
+              "visits": 14,
+              "ownMean": -0.615039,
+              "pv": [
+                "O4",
+                "D17",
+                "P5",
+                "Q4",
+                "D18",
+                "C17",
+                "O2",
+                "O5",
+                "N4",
+                "K4",
+                "J4"
+              ],
+              "pvVisits": [
+                14,
+                8,
+                4,
+                3,
+                2,
+                21,
+                7,
+                5,
+                3,
+                2,
+                1
+              ],
+              "retainedThroughCaptureHorizon": false,
+              "preferredMinusAlternativeScoreMover": -0.015358309999999875,
+              "preferredMinusAlternativeWinrateMover": -0.003953149999999961,
+              "elsewhereOwnershipDeltaSum": 0.24637200000000237,
+              "sacrificedGroupOwnershipCost": 0.24074099999999998,
+              "ownershipGateOnlyAtFixedThresholds": false
+            }
+          ]
+        }
+      ],
+      "capturedMoverNewStones": [],
+      "assessment": "Unlabelled candidate evidence; threshold contrast is not expert ground truth or a confirmed sacrifice."
+    },
+    {
+      "id": "dosaku1669-p71",
+      "actualMove": "E13",
+      "preferredMove": "G6",
+      "preferredVisits": 13,
+      "rootScoreBlack": 9.57480957,
+      "preferredScoreBlack": 10.5479439,
+      "preferredWinrateBlack": 0.981657052,
+      "endpointScoreBlack": 10.4977449,
+      "endpointWinrateBlack": 0.986092689,
+      "pv": [
+        "G6",
+        "H7",
+        "C8",
+        "Q6",
+        "Q7"
+      ],
+      "pvVisits": [
+        13,
+        5,
+        3,
+        2,
+        1
+      ],
+      "capturedRootGroups": [],
+      "capturedMoverNewStones": [],
+      "assessment": "Unlabelled candidate evidence; threshold contrast is not expert ground truth or a confirmed sacrifice."
+    },
+    {
+      "id": "dosaku1669-p137",
+      "actualMove": "M7",
+      "preferredMove": "M7",
+      "preferredVisits": 61,
+      "rootScoreBlack": 13.7609453,
+      "preferredScoreBlack": 14.1854605,
+      "preferredWinrateBlack": 0.952300869,
+      "endpointScoreBlack": 15.5335489,
+      "endpointWinrateBlack": 0.988848698,
+      "pv": [
+        "M7",
+        "N7",
+        "N8",
+        "M7",
+        "N5",
+        "N6",
+        "L5",
+        "M4",
+        "L4",
+        "P8",
+        "K14",
+        "L13",
+        "L14",
+        "M13",
+        "M14"
+      ],
+      "pvVisits": [
+        61,
+        60,
+        58,
+        56,
+        54,
+        49,
+        48,
+        42,
+        41,
+        29,
+        11,
+        5,
+        4,
+        2,
+        1
+      ],
+      "capturedRootGroups": [],
+      "capturedMoverNewStones": [
+        {
+          "point": "M7",
+          "bornAtPvPly": 1,
+          "capturedAtPvPly": 2,
+          "capturingMove": "N7",
+          "endpointOwn": -0.98579
+        }
+      ],
+      "assessment": "Unlabelled candidate evidence; threshold contrast is not expert ground truth or a confirmed sacrifice."
+    }
+  ]
+}

@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "state": "complete",
+  "startedAt": "2026-10-20T23:34:20.373Z",
+  "purpose": "Targeted real-game candidate screening, not expert-labelled positive calibration.",
+  "engine": {
+    "path": "C:\\Users\\dsh04\\Documents\\Codex\\2026-10-18\\task\\yagoo-issue5\\.yagoo-data\\native-katago\\katago.exe",
+    "sha256": "bad55cf31ec42f58dec821a2e428c8d45d9e4697f9e2741b8aa644d03a37acfc",
+    "version": "KataGo v1.16.4\r\nGit revision: 4b8de63bea2bd8790db96cd6f8daf86dc87be6f7\r\nCompile Time: Oct 20 2025 09:47:37\r\nUsing Eigen(CPU) backend\r\nCompiled with AVX2 and FMA instructions\r\nCompiled to support contributing to online distributed selfplay"
+  },
+  "model": {
+    "path": "C:\\Users\\dsh04\\Documents\\Codex\\2026-10-18\\task\\yagoo-issue5\\.yagoo-data\\native-katago\\official-swa.bin",
+    "sha256": "46a623a366ef6ef423fa2055f1b094fd8f64c518c065e7d254a9e0829c192c5c"
+  },
+  "rules": "chinese",
+  "komi": 0,
+  "boardSize": 19,
+  "visits": 256,
+  "rootSymmetries": 8,
+  "fullHistory": true,
+  "perspective": "BLACK",
+  "ownershipLayout": "row-major A19 through T1",
+  "sourceProvenance": "../source-provenance.json",
+  "candidateSelection": "../screen-plan.json",
+  "requestedCaseIds": [
+    "chitetsu1668-p131"
+  ],
+  "candidateSelectionSha256": "a4ea3045c1618208e85d2dd48acc1da402cd1e1a2de548c0956222c155c90f81",
+  "sourceProvenanceSha256": "404c4143a19d1ac32ee6edc95a169624200a44ae31bdf73b440edd6f1bea6a15",
+  "queryCount": 3,
+  "cases": [
+    {
+      "id": "chitetsu1668-p131",
+      "sgf": "chitetsu-dosaku-1668.chinese.sgf",
+      "sourceSha256": "974b406100ad5e1f5ec834ff05d10d28f80919d5bfef9d3126fdf936f0a5e808",
+      "actualPly": 131,
+      "rootPly": 130,
+      "actualMove": "J6",
+      "mover": "B",
+      "preferredMove": "J6",
+      "preferredVisits": 254,
+      "pv": [
+        "J6",
+        "F7",
+        "G7",
+        "G8",
+        "M7",
+        "G3",
+        "G2",
+        "F2",
+        "H2",
+        "N7",
+        "N8",
+        "O7",
+        "L7",
+        "O6",
+        "O3"
+      ],
+      "pvVisits": [
+        254,
+        252,
+        62,
+        52,
+        50,
+        47,
+        44,
+        42,
+        19,
+        18,
+        6,
+        5,
+        3,
+        2,
+        1
+      ],
+      "capturedMoverRootStones": [
+        {
+          "point": "F8",
+          "pvPly": 2,
+          "capturingMove": "F7",
+          "rootOwn": -0.983138,
+          "preferredOwn": -0.983155,
+          "endpointOwn": -0.995431
+        },
+        {
+          "point": "G8",
+          "pvPly": 2,
+          "capturingMove": "F7",
+          "rootOwn": -0.984685,
+          "preferredOwn": -0.984765,
+          "endpointOwn": -0.998498
+        },
+        {
+          "point": "G7",
+          "pvPly": 2,
+          "capturingMove": "F7",
+          "rootOwn": -0.982541,
+          "preferredOwn": -0.982579,
+          "endpointOwn": -0.996512
+        }
+      ],
+      "capturedMoverNewStones": [
+        {
+          "point": "G7",
+          "bornAtPvPly": 3,
+          "capturedAtPvPly": 4,
+          "capturingMove": "G8",
+          "endpointOwn": -0.996512
+        }
+      ],
+      "rootScoreBlack": -2.57855383,
+      "preferredScoreBlack": -2.59639044,
+      "endpointScoreBlack": -7.58216519,
+      "preferredVsPassScoreMover": 38.42216196,
+      "healthyRootCaptureCount": 0,
+      "caveat": "Score/ownership diagnostics are not sacrifice labels. Endpoint search is later-root evidence, not same-root move loss."
+    }
+  ],
+  "enginePid": 22388,
+  "engineExit": {
+    "code": 0,
+    "signal": null
+  },
+  "finishedAt": "2026-10-20T23:39:01.910Z",
+  "files": {
+    "analysis.cfg": {
+      "sha256": "104027dae6852a2531727a57eb77ff19eded6076f97ebfd7a709cf89b0b1d893",
+      "bytes": 409
+    },
+    "engine-version.txt": {
+      "sha256": "99d9d21b4808f930f46b714b586e4cfacfe50b0b74a86307e100501b622d55f4",
+      "bytes": 240
+    },
+    "process-running.json": {
+      "sha256": "1bff30d659d75ed375b12c9b09d8b233d96f33a619c8b9cb65829221525960c9",
+      "bytes": 555
+    },
+    "queries.ndjson": {
+      "sha256": "5fc3e82cc5c990314db7388cd6476e656578e4c14c1aaa07e72c73b48ff9dd6e",
+      "bytes": 5523
+    },
+    "responses.ndjson": {
+      "sha256": "f86b4100b9a1e306dc8c000495bb54b8316e271613288cf345d358ae32ffe2c7",
+      "bytes": 159377
+    },
+    "screen-plan.json": {
+      "sha256": "a4ea3045c1618208e85d2dd48acc1da402cd1e1a2de548c0956222c155c90f81",
+      "bytes": 1747
+    },
+    "screen-positions.mjs": {
+      "sha256": "273046f2ebc1a5ee6bfe6d12a221deba7934e9f399a9c7ea4952da4ce51543ba",
+      "bytes": 12817
+    },
+    "source-provenance.json": {
+      "sha256": "404c4143a19d1ac32ee6edc95a169624200a44ae31bdf73b440edd6f1bea6a15",
+      "bytes": 6434
+    },
+    "stderr.log": {
+      "sha256": "d85729701b0a368d2b7305f710c12a1f94c7e927bb3ef106b8039068156a41f3",
+      "bytes": 460
+    }
+  }
+}

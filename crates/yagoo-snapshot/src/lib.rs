@@ -14,12 +14,14 @@ mod convert;
 mod events;
 mod groups;
 mod ledger;
+mod pv_lineage;
+mod sacrifice;
 mod schema;
 
 pub use comparison::{
     candidate_has_comparison_evidence, compute_move_comparison, ComparisonBranch,
     ComparisonCandidateSource, ComparisonContext, ComparisonEvidence, ComparisonGroupTempo,
-    MoveComparison,
+    MoveComparison, SavingCandidateProbe,
 };
 pub use convert::{
     board_from_game, candidate_from_move_info, candidates_from_response, chains_from_game,
@@ -32,6 +34,12 @@ pub use ledger::{
     compute_tempo_changes, GainLossLedger, GainLossLine, GroupTempoChange, LedgerBaseline,
     LedgerInconsistency, LedgerLineKind, LedgerScaling, LedgerStrengthChange, LedgerTempo,
     LEDGER_CONSISTENCY_TOLERANCE, LEDGER_STRENGTH_THRESHOLD,
+};
+pub use pv_lineage::{trace_candidate_pv, CandidatePvLineage, RootStoneCapture};
+pub use sacrifice::{
+    compute_sacrifices, compute_sacrifices_with_params, SacrificeAnnotation, SacrificeAssessment,
+    SacrificeAssessmentStatus, SacrificeCheck, SacrificeEvidence, SacrificeExchange,
+    SacrificeParams, SacrificeReason, SacrificeReferenceSource,
 };
 pub use schema::{
     BoardSnapshot, CandidateSnapshot, ChainSnapshot, ColorToken, EngineAnalysis, GameSnapshot,

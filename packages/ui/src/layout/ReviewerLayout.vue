@@ -397,13 +397,16 @@ function analyzeVariation(force = false) {
   variationPinned.value = null;
   variationSelected.value = 0;
   if (key == null) { variation.stop(); return; }
-  if (props.positionSource) emit("variation-analysis");
+  // Keep selection/cache aligned when keys or adapters change behind a report,
+  // but leave canceled work stopped until a board action requests analysis.
+  const source = view.value === "board" ? props.positionSource : null;
+  if (source) emit("variation-analysis");
   variation.select(key, {
     sgf: tryMode.value ? anchorSgf.value : positionSgf.value,
     ply: moveNumber.value,
     moves: tryMode.value ? tryPath(tryNodes.value, tryCursor.value).map((node) => node.label) : [],
     visits: 200,
-  }, props.positionSource, force);
+  }, source, force);
 }
 
 watch(() => props.positionSource, () => { variation.clear(); analyzeVariation(); });
@@ -575,6 +578,16 @@ function openReport() {
   // the same adapter. Queued variation watchers will then see a main-line key.
   leaveVariation();
   view.value = "report";
+}
+
+function toggleReport() {
+  if (view.value === "report") {
+    view.value = "board";
+  } else {
+    // Viewing existing results must preserve the user's local branch and tree.
+    variation.stop();
+    view.value = "report";
+  }
 }
 
 function captureAnchor() {
@@ -1058,7 +1071,7 @@ defineExpose({
       @back="onBack"
       @forward="onForward"
       @toggle-try="toggleTry"
-      @toggle-report="view === 'report' ? (view = 'board') : openReport()"
+      @toggle-report="toggleReport"
     />
   </div>
 </template>

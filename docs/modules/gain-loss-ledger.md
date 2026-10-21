@@ -117,3 +117,54 @@ The older recording omitted move history; some candidates violate the true
 game's ko restriction. It remains an arithmetic/data-flow regression fixture,
 not historical comparison evidence. The newer full-history `comparison-19x19`
 corpus is used for actual-versus-preferred tests and supported branch statuses.
+
+## Value of the played move
+
+For a deeply compared move *p*, `comparison.playedLedger` attributes the actual
+candidate at root *p - 1* against that root's explicit pass probe. It uses the
+existing `movesOwnership` and pass ownership, with the same signed mover
+perspective, partition and 3-point consistency guard as other ledgers. This
+answers "what did playing this move gain compared with passing?" It is separate
+from `comparison.ledgerDiff`, which measures actual versus preferred, and does
+not subtract the ownership estimates of consecutive positions.
+
+If a candidate or played move is itself `pass`, both sides are the same action. After
+validating the required explicit pass probe, the ledger uses the actual
+candidate's ownership and score as both candidate and reference. Played value,
+ownership-book contributions and signed shares are therefore zero even when
+independent pass searches disagree. The zero book remains unpriced (`points:
+null`); missing or malformed pass evidence still leaves the ledger unavailable.
+The ordinary best-versus-pass ledger shares this alias rule. The rule also
+applies when validating imported played ledgers and does
+not change actual-versus-AI loss or the recorded before/after pass sensitivity.
+
+`comparison.playedTempo` evaluates the original root group's stones before the
+move and after the actual branch. Each position supplies its own root/pass pair;
+side-to-play determines `gPlus`/`gMinus` independently. These are the existing
+`GroupStatus` classifications from the group module, not sente/gote labels or
+proof of life. Original stone coordinates remain fixed, including captured
+locations; newly placed stones are not added to these groups. A supported
+before/after status change gives the group ledger priority even when the
+candidate/pass ownership-strength change is below 0.3. The row carries
+`tempo: "root_branch_pass_probes"` and `playedTempoChanges`.
+
+The **Why not** view shows this played/pass ledger separately on the board
+before move *p*. Row hover/focus highlights that root's exact intersections.
+Missing root pass evidence leaves played value unavailable. Missing actual-branch
+pass evidence leaves before/after statuses unassessed without discarding the
+supported played/pass value. Imported claims are checked against their maps,
+scores, coordinates, query identifiers and status means before rendering.
+
+No extra analysis queries are needed: existing deep-comparison evidence supplies
+both features. Scan-only moves still lack the multi-scenario groups and pass
+probes; this is selective coverage, not a ledger for every scanned move. Full
+scan coverage would require additional evidence and is not claimed here.
+
+The unchanged genuine five-position corpus gives Black move 43 R2 a value of
+**25.72956312** points versus pass, while its actual-versus-AI loss is exactly
+zero. White move 60 S3 has **8.89357024** points versus pass and a separate
+**6.681626325**-point loss versus H3. These are finite-visit search estimates,
+not calibrated teaching severity. Recorded root-to-actual status transitions
+include N3 Black `tempo_critical` to `weak` at move 43 and Q4 White `weak` to
+`settled` at move 44. Offline replay still requests exactly the same 30 recorded
+queries; no new model run is needed to test this extension.

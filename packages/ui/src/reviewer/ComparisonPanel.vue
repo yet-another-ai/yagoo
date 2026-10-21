@@ -16,6 +16,7 @@ const emit = defineEmits<{
 const transitions = computed(() => props.comparison.groupTempo.filter(
   (entry) => entry.actualStatus !== entry.preferredStatus,
 ));
+const playedTempo = computed(() => props.comparison.playedTempo ?? []);
 const percent = (value: number) => `${(value * 100).toFixed(1)}%`;
 const points = (value: number) => `${value > 0 ? "+" : ""}${value.toFixed(2)}`;
 </script>
@@ -27,6 +28,7 @@ const points = (value: number) => `${value > 0 ? "+" : ""}${value.toFixed(2)}`;
       · before-move board (ply {{ comparison.rootPly }}).
       A = actual, AI = preferred.
     </p>
+    <h3>Actual move versus AI</h3>
     <p v-if="comparison.actualMove === comparison.aiMove" data-testid="comparison-equal">
       The played move matches the preferred move. Both columns use the same branch.
     </p>
@@ -80,6 +82,37 @@ const points = (value: number) => `${value > 0 ? "+" : ""}${value.toFixed(2)}`;
         </li>
       </ul>
     </details>
+    <section class="yagoo-comparison__played" data-testid="comparison-played">
+      <h3>Played move versus pass</h3>
+      <LedgerPanel v-if="comparison.playedLedger" :ledger="comparison.playedLedger"
+        :tempo-evidence-available="playedTempo.length > 0" tempo-comparison="played"
+        @preview="emit('preview', $event)" @clear-preview="emit('clear-preview')" />
+      <p v-else data-testid="comparison-played-unavailable">
+        The played-move ledger is unavailable: no played-versus-pass evidence was recorded.
+      </p>
+      <details data-testid="comparison-played-tempo">
+        <summary>Before and after the played move ({{ playedTempo.length }} group/color pairs)</summary>
+        <p class="yagoo-comparison__note">
+          The same root stones are assessed before and after {{ comparison.actualMove }},
+          using separate pass probes. Highlights remain on the before-move board.
+          These status changes do not establish sente or gote.
+        </p>
+        <p v-if="playedTempo.length === 0" data-testid="comparison-played-tempo-unavailable">
+          Before/after status transitions are unassessed: pass-probe evidence is unavailable.
+        </p>
+        <ul v-else>
+          <li v-for="entry in playedTempo" :key="`${entry.groupId}-${entry.color}`">
+            <button type="button" :data-played-tempo-group="entry.groupId" :data-played-tempo-color="entry.color"
+              @mouseenter="emit('preview-stones', entry.stones)"
+              @focus="emit('preview-stones', entry.stones)" @mouseleave="emit('clear-preview')"
+              @blur="emit('clear-preview')">
+              {{ entry.groupId }} {{ entry.color === "B" ? "Black" : "White" }}:
+              before {{ entry.beforeStatus }} → after {{ entry.afterStatus }}
+            </button>
+          </li>
+        </ul>
+      </details>
+    </section>
     <details>
       <summary>Evidence and limits</summary>
       <p>{{ comparison.evidence.rootQueryId }} / {{ comparison.evidence.actualQueryId }}</p>
@@ -93,6 +126,8 @@ const points = (value: number) => `${value > 0 ? "+" : ""}${value.toFixed(2)}`;
 .yagoo-comparison table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .yagoo-comparison th, .yagoo-comparison td { text-align: left; padding: 0.3rem; border-bottom: 1px solid var(--yagoo-border, #ddd); }
 .yagoo-comparison__note { color: var(--yagoo-muted, #5c5c66); }
+.yagoo-comparison h3 { font-size: 0.9rem; margin: 0.8rem 0 0.5rem; }
+.yagoo-comparison__played { border-top: 1px solid var(--yagoo-border, #ddd); margin-top: 0.8rem; }
 .yagoo-comparison details { margin: 0.6rem 0; }
 .yagoo-comparison button { color: var(--yagoo-accent, #0066cc); background: none; border: 0; font: inherit; cursor: pointer; text-align: left; }
 </style>

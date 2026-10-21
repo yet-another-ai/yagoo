@@ -342,3 +342,146 @@ async fn recorded_status_transitions_drive_group_priority_with_explicit_provenan
         361
     );
 }
+
+#[tokio::test]
+async fn recorded_played_value_and_before_after_statuses_reuse_existing_queries() {
+    use yagoo_snapshot::{GroupStatus, LedgerBaseline, LedgerTempo};
+    let record = record();
+    let positions = replay_main_line(&record).unwrap();
+    let engine = RecordedEngine::load();
+    let mut transition_count = 0;
+    for ply in [43, 44, 50, 60, 96] {
+        let comparison = analyze_move_comparison(&record, &positions[ply], &engine, &config())
+            .await
+            .unwrap()
+            .unwrap();
+        let ledger = comparison.played_ledger.as_ref().unwrap();
+        assert_eq!(ledger.root_ply + 1, comparison.ply);
+        assert_eq!(ledger.move_, comparison.actual_move);
+        assert_eq!(ledger.vs, LedgerBaseline::Pass);
+        assert_eq!(ledger.reference_move, "pass");
+        let sign = if comparison.mover == ColorToken::B {
+            1.0
+        } else {
+            -1.0
+        };
+        let pass = comparison.context.pass_probe.as_ref().unwrap();
+        assert!(
+            (ledger.value - sign * (comparison.actual_score_lead - pass.score_lead.unwrap())).abs()
+                < 1e-9
+        );
+        let expected_book: f64 = comparison
+            .context
+            .actual
+            .ownership
+            .as_ref()
+            .unwrap()
+            .iter()
+            .zip(pass.ownership.as_ref().unwrap())
+            .map(|(actual, pass)| sign * (actual - pass))
+            .sum();
+        assert!((ledger.book_total - expected_book).abs() < 1e-9);
+        let cells: Vec<_> = ledger
+            .ledger
+            .iter()
+            .flat_map(|line| &line.intersections)
+            .collect();
+        assert_eq!(cells.len(), 361);
+        assert_eq!(
+            cells
+                .into_iter()
+                .collect::<std::collections::HashSet<_>>()
+                .len(),
+            361
+        );
+        if comparison.actual_move == comparison.ai_move {
+            assert_eq!(comparison.score_loss, 0.0);
+            assert!(
+                ledger.value.abs() > 0.01,
+                "playing the best move can still have value against pass"
+            );
+        }
+        if ply == 43 {
+            assert!((ledger.value - 25.729_563_12).abs() < 1e-8);
+            assert!(comparison
+                .played_tempo
+                .iter()
+                .any(|entry| entry.group_id == "N3"
+                    && entry.color == ColorToken::B
+                    && entry.before_status == GroupStatus::TempoCritical
+                    && entry.after_status == GroupStatus::Weak));
+        }
+        for change in comparison
+            .played_tempo
+            .iter()
+            .filter(|change| change.before_status != change.after_status)
+        {
+            transition_count += 1;
+            let line = ledger
+                .ledger
+                .iter()
+                .find(|line| line.id.as_ref() == Some(&change.group_id))
+                .unwrap();
+            assert_eq!(line.tempo, Some(LedgerTempo::RootBranchPassProbes));
+            assert!(line.played_tempo_changes.contains(change));
+            assert!(
+                line.tempo_changes.is_empty(),
+                "not actual-versus-AI status evidence"
+            );
+            assert_ne!(change.before_status, GroupStatus::LikelySeki);
+            assert_ne!(change.after_status, GroupStatus::LikelySeki);
+        }
+    }
+    assert!(
+        transition_count > 0,
+        "real before/after transitions, not constructed values"
+    );
+    assert_eq!(
+        engine.seen.lock().unwrap().len(),
+        30,
+        "no new queries or models"
+    );
+}
+
+#[tokio::test]
+async fn played_value_does_not_subtract_later_roots_and_missing_probes_stay_unassessed() {
+    let record = record();
+    let positions = replay_main_line(&record).unwrap();
+    let comparison =
+        analyze_move_comparison(&record, &positions[60], &RecordedEngine::load(), &config())
+            .await
+            .unwrap()
+            .unwrap();
+    let recompute =
+        |context| compute_move_comparison(60, context, comparison.evidence.clone()).unwrap();
+    // Deliberately corrupted later-root values: price must still use the same-root candidate/pass.
+    let mut context = comparison.context.clone();
+    context.actual_branch.as_mut().unwrap().root.score_lead = Some(999.0);
+    context.actual_branch.as_mut().unwrap().root.ownership = Some(vec![0.0; 361]);
+    let altered = recompute(context);
+    assert_eq!(
+        altered.played_ledger.as_ref().unwrap().value,
+        comparison.played_ledger.as_ref().unwrap().value
+    );
+    assert_eq!(
+        altered.played_ledger.as_ref().unwrap().book_total,
+        comparison.played_ledger.as_ref().unwrap().book_total
+    );
+
+    let mut context = comparison.context.clone();
+    context.actual_branch.as_mut().unwrap().pass_probe = None;
+    let missing_after = recompute(context);
+    assert!(missing_after.played_ledger.is_some());
+    assert_eq!(missing_after.played_tempo, []);
+    let mut context = comparison.context.clone();
+    context.pass_probe = None;
+    let missing_before = recompute(context);
+    assert!(missing_before.played_ledger.is_none());
+    assert_eq!(missing_before.played_tempo, []);
+    assert!(missing_before.ledger_diff.is_some());
+    let mut context = comparison.context.clone();
+    context.pass_query_id = None;
+    let missing_provenance = recompute(context);
+    assert!(missing_provenance.played_ledger.is_none());
+    assert_eq!(missing_provenance.played_tempo, []);
+}

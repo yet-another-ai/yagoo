@@ -4,9 +4,9 @@ use serde::{Deserialize, Serialize};
 use yagoo_core::Point;
 
 use crate::{
-    compute_ledger_against_with_tempo, BoardSnapshot, CandidateSnapshot, ColorToken,
-    EngineAnalysis, GainLossLedger, GroupParams, GroupSnapshot, GroupStatus, PositionSnapshot,
-    PvEndSnapshot,
+    compute_ledger_against_with_tempo, compute_played_ledger_with_tempo, BoardSnapshot,
+    CandidateSnapshot, ColorToken, EngineAnalysis, GainLossLedger, GroupParams, GroupSnapshot,
+    GroupStatus, PositionSnapshot, PvEndSnapshot,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -98,6 +98,22 @@ pub struct ComparisonGroupTempo {
     pub preferred_g_minus: f64,
 }
 
+/// Before/after pass sensitivity on the same original group stones.
+/// This is separate from comparing the actual and preferred alternatives.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlayedGroupTempo {
+    pub group_id: String,
+    pub color: ColorToken,
+    pub stones: Vec<String>,
+    pub before_status: GroupStatus,
+    pub after_status: GroupStatus,
+    pub before_g_plus: f64,
+    pub before_g_minus: f64,
+    pub after_g_plus: f64,
+    pub after_g_minus: f64,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MoveComparison {
@@ -118,6 +134,11 @@ pub struct MoveComparison {
     /// Actual minus preferred ownership, still Black-positive.
     pub ownership_delta: Vec<f64>,
     pub ledger_diff: Option<GainLossLedger>,
+    /// Played move versus the explicit pass probe at root p-1, not move loss.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub played_ledger: Option<GainLossLedger>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub played_tempo: Vec<PlayedGroupTempo>,
     pub context: ComparisonContext,
     pub evidence: ComparisonEvidence,
     /// Per-color statuses from explicit branch/root pass pairs, when available.
@@ -172,8 +193,15 @@ pub fn compute_move_comparison(
         vec![],
     );
     root.groups.clone_from(&context.groups);
+    root.pass_probe.clone_from(&context.pass_probe);
     let group_tempo = compute_branch_tempo(&context);
     let ledger_diff = compute_ledger_against_with_tempo(&root, actual, preferred, &group_tempo);
+    let played_tempo = compute_played_tempo(&context);
+    let played_ledger = context
+        .pass_query_id
+        .as_ref()
+        .filter(|id| !id.is_empty())
+        .and_then(|_| compute_played_ledger_with_tempo(&root, actual, &played_tempo));
     let sign = if context.mover == ColorToken::B {
         1.0
     } else {
@@ -214,6 +242,8 @@ pub fn compute_move_comparison(
             .map(|(actual, preferred)| actual - preferred)
             .collect(),
         ledger_diff,
+        played_ledger,
+        played_tempo,
         group_tempo,
         context,
         evidence,
@@ -221,6 +251,58 @@ pub fn compute_move_comparison(
     };
     comparison.sacrifice_assessment = Some(crate::compute_sacrifices(&comparison));
     Some(comparison)
+}
+
+fn compute_played_tempo(context: &ComparisonContext) -> Vec<PlayedGroupTempo> {
+    let Some(after) = &context.actual_branch else {
+        return vec![];
+    };
+    if after.board.size != context.board.size
+        || after.to_play == context.mover
+        || context.pass_query_id.as_ref().is_none_or(String::is_empty)
+        || after.root_query_id.is_empty()
+        || after.pass_query_id.as_ref().is_none_or(String::is_empty)
+    {
+        return vec![];
+    }
+    let mut result = Vec::new();
+    for group in &context.groups {
+        for (color, stones) in [
+            (ColorToken::B, &group.members.black_stones),
+            (ColorToken::W, &group.members.white_stones),
+        ] {
+            if stones.is_empty() {
+                continue;
+            }
+            let Some((before_status, before_g_plus, before_g_minus)) = position_tempo(
+                context.board.size,
+                context.mover,
+                &context.root,
+                context.pass_probe.as_ref(),
+                color,
+                stones,
+            ) else {
+                continue;
+            };
+            let Some((after_status, after_g_plus, after_g_minus)) =
+                branch_tempo(after, color, stones)
+            else {
+                continue;
+            };
+            result.push(PlayedGroupTempo {
+                group_id: group.group_id.clone(),
+                color,
+                stones: stones.clone(),
+                before_status,
+                after_status,
+                before_g_plus,
+                before_g_minus,
+                after_g_plus,
+                after_g_minus,
+            });
+        }
+    }
+    result
 }
 
 fn compute_branch_tempo(context: &ComparisonContext) -> Vec<ComparisonGroupTempo> {
@@ -268,9 +350,29 @@ fn branch_tempo(
     color: ColorToken,
     stones: &[String],
 ) -> Option<(GroupStatus, f64, f64)> {
-    let size = branch.board.size;
-    let root = branch.root.ownership.as_deref()?;
-    let pass = branch.pass_probe.as_ref()?.ownership.as_deref()?;
+    position_tempo(
+        branch.board.size,
+        branch.to_play,
+        &branch.root,
+        branch.pass_probe.as_ref(),
+        color,
+        stones,
+    )
+}
+
+fn position_tempo(
+    size: u8,
+    to_play: ColorToken,
+    root: &EngineAnalysis,
+    pass: Option<&EngineAnalysis>,
+    color: ColorToken,
+    stones: &[String],
+) -> Option<(GroupStatus, f64, f64)> {
+    if stones.is_empty() {
+        return None;
+    }
+    let root = root.ownership.as_deref()?;
+    let pass = pass?.ownership.as_deref()?;
     if !valid_map(root, size) || !valid_map(pass, size) {
         return None;
     }
@@ -296,7 +398,7 @@ fn branch_tempo(
     let sign = if color == ColorToken::B { 1.0 } else { -1.0 };
     let root_strength = sign * indices.iter().map(|&index| root[index]).sum::<f64>() / count;
     let pass_strength = sign * indices.iter().map(|&index| pass[index]).sum::<f64>() / count;
-    let (plus, minus) = if color == branch.to_play {
+    let (plus, minus) = if color == to_play {
         (root_strength, pass_strength)
     } else {
         (pass_strength, root_strength)

@@ -58,6 +58,87 @@ fn pass_ledger(snapshot: &PositionSnapshot) -> GainLossLedger {
     compute_ledger(snapshot, &snapshot.candidates[0], LedgerBaseline::Pass).unwrap()
 }
 
+#[test]
+fn constructed_played_pass_aliases_differing_estimates_for_both_colors() {
+    for color in [ColorToken::B, ColorToken::W] {
+        let mut snapshot = constructed_snapshot();
+        snapshot.to_play = color;
+        let mut actual = snapshot.candidates[0].clone();
+        actual.move_ = "pass".into();
+        let pass = snapshot.pass_probe.as_ref().unwrap();
+        assert_ne!(actual.score_lead, pass.score_lead);
+        assert_ne!(actual.ownership, pass.ownership);
+
+        let ledger = compute_played_ledger_with_tempo(&snapshot, &actual, &[]).unwrap();
+        assert_eq!(
+            ledger,
+            compute_ledger(&snapshot, &actual, LedgerBaseline::Pass).unwrap(),
+            "ordinary and played pass ledgers share the same alias"
+        );
+        assert_eq!(ledger.value, 0.0);
+        assert_eq!(ledger.book_total, 0.0);
+        assert_eq!(ledger.inconsistency, Some(LedgerInconsistency::ZeroBook));
+        assert_eq!(ledger.scaling, LedgerScaling::Proportions);
+        assert!(ledger.ledger.iter().all(|line| {
+            line.book_value == 0.0 && line.proportion == 0.0 && line.points.is_none()
+        }));
+        let mut preferred = snapshot.candidates[0].clone();
+        preferred.score_lead = Some(9.0);
+        let against_ai = compute_ledger_against(&snapshot, &actual, &preferred).unwrap();
+        close(against_ai.value, color_sign(color) * (1.8 - 9.0));
+    }
+}
+
+#[test]
+fn constructed_played_pass_still_requires_valid_recorded_evidence() {
+    let mut snapshot = constructed_snapshot();
+    let mut actual = snapshot.candidates[0].clone();
+    actual.move_ = "PASS".into();
+    assert_eq!(
+        compute_played_ledger_with_tempo(&snapshot, &actual, &[])
+            .unwrap()
+            .value,
+        0.0
+    );
+    snapshot.pass_probe.as_mut().unwrap().ownership = Some(vec![0.1]);
+    assert!(compute_played_ledger_with_tempo(&snapshot, &actual, &[]).is_none());
+    snapshot.pass_probe = constructed_snapshot().pass_probe;
+    snapshot.pass_probe.as_mut().unwrap().score_lead = Some(f64::NAN);
+    assert!(compute_played_ledger_with_tempo(&snapshot, &actual, &[]).is_none());
+    snapshot.pass_probe = None;
+    assert!(compute_played_ledger_with_tempo(&snapshot, &actual, &[]).is_none());
+}
+
+#[test]
+fn constructed_played_status_change_prioritizes_a_group_without_ownership_swing() {
+    let mut snapshot = constructed_snapshot();
+    snapshot.candidates[0].ownership = snapshot.pass_probe.as_ref().unwrap().ownership.clone();
+    let tempo = PlayedGroupTempo {
+        group_id: "A3".into(),
+        color: ColorToken::B,
+        stones: vec!["A3".into()],
+        before_status: GroupStatus::Weak,
+        after_status: GroupStatus::Settled,
+        before_g_plus: 0.5,
+        before_g_minus: 0.1,
+        after_g_plus: 0.9,
+        after_g_minus: 0.8,
+    };
+    let ledger = compute_played_ledger_with_tempo(
+        &snapshot,
+        &snapshot.candidates[0],
+        std::slice::from_ref(&tempo),
+    )
+    .unwrap();
+    let group = &ledger.ledger[0];
+    assert_eq!(group.id.as_deref(), Some("A3"));
+    assert_eq!(group.tempo, Some(LedgerTempo::RootBranchPassProbes));
+    assert_eq!(group.played_tempo_changes, vec![tempo]);
+    assert_eq!(group.tempo_changes, []);
+    assert_eq!(group.book_value, 0.0);
+    assert_eq!(group.points, None, "zero ownership book remains unpriced");
+}
+
 fn close(actual: f64, expected: f64) {
     assert!((actual - expected).abs() < 1e-10, "{actual} != {expected}");
 }

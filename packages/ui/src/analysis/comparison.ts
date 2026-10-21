@@ -1,6 +1,7 @@
 import type { MoveComparison } from "./modules";
 import type { BoardMap, Marker, Sign } from "../types";
 import { emptyBoardMap, parseGtpVertex } from "./coords";
+import { validPlayedEvidence } from "./playedLedger";
 
 /** Reject a mismatched/partial comparison before placing it on a board. */
 export function isAlignedComparison(
@@ -39,7 +40,8 @@ export function isAlignedComparison(
       && comparison.ledgerDiff.mover === comparison.mover
       && comparison.ledgerDiff.move === comparison.actualMove
       && comparison.ledgerDiff.referenceMove === comparison.aiMove))
-    && !(evidence.rootHash && evidence.actualRootHash && evidence.rootHash !== evidence.actualRootHash);
+    && !(evidence.rootHash && evidence.actualRootHash && evidence.rootHash !== evidence.actualRootHash)
+    && validPlayedEvidence(comparison);
 }
 
 export function comparisonBoard(comparison: MoveComparison): BoardMap<Sign> {

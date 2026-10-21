@@ -37,6 +37,21 @@ original research report.
   and ownership after inverse transforms. Async batches of up to four reserve
   distinct unexpanded edges, apply temporary virtual losses, preserve row order
   and honor the remaining visit budget. Failure discards the query's tree.
+- Root-only `allowMoves` supports the comparison pipeline's forced actual move
+  and bounded saving probes. Exactly one record must name the current player,
+  a nonempty move list and `untilDepth: 1`. Legal allowed moves are normalized
+  before root search selection, after inverse symmetry; descendants remain
+  unrestricted. Occupied, ko and superko moves cannot bypass legality. An empty
+  legal set, terminal root, other depths, multiple records, `avoidMoves` and
+  `focusMoves` return explicit errors. This is a bounded subset of the native
+  [analysis protocol](https://github.com/lightvector/KataGo/blob/master/docs/Analysis_Engine.md).
+- Every search response carries a `rootInfo.thisHash` prefixed
+  `yagoo-browser-root-v1:`. Its SHA-256 input includes normalized setup and full
+  colored move/pass history, current board/player/ko/pass state, rules and komi.
+  Query IDs, visit budgets, restrictions and output options are excluded, so
+  unrestricted, forced, partial and final responses can establish the same
+  historical root. This browser identity is not a native KataGo hash and does
+  not assert agreement between models or searches.
 - Chinese/Chinese-OGS two-pass endings use exact area scoring without a neural
   call or further continuations. Thirty cases match upstream C++ BoardHistory,
   including handicap compensation, draws and a Benson-alive enclosing chain.
@@ -267,6 +282,12 @@ semantics and should not be presented as calibrated teaching conclusions.
   and a mixed batch containing scored terminal and neural leaves. Terminal
   roots bypass all inference. These deterministic test evaluators are not models
   and are not used by the browser runtime.
+- Additional model-free tests exercise restricted root expansion, extreme
+  logits, symmetry/batching, unrestricted descendants, pass/ko legality and
+  root identity. A deliberately synthetic ownership fixture runs actual-move
+  and saving-probe comparison queries through `SearchEngine`. These checks
+  establish query execution and provenance; real-model browser comparison
+  quality and positive sacrifice calibration remain unverified.
 - The real GPU batch smoke also completes scan and deep analysis of a Chinese
   two-pass ending: exact black score `-7.5`, zero continuation policy, no candidates,
   and no pass probe after the game ends. Japanese encore still produces a visible

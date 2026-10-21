@@ -93,8 +93,11 @@ CLI `--no-comparison` preserves old scripted replay, and
 These are optional additions to the v1 configuration and snapshot schema.
 
 Core comparison query failures produce a warning and leave the field absent.
-This preserves browser/WASM analysis when its experimental search cannot
-handle a restricted move query. Optional branch/PV probe failures retain the
+The experimental browser/WASM engine supports the current-player, depth-one
+`allowMoves` form used here, including moves ownership and a stable browser
+root identity. Other restriction forms and existing unsupported rule phases
+still fail explicitly; real-model comparison quality remains unverified.
+Optional branch/PV probe failures retain the
 same-root comparison and disclose missing evidence. A completed snapshot with
 no comparison clears older UI comparison data. No threshold or runtime is a CI
 performance gate.

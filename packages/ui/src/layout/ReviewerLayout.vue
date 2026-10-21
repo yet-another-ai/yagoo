@@ -408,6 +408,7 @@ function selectDisplayedGroup(id: string) {
 
 function citeCommentary(target: CommentaryTarget) {
   if (suspendAnalysis.value) return;
+  clearCommentaryCitation();
   if (target.intersections?.length) {
     ledgerPreview.value = target.intersections
       .map((coordinate) => parseGtpVertex(coordinate, boardSize.value))

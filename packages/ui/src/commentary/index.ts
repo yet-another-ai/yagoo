@@ -7,3 +7,5 @@ export { CommentarySession, verifyCommentarySelection } from "./session";
 export type {
   CommentaryProvider, CommentaryRequest, CommentarySessionState,
 } from "./session";
+export { createHttpCommentaryProvider } from "./httpProvider";
+export type { HttpCommentaryConfig, HttpCommentaryProtocol } from "./httpProvider";

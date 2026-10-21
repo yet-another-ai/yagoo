@@ -146,8 +146,11 @@ export function buildReviewReport(
     },
     opening: options.sgf ? matchSgfOpening(options.sgf) : state.opening,
     moves,
-    unassessedPlies: [...new Set(state.deepPlies)]
-      .filter((p) => !coverage.comparedMovePlies.includes(p)).sort((a, b) => a - b),
+    // Range/all deepening targets do not establish scan swings; only emitted
+    // selection reasons identify leads, and ply 0 is not a played move.
+    unassessedPlies: [...new Set(state.deepReasons.map((reason) => reason.ply))]
+      .filter((p) => Number.isSafeInteger(p) && p > 0 && p <= coverage.moveCount &&
+        !coverage.comparedMovePlies.includes(p)).sort((a, b) => a - b),
     warnings: [...new Set(warnings)],
   };
 }

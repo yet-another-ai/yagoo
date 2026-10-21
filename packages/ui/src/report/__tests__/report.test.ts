@@ -57,6 +57,47 @@ describe("deterministic review from genuine full-history fixtures", () => {
     expect(old.unassessedPlies.length).toBeGreaterThan(0);
   });
 
+  it.each(["range", "all"])("does not present %s deepening targets as scan leads", mode => {
+    const partial = reviewPipelineEvents([
+      ...evidenceEvents(),
+      { type: "deepPliesSelected", v: 1, mode, plies: [0, 43, 47, 60], reasons: [] },
+    ]);
+    expect(partial.unassessedPlies).toEqual([]);
+    expect(partial.status).toBe("partial");
+    expect(partial.coverage.comparedMovePlies).toEqual([43, 44, 50, 60, 96]);
+    expect(partial.coverage.missingComparisonPlies).toContain(47);
+
+    // Controlled root-only complete game: ply 0 is not a played-move scan lead.
+    const complete = reviewPipelineEvents([
+      { ...start, moveCount: 0, positionCount: 1 },
+      { type: "deepPliesSelected", v: 1, mode, plies: [0], reasons: [] },
+      { type: "positionCompleted", v: 1, phase: "deep", snapshot: {
+        schemaVersion: 1, ply: 0, toPlay: "B", ownershipConvention: "black_positive",
+        board: { size: 19, black: [], white: [] }, chains: [], root: { visits: 100 },
+      } },
+      { type: "gameCompleted", v: 1 },
+    ]);
+    expect(complete.status).toBe("complete");
+    expect(complete.unassessedPlies).toEqual([]);
+    expect(complete.coverage.missingPositionPlies).toEqual([]);
+    expect(complete.coverage.missingComparisonPlies).toEqual([]);
+  });
+
+  it("preserves genuine scan reasons until the played moves have validated comparisons", () => {
+    const recorded = parseNdjson(oldSample);
+    expect(reviewPipelineEvents(recorded).unassessedPlies).toEqual([43, 44, 47, 49, 50, 60, 79, 95]);
+    const withComparisons = reviewPipelineEvents([
+      ...recorded,
+      ...snapshots.map((snapshot): PipelineEvent => ({
+        type: "positionCompleted", v: 1, phase: "deep", snapshot,
+      })),
+    ]);
+    expect(withComparisons.unassessedPlies).toEqual([47, 49, 79, 95]);
+    expect(withComparisons.status).toBe("partial");
+    expect(withComparisons.coverage.comparedMovePlies).toEqual([43, 44, 50, 60, 96]);
+    expect(withComparisons.coverage.missingComparisonPlies).toContain(47);
+  });
+
   it("rejects p-position context, conflicting histories, malformed loss and partial replacements", () => {
     const comparison = structuredClone(snapshots.find((s) => s.ply === 60)!.comparison!);
     expect(isReportComparison(comparison, 60)).toBe(true);

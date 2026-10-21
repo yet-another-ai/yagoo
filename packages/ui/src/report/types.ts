@@ -40,12 +40,22 @@ export interface ReviewRecommendation {
   factIds: string[];
 }
 
+/** Deterministic report clauses, independent of the optional three-sentence notes. */
+export interface ReviewEvidenceSection {
+  id: "group_tradeoffs" | "tempo_changes" | "sacrifices";
+  title: string;
+  facts: CommentaryFact[];
+  omittedFacts: number;
+  emptyMessage?: string;
+}
+
 export interface ReviewReportMove extends ReviewMoveReference {
   rank: number;
   comparison: MoveComparison;
   categories: ReviewCategory[];
   facts: CommentaryFact[];
   explanation: GroundedCommentary;
+  evidenceSections: ReviewEvidenceSection[];
   recommendations: ReviewRecommendation[];
   missingEvidence: string[];
 }

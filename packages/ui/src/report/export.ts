@@ -50,11 +50,25 @@ export function exportReviewMarkdown(report: ReviewReportDocument): string {
       `Root ${integer(row.rootPly)}; preferred ${m(row.aiMove)}; score loss ${reportNumber(row.scoreLoss)} points; winrate loss ${reportNumber(row.winrateLoss * 100)} percentage points.`,
       "", `Categories: ${row.categories.map(m).join(", ") || "none"}.`, "",
       m(row.explanation.text), "");
+    for (const section of row.evidenceSections) {
+      lines.push(`#### ${m(section.title)}`, "");
+      if (section.emptyMessage) lines.push(m(section.emptyMessage), "");
+      for (const fact of section.facts) {
+        lines.push(`- ${m(fact.variants[0] ?? "")}`);
+        for (const evidence of fact.evidence) {
+          lines.push(`  - ${m(evidence.path)} = ${m(JSON.stringify(evidence.value) ?? "null")}`);
+        }
+      }
+      if (section.omittedFacts > 0) {
+        lines.push("", m(`${integer(section.omittedFacts)} additional ${section.omittedFacts === 1 ? "fact is" : "facts are"} available in Source facts below.`));
+      }
+      lines.push("");
+    }
     for (const recommendation of row.recommendations) {
       lines.push(`- ${m(recommendation.text)} Facts: ${recommendation.factIds.map(m).join(", ")}.`);
     }
     lines.push(...row.missingEvidence.map((line) => `- ${m(line)}`));
-    lines.push("", "Evidence:", "");
+    lines.push("", "Source facts:", "");
     for (const fact of row.facts) {
       lines.push(`- ${m(fact.id)}: ${m(fact.variants[0] ?? "")}`);
       for (const evidence of fact.evidence) {
@@ -78,6 +92,13 @@ export function exportReviewHtml(report: ReviewReportDocument): string {
 <p>Root ${integer(row.rootPly)}; preferred ${h(row.aiMove)}; score loss ${reportNumber(row.scoreLoss)} points; winrate loss ${reportNumber(row.winrateLoss * 100)} percentage points.</p>
 <p>Categories: ${h(row.categories.join(", ") || "none")}.</p>
 <p>${h(row.explanation.text)}</p>
+${row.evidenceSections.map((section) => `<section class="report-evidence-section">
+<h3>${h(section.title)}</h3>
+${section.emptyMessage ? `<p>${h(section.emptyMessage)}</p>` : ""}
+${section.facts.length ? `<ul>${section.facts.map((fact) => `<li><p>${h(fact.variants[0] ?? "")}</p>
+<details><summary>Evidence</summary>${list(fact.evidence.map((evidence) => `${evidence.path} = ${JSON.stringify(evidence.value) ?? "null"}`))}</details></li>`).join("")}</ul>` : ""}
+${section.omittedFacts > 0 ? `<p>${integer(section.omittedFacts)} additional ${section.omittedFacts === 1 ? "fact is" : "facts are"} available in Source facts below.</p>` : ""}
+</section>`).join("")}
 ${list(row.recommendations.map((r) => `${r.text} Facts: ${r.factIds.join(", ")}.`))}
 ${list(row.missingEvidence)}
 <details><summary>Source facts</summary>${row.facts.map((f) =>

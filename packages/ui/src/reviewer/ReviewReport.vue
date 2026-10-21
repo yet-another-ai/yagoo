@@ -99,6 +99,24 @@ const showPlies = (values: number[]) => values.join(", ") || "none";
             <span>Winrate loss {{ reportNumber(row.winrateLoss * 100) }} pp</span>
           </button>
           <p>{{ row.explanation.text }}</p>
+          <section v-for="section in row.evidenceSections" :key="section.id"
+            class="yagoo-report__evidence-section" :data-report-evidence="section.id">
+            <h4>{{ section.title }}</h4>
+            <p v-if="section.emptyMessage">{{ section.emptyMessage }}</p>
+            <ul v-if="section.facts.length" class="yagoo-report__evidence-facts">
+              <li v-for="fact in section.facts" :key="fact.id" :data-report-fact="fact.id">
+                <p>{{ fact.variants[0] }}</p>
+                <details>
+                  <summary>Evidence</summary>
+                  <code v-for="evidence in fact.evidence" :key="evidence.path">{{ evidence.path }} = {{ JSON.stringify(evidence.value) }}</code>
+                </details>
+              </li>
+            </ul>
+            <p v-if="section.omittedFacts > 0" class="yagoo-report__omitted">
+              {{ section.omittedFacts }} additional {{ section.omittedFacts === 1 ? "fact is" : "facts are" }}
+              available in Source facts and comparison limits below.
+            </p>
+          </section>
           <p class="yagoo-report__categories">{{ row.categories.map((c) => c.replaceAll("_", " ")).join(" · ") }}</p>
           <ul><li v-for="recommendation in row.recommendations" :key="recommendation.text">{{ recommendation.text }}</li></ul>
           <ul><li v-for="missing in row.missingEvidence" :key="missing">{{ missing }}</li></ul>
@@ -133,6 +151,12 @@ const showPlies = (values: number[]) => values.join(", ") || "none";
 .yagoo-report__row{display:grid;grid-template-columns:1fr 1fr;gap:.2rem .8rem;width:100%;text-align:left;font:inherit}
 .yagoo-report__row--current{outline:2px solid var(--yagoo-accent,#0082f0)}
 .yagoo-report__categories{font-size:.8rem;color:var(--yagoo-muted,#5c5c66)}
+.yagoo-report__evidence-section{margin:.85rem 0}
+.yagoo-report__evidence-section h4{margin:0 0 .35rem;font-size:.95rem}
+.yagoo-report__evidence-facts{margin:0;padding-left:1.2rem}
+.yagoo-report__evidence-facts li{margin:.45rem 0}
+.yagoo-report__evidence-facts p{margin:.2rem 0}
+.yagoo-report__evidence-facts details,.yagoo-report__omitted{font-size:.8rem;color:var(--yagoo-muted,#5c5c66)}
 .yagoo-report__metadata{display:grid;grid-template-columns:auto 1fr;gap:.2rem 1rem}
 .yagoo-report dt{font-weight:600}.yagoo-report dd{margin:0}
 .yagoo-report code{display:block;overflow-wrap:anywhere;white-space:pre-wrap;font-size:.75rem}

@@ -2,7 +2,9 @@ import { BrowserEngine } from './client';
 import { MODEL_CATALOG, defaultCatalogEntry, formatBytes, type CatalogEntry } from './catalog';
 import { clearModelCache, listCachedModels } from './cache';
 import { artifactsCached, bundleFromLocalFiles, manifestDownloadBytes, validateManifest } from './model';
+import { SINGLE_THREAD_NOTE } from './capabilities';
 import { enableIsolation } from './isolation';
+import { configuredManifestUrl } from './manifest-url';
 import './style.css';
 
 const engine = new BrowserEngine();
@@ -90,29 +92,20 @@ function applyCatalogSelection(entry: CatalogEntry): void {
   void refreshCacheStatus(undefined, entry.preferFp16 === true);
 }
 
-/** Probe manifest metadata only — never downloads weight tensors. */
-async function probeManifestSizes(manifestUrl: string, preferFp16: boolean): Promise<void> {
-  try {
-    const response = await fetch(new URL(manifestUrl, location.href), { method: 'GET' });
-    if (!response.ok) return;
-    const manifest = validateManifest(await response.json());
-    const bytes = manifestDownloadBytes(manifest, preferFp16);
-    modelSize.textContent = `${formatBytes(bytes)} (from manifest${preferFp16 && manifest.variants.fp16 ? ', prefer fp16' : ', fp32'})`;
-    await refreshCacheStatus(manifest, preferFp16);
-  } catch {
-    /* leave approximate catalog size; Load will surface real errors */
-  }
-}
-
 fillCatalog();
-// Page load: catalog + cache listing only. No model weight download.
+const remoteManifest = configuredManifestUrl();
+const manifestField = document.querySelector<HTMLElement>('#manifest-field');
+if (manifestField) manifestField.hidden = !remoteManifest;
+if (!remoteManifest) input('manifest').value = '';
+const isolationHint = document.querySelector<HTMLElement>('#isolation-hint');
+if (isolationHint && !crossOriginIsolated) isolationHint.textContent = SINGLE_THREAD_NOTE;
+// Page load: catalog + cache listing only. No manifest or weight download.
 void refreshCacheStatus();
 
 modelSelect.addEventListener('change', () => {
   const entry = MODEL_CATALOG.find(item => item.id === modelSelect.value) ?? defaultCatalogEntry();
   localRevoke?.(); localRevoke = undefined;
   applyCatalogSelection(entry);
-  if (entry.manifestUrl && !entry.disabled) void probeManifestSizes(entry.manifestUrl, entry.preferFp16 === true);
 });
 
 engine.onMessage = message => {
@@ -144,6 +137,12 @@ engine.onMessage = message => {
 
 async function loadModel(): Promise<void> {
   if (loadingModel || selected.disabled) return;
+  const manifestUrl = input('manifest').value.trim();
+  if (!manifestUrl) {
+    setModelUi('idle', 'No model loaded');
+    status.textContent = 'No remote manifest is configured. Load a local model bundle (manifest.json, the .onnx weights, and warmup.json).';
+    return;
+  }
   const request = ++lifecycle;
   loadingModel = true;
   engine.dispose();
@@ -155,7 +154,7 @@ async function loadModel(): Promise<void> {
   try {
     const storage = await navigator.storage?.persist?.().catch(() => false);
     if (request !== lifecycle) return;
-    const result = await engine.initialize(input('manifest').value, {
+    const result = await engine.initialize(manifestUrl, {
       forceWasm: input('wasm').checked,
       wasmThreads: Number(input('threads').value),
       retainRootActivations: input('activations').checked,

@@ -128,6 +128,7 @@ export default defineConfig({
         { find: "jschardet", replacement: emptyShim },
       ],
     },
+    worker: { format: "es" },
     ssr: {
       noExternal: ["@yagoo/ui", "@sabaki/sgf", "@sabaki/go-board", "@sabaki/immutable-gametree"],
     },

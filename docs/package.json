@@ -8,6 +8,7 @@
     "preview": "vitepress preview"
   },
   "dependencies": {
+    "@yagoo/browser-engine": "workspace:*",
     "@yagoo/ui": "workspace:*"
   },
   "devDependencies": {

@@ -1,4 +1,7 @@
 export const MAX_WASM_THREADS = 8;
+/** Shown beside Enable threads. Not an analysis error. */
+export const SINGLE_THREAD_NOTE =
+  'Wasm is running on one thread: cross-origin isolation and shared WebAssembly memory are required for multiple threads.';
 export type ThreadPlan = { ortThreads: number; searchThreads: 1; reason?: string };
 
 export function threadPlan(options: {
@@ -12,7 +15,7 @@ export function threadPlan(options: {
   if (backend === 'webgpu') return { ortThreads: 1, searchThreads: 1 };
   if (!isolated || !sharedMemory) return {
     ortThreads: 1, searchThreads: 1,
-    reason: 'Wasm is running on one thread: cross-origin isolation and shared WebAssembly memory are required for multiple threads.',
+    reason: SINGLE_THREAD_NOTE,
   };
   const cores = Number.isFinite(options.hardwareConcurrency) ? Math.max(1, Math.floor(options.hardwareConcurrency)) : 2;
   // ORT counts its calling engine worker as one of these threads. Rust MCTS runs

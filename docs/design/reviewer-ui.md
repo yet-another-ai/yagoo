@@ -1,6 +1,6 @@
 # Reviewer UI
 
-The `/app/` page is the game-review workspace from [issue #30](https://github.com/yet-another-ai/yagoo/issues/30). It stays a client-only VitePress page (`layout: page`, no sidebar) and renders `@yagoo/ui`. The experimental browser engine keeps its own page; its model controls sit in an island the reviewer can host later.
+The `/app/` page is the game-review workspace from [issue #30](https://github.com/yet-another-ai/yagoo/issues/30). It stays a client-only VitePress page (`layout: page`, no sidebar) and renders `@yagoo/ui`. `/demo/` embeds the same reviewer. The experimental browser engine loads from the **Engine** panel on both pages. There is no separate engine UI; `/engine/` redirects to `/demo/`.
 
 The event-stream reducer (`AnalysisState`) is the only source of analysis. Panels read it. They do not estimate winrate, groups, ledgers, or commentary on the client.
 
@@ -63,7 +63,7 @@ Keyboard: Left / Right move through the game, or through the try branch when one
 - Key-move previous / next, from `deepPliesSelected` only.
 - Try mode: click an empty point to grow a local branch and walk it in the tree. The bottom bar's side to move and capture counts follow that branch. Analysis overlays hide off the main line. No engine call.
 - Report view: lists those same key moves and the deltas already on `deepReasons`, across the full width of the page.
-- Engine menu: NDJSON is usable. Live native and the browser engine stay disabled until their adapters connect.
+- Engine menu: NDJSON is the default. The browser engine stays disabled until a local bundle (or a configured manifest URL) is staged, then **Use browser engine** runs it. Live native stays disabled.
 
 ## Stubs and the issue that fills them
 
@@ -77,8 +77,7 @@ Keyboard: Left / Right move through the game, or through the try branch when one
 | Try-mode AI suggestions | Always, for now. Local moves still work. | [#26](https://github.com/yet-another-ai/yagoo/issues/26) |
 | Report prose and export | `AnalysisState.report == null` | [#29](https://github.com/yet-another-ai/yagoo/issues/29) |
 | Live native connect | `isLiveNativeAvailable()` is false | [#19](https://github.com/yet-another-ai/yagoo/issues/19) |
-| Browser engine connect | No `BrowserEngineAdapter` | [#20](https://github.com/yet-another-ai/yagoo/issues/20) |
-| Model island (catalog, cancel, OPFS clear, local files) | Default slot content | [#22](https://github.com/yet-another-ai/yagoo/pull/22) |
+| Live catalog download, cancel, OPFS clear | Package harness only (`packages/browser-engine`). The published panel loads local files and does not host weights. | [#22](https://github.com/yet-another-ai/yagoo/pull/22) |
 
 An empty array is different from `null` where the type allows it. `sacrifices: []` means the pipeline looked and found none. `null` means it has not spoken.
 
@@ -102,9 +101,9 @@ Defined in `packages/ui/src/analysis/modules.ts` and stored on `PlyAnalysis` / `
 
 1. **NDJSON** — SGF and event file, same as drop on the board.
 2. **Live native** — button disabled, points at `yagoo analyze --serve` (#19).
-3. **Browser engine** — button disabled (#20). Inside it, `[data-slot="model-island"]` is where the experimental page’s model island mounts.
+3. **Browser engine** — experimental. `[data-slot="model-island"]` is the empty state: this site does not host weights, **Load local model**, and the single-thread hint beside **Enable threads**. **Use browser engine** stays disabled until a bundle is verified. Recorded analysis stays on the board until that button runs `BrowserEngineAdapter`.
 
-The experimental page (`packages/browser-engine/index.html`) is the #22 model island: catalog, size, **Load model**, cancel, OPFS clear, and local files, in `#model-island` (`data-slot="model-island"`). Load is explicit. The page does not fetch weights on startup. The reviewer keeps the same slot for #20 and does not download weights itself. The element ids the engine demo binds (`#load`, `#manifest`, `#model-select`, `#cancel-download`, `#scan`, `#status`, …) stay put.
+The package page (`packages/browser-engine/index.html`) remains the local harness: catalog, size, **Load model**, cancel, OPFS clear, and local files, in `#model-island`. It does not fetch a manifest on startup. The published site does not copy that page. Its element ids (`#load`, `#manifest`, `#model-select`, `#cancel-download`, `#scan`, `#status`, …) stay on the harness.
 
 ## Tests
 

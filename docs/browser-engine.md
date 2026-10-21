@@ -23,13 +23,15 @@ original research report.
 - `AnalysisEngine` keeps the existing analysis protocol and NDJSON pipeline,
   usable by native `AnalysisClient` and browser Rust/Wasm search. Game history
   is retained when building queries, including setup and pass moves.
-- The browser package has a standalone load/scan/deepen/stop/download page with a
-  **jet-style model island**: choose a catalog entry (b18 SWA default; others
-  listed as unavailable when unsupported), see approximate/exact size, **Load
-  model** only on explicit click (never on page load / never in CI), progress in
-  MB with cancel, OPFS content-addressed cache with clear, and **Load local
-  files** for an exported `manifest.json` + `.onnx` + `warmup.json`. Bytes are
-  SHA-256 verified before use. HTTP Range resume remains open ([#14](https://github.com/yet-another-ai/yagoo/issues/14)).
+- The published demo and the `/app/` reviewer are the same Sabaki-style UI.
+  **Engine** opens a local-model island: the site does not host weights, nothing
+  is fetched on load, and **Load local model** stages an exported `manifest.json`
+  + `.onnx` + `warmup.json` after SHA-256 checks. Recorded sample analysis stays
+  on the board until **Use browser engine**. A remote manifest is used only when
+  `VITE_YAGOO_MANIFEST_URL` is set, and only after **Load configured manifest**.
+  The package still has a local dev page (`packages/browser-engine`) with catalog,
+  progress, cancel, and OPFS clear for `mise run browser:check`. HTTP Range
+  resume remains open ([#14](https://github.com/yet-another-ai/yagoo/issues/14)).
 - Experimental PUCT/FPU search has a bounded cache, partial events, candidates,
   PVs and tree ownership. Optional eight-way root symmetry averages probabilities
   and ownership after inverse transforms. Async batches of up to four reserve
@@ -71,8 +73,9 @@ worker; it does not run parallel CPU tree traversals. This avoids oversubscribin
 the ORT pool while allowing actual multi-row inference.
 
 Multiple ORT threads require cross-origin isolation, SharedArrayBuffer, and
-shared WebAssembly memory. Without them, the UI explains its single-thread
-fallback. A failed backend initialization creates a fresh worker for fallback;
+shared WebAssembly memory. Without them, a hint sits next to **Enable threads**.
+That hint is not an analysis error, and a missing hosted manifest does not walk
+through WebGPU and Wasm as a chain of 404s. A failed backend initialization creates a fresh worker for fallback;
 stop terminates the engine and its child workers, including during initialization.
 
 GPU startup first tries fp16 when supported, then retries fp32 in a fresh worker
@@ -80,12 +83,14 @@ if validation fails, before falling back to Wasm. Nonfinite outputs are rejected
 on every inference. Warmup probability/ownership/lead checks keep the same
 tolerances on retries; a failed fp16 warmup is never labeled as validated fp16.
 
-Vite copies the installed ORT `.wasm` and `.mjs` worker assets into `ort/`, and
-bundles the Rust Wasm URL. Local dev and preview default to `/yagoo-engine/`.
-Override that with `YAGOO_BASE`, an absolute path with a trailing slash.
-`mise run pages:build` sets `YAGOO_BASE=/yagoo/engine/` and copies the bundle
-into the docs site. Relative paths, query strings and URL hosts are rejected at
-build time so ORT and service-worker URLs cannot silently resolve elsewhere.
+The package Vite build copies the installed ORT `.wasm` and `.mjs` worker assets
+into `ort/`, and bundles the Rust Wasm URL. Local dev and preview default to
+`/yagoo-engine/`. Override that with `YAGOO_BASE`, an absolute path with a
+trailing slash. `mise run pages:build` builds the docs site at `/yagoo/` and
+stages those ORT files under `docs/public/ort` so the demo can load them from
+`/yagoo/ort/`. It does not publish a second engine app. Relative paths, query
+strings and URL hosts are rejected at build time so ORT and service-worker URLs
+cannot silently resolve elsewhere.
 Dev and preview serve COOP `same-origin` and COEP
 `require-corp`. `public/_headers` carries the same pair for hosts that honor it.
 GitHub Pages does not. On static hosts that cannot set headers,
@@ -109,17 +114,20 @@ pnpm --filter @yagoo/browser-engine preview
 ```
 
 Open the preview URL printed by Vite, normally
-`http://localhost:4173/yagoo-engine/`. This is the runnable engine entry point;
-the existing reviewer at docs `/app/` imports downloaded NDJSON (browser live
-adapter is [#20](https://github.com/yet-another-ai/yagoo/issues/20)). Weights are
-not shipped in git and are not fetched until you click **Load model** (or stage
-local files first).
+`http://localhost:4173/yagoo-engine/`. That page is the package harness used by
+local smoke checks. The published experience is the docs reviewer: `mise run docs`
+(builds the Wasm glue and stages ORT under `docs/public/ort`),
+then **Demo** at `/yagoo/demo/` or **Reviewer** at `/yagoo/app/`. Both mount
+`BrowserEngineAdapter` through `ReviewerBrowserEngine`. Weights are not shipped
+in git. The harness does not fetch a manifest until **Load model**, and only when
+a URL is filled in or `VITE_YAGOO_MANIFEST_URL` is set. The docs pages do not
+fetch one at all until you load local files or a configured URL.
 
-The page’s `#model-island` (`data-slot="model-island"`) is the catalog, size,
-progress, cancel, OPFS clear, and local-file island. The reviewer engine menu
-exposes the same slot so that island can mount there when #20 wires the adapter
-([reviewer UI](./design/reviewer-ui.md)). Opening either surface does not fetch
-weights.
+The harness `#model-island` (`data-slot="model-island"`) is the catalog, size,
+progress, cancel, OPFS clear, and local-file island. The reviewer **Engine**
+panel is the published island ([reviewer UI](./design/reviewer-ui.md)): empty
+state, **Load local model**, and the **Enable threads** hint. Opening either
+surface does not fetch weights.
 
 `build:wasm` installs a matching wasm-bindgen CLI into the repository's ignored
 `.yagoo-data/wasm-tools` directory when needed. `WASM_BINDGEN` can select an
@@ -157,25 +165,25 @@ error. Small-net / mobile profiles are not shipped
 
 ### GitHub Pages
 
-`mise run pages:build` publishes the **static shell** (not the weights) at
-<a href="engine/" target="_blank" rel="noopener">/yagoo/engine/</a>
-(`https://yet-another-ai.github.io/yagoo/engine/`).
-The link opens the shell directly so the docs router does not treat it as a missing page.
-The docs workflow copies `packages/browser-engine/dist` to `engine/` inside the
-VitePress artifact. Model files are still absent; **Load model** does nothing
-useful until you supply a manifest. A verified public analysis host, with
-weights, is still open
+`mise run pages:build` publishes the docs site, including the reviewer demo, at
+`/yagoo/`. The browser engine is the **Engine** panel on
+[the demo](./demo/) and on [the reviewer](./app/). This site does not host
+KataGo weights. With no bundle loaded, the board shows the recorded sample
+analysis. **Load local model** verifies a bundle from disk. **Use browser engine**
+then runs scan and deepen in the page. `/yagoo/engine/` redirects to `/yagoo/demo/`.
+A verified public analysis host, with weights, is still open
 ([#17](https://github.com/yet-another-ai/yagoo/issues/17)).
 
 GitHub Pages serves `.wasm` as `application/wasm` and `.mjs` as JavaScript. It
 cannot set custom response headers or per-file MIME types, so `public/_headers`
 is ignored and the first load is **not** cross-origin isolated. ORT then uses
-one Wasm thread. **Enable threads on static hosting** registers
-`coi-serviceworker.js` with scope `/yagoo/engine/` only, then reloads once. The
-worker adds COOP `same-origin` and COEP `require-corp` to same-origin responses
-under that scope. The rest of the docs site is left alone, because isolating
-`/yagoo/` would require CORP on every docs asset. If the reload still is not
-isolated, the page keeps the single-thread fallback.
+one Wasm thread. The hint next to **Enable threads** says so; it is not shown as
+a load error. **Enable threads** registers `coi-serviceworker.js` with scope
+`/yagoo/demo/` or `/yagoo/app/`, matching the page you are on, then reloads once.
+The worker adds COOP `same-origin` and COEP `require-corp` to same-origin
+responses under that scope. The rest of the docs site is left alone, because
+isolating `/yagoo/` would require CORP on every docs asset. If the reload still
+is not isolated, the hint stays and Wasm keeps one thread.
 
 ## Root activations
 

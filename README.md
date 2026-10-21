@@ -61,7 +61,7 @@ mise run docs
 # http://localhost:5173/yagoo/
 ```
 
-The reviewer is at `/yagoo/app/` and loads its bundled SGF and NDJSON from that base. The experimental engine shell is at `/yagoo/engine/` (no model weights). GitHub Pages serves `.wasm` as `application/wasm`. It cannot set COOP/COEP or other custom headers, and it ignores `public/_headers`. Multi-thread Wasm needs those headers, so the engine page stays single-threaded until you click **Enable threads on static hosting**. That registers `coi-serviceworker.js` scoped only to `/yagoo/engine/` and reloads once. The rest of the docs site is not isolated.
+The reviewer is at `/yagoo/app/` and the same UI is embedded at `/yagoo/demo/`. Both load the bundled SGF and NDJSON from `/yagoo/app/` and keep that recorded analysis until a model is loaded. The site does not host KataGo weights. **Engine** → **Load local model** stages a local bundle; **Use browser engine** runs it in the page. `/yagoo/engine/` redirects to `/yagoo/demo/`. GitHub Pages serves `.wasm` as `application/wasm`. It cannot set COOP/COEP or other custom headers, and it ignores `public/_headers`. Multi-thread Wasm needs those headers, so the hint next to **Enable threads** stays visible until you click it. That registers `coi-serviceworker.js` scoped only to `/yagoo/demo/` or `/yagoo/app/` and reloads once. The rest of the docs site is not isolated.
 
 ## Experimental browser engine
 

@@ -1,3 +1,4 @@
+import { parsePipelineEventLine } from "../reduce";
 import type {
   AnalysisEventSource,
   AnalysisSourceHandle,
@@ -5,30 +6,24 @@ import type {
 } from "./types";
 
 export interface BrowserEngineSourceOptions {
-  /** Optional handle to a future browser engine module (PR #7 / issue #5). */
+  /** In-browser KataGo engine. Null until the reviewer has a local model staged. */
   engine?: BrowserEngineAdapter | null;
+  /** SGF the engine should analyze. Recorded fixtures stay in place until this runs. */
+  sgf?: string;
   id?: string;
   label?: string;
 }
 
-/**
- * Minimal contract for a future in-browser KataGo engine.
- * Intentionally does **not** import unmerged PR #7 code.
- *
- * TODO(#20): provide a real adapter once PR #7 / issue #5 lands on main.
- */
+/** In-browser engine that yields the same NDJSON lines as `yagoo analyze`. */
 export interface BrowserEngineAdapter {
   analyzeSgf(sgf: string): AsyncIterable<string> | ReadableStream<string>;
+  stop?: () => void;
 }
 
 /**
- * (c) Browser engine adapter seam.
- *
- * PR #7 (browser KataGo / WebGPU) was **not** merged when this page landed.
- * When it merges, wire `BrowserEngineAdapter` to emit the same NDJSON event
- * lines and pass them through `parsePipelineEventLine` → reducer.
- *
- * TODO(#20): wire browser engine after #7 merges.
+ * Browser engine source. Experimental (issue #5 / #20).
+ * Emits parsed `PipelineEvent`s. Recorded NDJSON remains the default until
+ * the reviewer starts this source.
  */
 export function createBrowserEngineSource(
   options: BrowserEngineSourceOptions = {},
@@ -36,13 +31,12 @@ export function createBrowserEngineSource(
   const engine = options.engine ?? null;
   return {
     id: options.id ?? "browser-engine",
-    label: options.label ?? "Browser engine (not available yet)",
+    label: options.label ?? "Browser engine (experimental)",
     start(handlers: AnalysisSourceHandlers): AnalysisSourceHandle {
       if (engine == null) {
         const err = new Error(
-          "Browser engine is not available on this build. " +
-            "See #20 (await merge of WebGPU/Wasm engine, issue #5 / PR #7), " +
-            "then inject a BrowserEngineAdapter. Import NDJSON for now.",
+          "Load a local model bundle before starting the browser engine. " +
+            "Recorded analysis stays on the board until you do.",
         );
         queueMicrotask(() => handlers.onError?.(err));
         return { stop() {} };
@@ -51,11 +45,24 @@ export function createBrowserEngineSource(
       let stopped = false;
       void (async () => {
         try {
-          // TODO(#20): parsePipelineEventLine(line) → handlers.onEvent(...).
-          const stream = engine.analyzeSgf("");
+          const stream = engine.analyzeSgf(options.sgf ?? "");
           if (Symbol.asyncIterator in stream) {
-            for await (const _line of stream) {
+            for await (const line of stream as AsyncIterable<string>) {
               if (stopped) return;
+              const event = parsePipelineEventLine(line);
+              if (event) handlers.onEvent(event);
+            }
+          } else {
+            const reader = stream.getReader();
+            try {
+              for (;;) {
+                const next = await reader.read();
+                if (stopped || next.done) break;
+                const event = parsePipelineEventLine(next.value);
+                if (event) handlers.onEvent(event);
+              }
+            } finally {
+              reader.releaseLock();
             }
           }
           if (!stopped) handlers.onDone?.();
@@ -71,6 +78,7 @@ export function createBrowserEngineSource(
       return {
         stop() {
           stopped = true;
+          engine.stop?.();
         },
       };
     },

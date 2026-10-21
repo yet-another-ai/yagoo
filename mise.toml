@@ -74,23 +74,25 @@ run = [
 ]
 
 [tasks.docs]
-description = "Start the documentation site"
-depends = ["install"]
-run = "pnpm --filter @yagoo/docs dev"
+description = "Start the documentation site (Wasm glue and ORT runtime staged for the demo engine)"
+depends = ["install", "browser:wasm"]
+run = [
+  "node scripts/stage-ort.mjs",
+  "pnpm --filter @yagoo/docs dev",
+]
 
 [tasks."docs-build"]
-description = "Build the documentation site"
-depends = ["install"]
-run = "pnpm --filter @yagoo/docs build"
+description = "Build the documentation site (includes the Wasm glue the demo engine imports)"
+depends = ["install", "browser:wasm"]
+run = [
+  "node scripts/stage-ort.mjs",
+  "pnpm --filter @yagoo/docs build",
+]
 
 [tasks."pages:build"]
-description = "Assemble the GitHub Pages site at /yagoo/ (docs plus the experimental engine shell)"
-depends = ["docs-build", "browser:wasm"]
-run = [
-  "pnpm --filter @yagoo/browser-engine build",
-  "node scripts/assemble-pages.mjs",
-]
-env = { YAGOO_BASE = "/yagoo/engine/" }
+description = "Build the GitHub Pages site at /yagoo/ and check the demo engine wiring"
+depends = ["docs-build"]
+run = "node scripts/assemble-pages.mjs"
 
 [tasks.format]
 description = "Format Rust sources"

@@ -143,6 +143,8 @@ export function reducePipelineEvent(
       ply.candidates = snap.candidates ? [...snap.candidates] : [];
       // Teaching groups (块) — additive; empty until pipeline emits them.
       ply.groups = snap.groups ? [...snap.groups] : [];
+      // The completed snapshot is authoritative, including omitted/null fields.
+      ply.ledger = snap.ledger ?? null;
       ply.complete = true;
       break;
     }

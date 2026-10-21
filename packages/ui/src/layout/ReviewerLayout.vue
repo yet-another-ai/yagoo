@@ -9,13 +9,14 @@ import {
 } from "vue";
 import type {
   GainLossLedger,
+  GainLossLine,
   LlmCommentary,
   MoveComparison,
   ReviewReportDocument,
   SacrificeAnnotation,
 } from "../analysis/modules";
 import type { CandidateSnapshot, EngineAnalysis, GroupSnapshot } from "../analysis/types";
-import { formatGtpVertex } from "../analysis/coords";
+import { formatGtpVertex, parseGtpVertex } from "../analysis/coords";
 import { useGame, type GamePlayerInfo } from "../composables/useGame";
 import Goban from "../goban/Goban.vue";
 import OverlayLayer from "../overlays/OverlayLayer.vue";
@@ -181,6 +182,7 @@ const section = ref<CompactSection>("inspector");
 const lowerTab = ref<"groups" | "tree">("groups");
 const view = ref<"board" | "report">("board");
 const tryMode = ref(false);
+const ledgerPreview = ref<Vertex[] | null>(null);
 const tryNodes = ref<TryNode[]>([]);
 const tryCursor = ref<string | null>(null);
 const anchorSign = ref<BoardMap<Sign>>([]);
@@ -198,6 +200,7 @@ const sections: { id: CompactSection; label: string }[] = [
 
 function load(contents: string | undefined) {
   if (!contents) return;
+  ledgerPreview.value = null;
   tryMode.value = false;
   clearTry();
   loadSgf(contents);
@@ -273,6 +276,7 @@ watch(
 
 watch(boardSize, () => updateAutoVertexSize());
 watch(moveNumber, (n) => {
+  ledgerPreview.value = null;
   emit("ply-change", n);
   if (tryMode.value) captureAnchor();
 });
@@ -292,6 +296,15 @@ const tryDepth = computed(() =>
 const suspendAnalysis = computed(
   () => tryDepth.value > 0 || (loaded.value && !onMainLine.value),
 );
+watch([() => props.ledger, suspendAnalysis], () => {
+  ledgerPreview.value = null;
+});
+
+function previewLedger(line: GainLossLine) {
+  ledgerPreview.value = line.intersections
+    .map((coordinate) => parseGtpVertex(coordinate, boardSize.value))
+    .filter((vertex): vertex is Vertex => vertex != null);
+}
 
 const overlayData = computed<OverlayData>(() => {
   if (suspendAnalysis.value) return { groupOutlines: [] };
@@ -382,11 +395,20 @@ const boardMarkers = computed(() =>
 const boardLines = computed(() =>
   suspendAnalysis.value ? [] : props.lines,
 );
-const boardDimmed = computed(() =>
-  suspendAnalysis.value ? [] : props.dimmedVertices,
-);
+const boardDimmed = computed(() => {
+  if (suspendAnalysis.value) return [];
+  if (ledgerPreview.value == null) return props.dimmedVertices;
+  const included = new Set(ledgerPreview.value.map(([x, y]) => `${x},${y}`));
+  const dimmed: Vertex[] = [];
+  for (let y = 0; y < boardSize.value; y += 1) {
+    for (let x = 0; x < boardSize.value; x += 1) {
+      if (!included.has(`${x},${y}`)) dimmed.push([x, y]);
+    }
+  }
+  return dimmed;
+});
 const boardSelected = computed(() =>
-  suspendAnalysis.value ? [] : props.selectedVertices,
+  suspendAnalysis.value ? [] : (ledgerPreview.value ?? props.selectedVertices),
 );
 
 function clearTry() {
@@ -714,6 +736,8 @@ defineExpose({
           @toggle="(i) => emit('toggle-candidate', i)"
           @select="(i) => emit('select-candidate', i)"
           @preview-group="(id) => emit('preview-group', id)"
+          @preview-ledger="previewLedger"
+          @clear-ledger-preview="ledgerPreview = null"
           @prev-key="stepKey(-1)"
           @next-key="stepKey(1)"
         />

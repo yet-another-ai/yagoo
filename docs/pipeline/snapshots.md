@@ -73,6 +73,33 @@ Stored under `passProbe` (engine analysis after appending `"pass"` for the side 
 
 Rust types live in `yagoo-snapshot`. Conversion from Analysis Engine responses and `GameState` is in the same crate (`engine_from_response`, `board_from_game`, …). Group computation: `compute_groups`.
 
+## Optional gain/loss ledger
+
+`PositionSnapshot.ledger` is an additive **schema-v1** field; old documents still
+deserialize, and omitted/null values mean unavailable. Deep completion emits the
+best retained candidate versus the explicit pass probe, rooted at this snapshot's
+position. Candidate and reference ownership must use the same root position;
+the pass probe is the explicitly documented counterfactual.
+
+| Field | Meaning |
+| --- | --- |
+| `rootPly`, `mover` | Root position after this many moves; side whose favor signs represent (`B` / `W`) |
+| `move`, `vs`, `referenceMove` | Candidate GTP move; `pass` or `best`; exact reference move |
+| `value`, `bookTotal` | Mover-perspective search difference and raw ownership sum |
+| `consistent`, `scaling`, `inconsistency` | Whether scaled points are safe; `score` or `proportions`; optional `zero_book` / `book_search_mismatch` |
+| `ledger[].kind`, `id` | `group`, `own_territory`, `reduce_opponent`, `other`; group id when applicable |
+| `ledger[].points` | Signed points when consistent, otherwise JSON `null` |
+| `ledger[].bookValue`, `proportion` | Raw signed ownership and share of total absolute contribution |
+| `ledger[].intersections` | Disjoint GTP coordinates assigned to the row, covering the board |
+| `ledger[].strengthChanges` | Optional per-color `{color, reference, candidate, delta}` on fixed root stone membership |
+| `ledger[].tempo` | `unassessed` for group rows; branch pass probes are not available |
+
+The reducer copies this server fact and clears stale values when an authoritative
+snapshot omits it. It does not calculate attribution in TypeScript. Evidence
+paths for later explanation modules can refer to `ledger.value`,
+`ledger.bookTotal`, `ledger.consistent`, and `ledger.ledger[i]` fields. See
+[Gain/loss ledger](../modules/gain-loss-ledger.md) for formulas and limitations.
+
 ## Optional browser neural sample
 
 `EngineAnalysis.neural` is an additive optional schema-v1 field, available on

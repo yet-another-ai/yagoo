@@ -53,3 +53,11 @@ cargo run -p yagoo-cli -- analyze docs/public/app/sample.sgf \
   -o docs/public/app/sample-scan-deep.ndjson \
   --strategy scan-then-deep --partials --from 0 --to 70
 ```
+
+## Legacy sample provenance
+
+The bundled recording used setup-board queries without move history. In ko
+positions its candidates can therefore include forbidden recaptures (R1 after
+plies 43 and 49). The reviewer visibly labels it as UI/replay evidence, not a
+validated assessment of the historical game. Fresh comparison analysis must
+preserve initial setup and complete move history.

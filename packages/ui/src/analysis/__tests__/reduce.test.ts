@@ -46,13 +46,16 @@ describe("parseNdjson / fixture format", () => {
   });
 });
 
-describe("unimplemented review modules", () => {
-  it("leaves ledger, comparison, sacrifice, commentary, opening, and report empty", () => {
+describe("review module availability", () => {
+  it("loads the deep ledger while leaving unavailable modules empty", () => {
     const state = reducePipelineEvents(fixtureEvents);
     expect(state.opening).toBeNull();
     expect(state.report).toBeNull();
     const ply = state.plies[DEEP_PLY];
-    expect(ply?.ledger).toBeNull();
+    expect(ply?.ledger?.move).toBe("P2");
+    expect(ply?.ledger?.consistent).toBe(false);
+    expect(ply?.ledger?.ledger.every((line) => line.points == null)).toBe(true);
+    expect(state.plies[0]?.ledger).toBeNull();
     expect(ply?.comparison).toBeNull();
     expect(ply?.sacrifices).toBeNull();
     expect(ply?.commentary).toBeNull();

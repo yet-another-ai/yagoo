@@ -146,6 +146,7 @@ mod tests {
 
     fn snap(ply: u32, wr: f64, sl: f64, own: Vec<f64>) -> PositionSnapshot {
         PositionSnapshot {
+            ledger: None,
             schema_version: SCHEMA_VERSION,
             ply,
             to_play: ColorToken::B,

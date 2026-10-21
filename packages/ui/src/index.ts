@@ -62,6 +62,7 @@ export type {
   AnalysisPhase,
   GainLossLedger,
   GainLossLine,
+  LedgerStrengthChange,
   LlmCommentary,
   MoveComparison,
   OpeningMatch,

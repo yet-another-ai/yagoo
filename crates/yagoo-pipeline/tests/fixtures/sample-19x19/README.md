@@ -34,3 +34,36 @@ Public-domain historical game: Yasuda Shusaku (B, 4d) vs Inoue Gennan Inseki (W,
 mise run katago:fetch-dev
 mise run fixtures:regen
 ```
+
+## Ledger derivative (2026-10-21)
+
+**History limitation discovered during roadmap validation:** these legacy
+responses have `turnNumber: 0` at nonzero plies and represent setup-board
+queries. They do not preserve the game's ko history. For example, R1 is a
+simple-ko forbidden move after plies 43 and 49 of the bundled SGF, yet appears
+among the recorded candidates. These responses remain genuine recordings,
+but are only evidence for arithmetic, serialization, and UI replay. They must
+not establish actual-move loss, legal alternatives, or sacrifice claims for
+those historical positions. The reviewer labels this limitation visibly.
+New comparison recordings retain the full initial setup and move sequence.
+
+The raw `responses.json.gz` recording above is unchanged. Both bundled
+`sample-scan-deep.ndjson` files were replayed through the ledger-enabled pipeline:
+
+```sh
+cargo run -p yagoo-cli -- analyze docs/public/app/sample.sgf --scripted-fixture crates/yagoo-pipeline/tests/fixtures/sample-19x19/responses.json.gz --strategy scan-then-deep --scan-visits 200 --visits 500 --max-deep-plies 8 --top-k 5 -o docs/public/app/sample-scan-deep.ndjson
+```
+
+Copy that output to `packages/ui/src/analysis/__fixtures__/sample-scan-deep.ndjson`.
+The UI's compact `ledger-position.json` is the real ply-50 snapshot with computed
+ledger fields, extracted with:
+
+```sh
+cargo run -p yagoo-snapshot --example ledger_fixture -- packages/ui/src/analysis/__fixtures__/sample-scan-deep.ndjson 50 packages/ui/src/analysis/__fixtures__/ledger-position.json
+```
+
+No engine/model is needed for either command. The recorded P2-versus-pass book at
+ply 50 is inconsistent with search (ownership book 31.762810, search 24.237321),
+so the derivative deliberately contains null line points and signed proportions.
+This is evidence for exercising the consistency guard, not a calibrated claim
+about this historical move's teaching interpretation.

@@ -65,3 +65,49 @@ If \(\big|\sum_k E_k-\sigma_P\Delta\mathrm{scoreLead}\big|\) exceeds **initial**
 - Ownership book ≠ points (issue #538) — scaling + consistency checks required
 - Choice of reference changes the story — UI must label the baseline
 - Sente / gote / double-sente classification is not produced directly; \(\Delta\) from tempo can approximate; full treatment is post-MVP
+
+## Implementation status (schema v1, 2026-10-21)
+
+`yagoo_snapshot::compute_ledger` attributes a root candidate against its explicit
+pass probe or the best candidate's `movesOwnership`. `compute_ledger_against`
+accepts two candidate branches from the same root, including a forced
+`allowMoves` query of that identical position. The caller must preserve this
+provenance. Neither API reads a later root or subtracts consecutive positions.
+
+The deep pipeline emits `PositionSnapshot.ledger` for the best retained root
+candidate versus pass. A snapshot at ply *p* explains a move **available after p**;
+it does not explain the already played move *p*. Actual-move comparison needs
+the preceding root and its played branch. Scan positions, old recordings, skipped
+pass probes, absent candidate maps/scores, and malformed evidence leave the
+field absent. Missing attribution is not zero value.
+
+Group membership remains fixed at the root. A group receives priority when any
+color's mean own-color stone strength changes by at least **0.3**. All its stones
+and empties then belong to that line. Remaining empties are split by the mover's
+reference ownership sign, and remaining stones go to `other`. Exact disjoint
+coordinates in `intersections` drive both mouse and keyboard board highlights.
+Malformed overlapping eligible groups are rejected.
+
+`value` is the mover-perspective search score difference; `bookTotal` is the
+ownership sum. With difference at most **3 points** and `abs(bookTotal) >= 1e-6`,
+`scaling: "score"` supplies signed line `points`. Otherwise
+`scaling: "proportions"` supplies `points: null`, raw `bookValue`, and
+`proportion = bookValue / sum(abs(bookValue))`. The all-zero case uses zero shares.
+Signed shares can cancel; they are not win probabilities or calibrated points.
+`inconsistency` distinguishes `zero_book` from `book_search_mismatch`.
+
+Tempo transitions remain **unassessed**. One ownership map per candidate does
+not establish post-move life status, sente, or gote. Group rows expose
+`strengthChanges` for each color and `tempo: "unassessed"`; the UI says why.
+The library's `compute_tempo_changes` can compare actual assessed group snapshots
+when their stone membership agrees, but the pipeline does not yet collect the
+branch pass probes needed to populate such transitions. Consequently the tempo
+transition acceptance item in issue #23 remains open; no full issue closure is
+claimed by this implementation.
+
+Validation uses constructed arithmetic tests separately from all eight deep
+positions in the genuine 2026-10-19 KataGo recording (see the fixture README).
+The bundled NDJSON is replayed through the new pipeline without changing the raw
+responses. `ledger-position.json` is a derived ply-50 snapshot used by reducer and
+UI hover/focus tests. This checks data flow and arithmetic, not human teaching
+calibration; the initial thresholds remain unvalidated on a broad game corpus.

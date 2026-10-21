@@ -4,7 +4,7 @@
 
 ## Implemented scope (#28)
 
-The reviewer **Notes** tab is off by default. Enabling **Show grounded notes** renders up to three deterministic sentences locally. It does not call a provider. A host may supply a `CommentaryProvider` to `AnalysisReviewer`; **Send selected facts to …** is a separate explicit action. No provider, transport, credentials, endpoint, model download, or paid service is built in.
+The reviewer **Notes** tab is off by default. Enabling **Show grounded notes** renders up to three deterministic sentences locally. It does not call a provider. Users can configure an existing OpenAI-compatible or Ollama chat endpoint in Notes, or a host may supply a `CommentaryProvider` to `AnalysisReviewer`. **Send selected facts to …** is a separate explicit action. The application supplies HTTP transports but no default endpoint, model, credentials, subscription, or model download.
 
 An optional provider selects and orders approved complete clauses. It cannot supply displayed prose. This is deliberately narrower than unrestricted LLM rewriting: checking that numbers and coordinates occur in the input does **not** prove that arbitrary prose says the same thing. The implementation validates a bounded response grammar instead.
 
@@ -42,6 +42,34 @@ interface CommentaryProvider {
 ```
 
 The exported prompt is inspectable JSON containing a request ID, approved facts, exact selected source values, clause variants, and a response example. It omits the SGF, names, comments, board arrays, and full ownership maps. Group or zone coordinates that support a selected fact can be included. Preparing the prompt does not send it anywhere; the user can copy it to a provider of their choosing. A host-supplied adapter owns any transport and must honor its `AbortSignal`.
+
+### Runnable HTTP adapters
+
+`createHttpCommentaryProvider` implements the same interface for two wire formats:
+
+- `openai-chat`: POST to a full Chat Completions URL with `model`, system/user `messages`, `stream: false`, and JSON output format. The adapter reads the completed assistant message in `choices[0].message.content`.
+- `ollama-chat`: POST to the user's full `/api/chat` URL with `model`, system/user `messages`, `stream: false`, and `format: "json"`. It reads the completed assistant `message.content`.
+
+The implementation follows the [Chat Completions reference](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create/) and [Ollama chat reference](https://docs.ollama.com/api/chat). Compatibility means these request/response contracts, not universal support for every vendor/model option. `CommentaryProvider` remains available for other protocols.
+
+In Notes, enable local notes, expand **Configure an LLM endpoint**, choose the format, enter the full endpoint and a model already available there, and optionally enter an existing bearer token. **Use endpoint** only validates and stores this configuration in page memory; it makes no request. The separate **Send selected facts** button sends the bounded fact packet. The endpoint must permit the reviewer's browser origin through CORS. Local HTTP is accepted only on loopback; other endpoints require HTTPS. URL credentials, query strings and fragments are rejected. There is no automatic proxy, credential creation, model pull, endpoint discovery, retry, or paid-provider fallback.
+
+An embedding host can use the same implementation:
+
+```ts
+import { createHttpCommentaryProvider } from "@yagoo/ui";
+
+const commentaryProvider = createHttpCommentaryProvider({
+  protocol: "ollama-chat",
+  endpoint: "http://localhost:11434/api/chat",
+  model: "your-already-installed-model",
+});
+// Pass commentaryProvider to AnalysisReviewer; construction sends nothing.
+```
+
+Only `select` makes an HTTP request. Cookies and browser credentials are omitted, redirects are refused, responses are bounded, and cancellation aborts the request/read. Response text still passes the existing exact request-ID/fact-ID/variant validator before any sentence is rendered. Errors do not expose remote response bodies or credentials. Editing the configuration cancels pending work; Forget, disabling Notes, a new game/source, and unmounting clear the page-owned configuration/token. Host-injected adapters remain the host's responsibility. Configuration and tokens never enter saved reports or browser storage.
+
+This is a runnable LLM selection interface, not unrestricted LLM prose generation. A configured LLM chooses and orders approved paraphrase variants. Actual model response quality and endpoint CORS compatibility need a user-selected, authorized endpoint; development and CI use explicitly mocked protocol responses, not claims of a live LLM run.
 
 The only accepted response shape is:
 

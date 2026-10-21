@@ -7,6 +7,7 @@ import {
 import {
   CommentarySession, type CommentaryProvider, type CommentarySessionState,
 } from "../commentary/session";
+import CommentaryProviderSettings from "./CommentaryProviderSettings.vue";
 
 const props = withDefaults(defineProps<{
   input: CommentaryInput;
@@ -25,6 +26,13 @@ const state = shallowRef<CommentarySessionState>({
   enabled: false, busy: false, awaitingManual: false, result: null, requestText: "",
 });
 const response = ref("");
+const configuredProvider = shallowRef<CommentaryProvider | null>(null);
+const configuredDestination = ref("");
+const effectiveProvider = computed(() => props.provider ?? configuredProvider.value);
+function configureProvider(provider: CommentaryProvider | null, destination = "") {
+  configuredProvider.value = provider;
+  configuredDestination.value = destination;
+}
 const facts = computed(() => buildCommentaryFacts(props.input));
 const session = new CommentarySession((next, persist) => {
   state.value = next;
@@ -45,8 +53,12 @@ watch(() => props.active, (active) => {
     emit("clear-citation");
   }
 }, { flush: "sync" });
-watch(() => props.provider, () => session.cancel());
-onBeforeUnmount(() => session.setEnabled(false));
+watch(effectiveProvider, () => session.cancel(), { flush: "sync" });
+watch(() => props.contextKey, () => configureProvider(null), { flush: "sync" });
+onBeforeUnmount(() => {
+  configureProvider(null);
+  session.setEnabled(false);
+});
 const cited = computed(() => state.value.result?.sentences.map((sentence) => ({
   ...sentence,
   fact: facts.value.find((fact) => fact.id === sentence.factId)!,
@@ -55,10 +67,13 @@ const cited = computed(() => state.value.result?.sentences.map((sentence) => ({
 function enable(event: Event) {
   const enabled = (event.target as HTMLInputElement).checked;
   session.setEnabled(enabled);
-  if (!enabled) emit("clear-citation");
+  if (!enabled) {
+    configureProvider(null);
+    emit("clear-citation");
+  }
 }
 function runProvider() {
-  if (props.provider) void session.request(props.provider);
+  if (effectiveProvider.value) void session.request(effectiveProvider.value);
 }
 function importSelection() {
   session.importResponse(response.value);
@@ -107,16 +122,24 @@ function importSelection() {
       </div>
       <div class="yagoo-commentary__actions">
         <button type="button" :disabled="!facts.length" @click="session.exportRequest()">Prepare prompt JSON</button>
-        <button v-if="provider" data-testid="commentary-provider" type="button" :disabled="!facts.length" @click="runProvider">
-          Send selected facts to {{ provider.id }}
+        <button v-if="effectiveProvider" data-testid="commentary-provider" type="button" :disabled="!facts.length" @click="runProvider">
+          Send selected facts to {{ effectiveProvider.id }}
         </button>
         <button v-if="state.busy || state.awaitingManual" type="button" data-testid="commentary-cancel" @click="session.cancel()">Cancel</button>
       </div>
       <p v-if="state.busy" role="status">Waiting for the configured provider…</p>
+      <p v-if="configuredProvider && !provider" class="yagoo-commentary__hint" data-testid="commentary-destination">
+        Send destination: {{ configuredDestination }}
+      </p>
       <p class="yagoo-commentary__hint">
-        No provider is built in. Prompt JSON contains selected structured values
+        Prompt JSON contains selected structured values
         and approved sentences, without SGF text, player names, comments, or full ownership maps.
       </p>
+      <CommentaryProviderSettings
+        v-if="!provider"
+        :key="contextKey ?? 'local'"
+        @provider="configureProvider"
+      />
       <template v-if="state.awaitingManual">
         <label>Copy prompt JSON
           <textarea data-testid="commentary-prompt" readonly :value="state.requestText" rows="6" />

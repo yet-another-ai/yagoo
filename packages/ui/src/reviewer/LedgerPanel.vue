@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { GainLossLedger, GainLossLine } from "../analysis/modules";
 
-defineProps<{ ledger: GainLossLedger }>();
+defineProps<{ ledger: GainLossLedger; tempoEvidenceAvailable?: boolean }>();
 const emit = defineEmits<{
   (e: "preview", line: GainLossLine): void;
   (e: "clear-preview"): void;
@@ -54,11 +54,19 @@ function label(line: GainLossLine): string {
           {{ change.reference.toFixed(2) }} → {{ change.candidate.toFixed(2) }}
           ({{ signed(change.delta) }})
         </p>
+        <p v-for="change in line.tempoChanges ?? []" :key="`tempo-${change.color}`" class="yagoo-ledger-panel__note">
+          {{ change.color }} branch status: {{ change.preferredStatus }} → {{ change.actualStatus }}
+          (explicit branch/pass probes).
+        </p>
       </li>
     </ul>
-    <p class="yagoo-ledger-panel__note" data-testid="ledger-tempo-limitation">
+    <p v-if="!tempoEvidenceAvailable" class="yagoo-ledger-panel__note" data-testid="ledger-tempo-limitation">
       Tempo transitions are unassessed: candidate branch pass probes are unavailable.
       Strength changes do not establish sente, gote, or a change in life status.
+    </p>
+    <p v-else class="yagoo-ledger-panel__note">
+      Status evidence uses fixed root stone membership in both branch/pass pairs.
+      It does not establish sente or gote; see branch evidence below.
     </p>
   </div>
 </template>

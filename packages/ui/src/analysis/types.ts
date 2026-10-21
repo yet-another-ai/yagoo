@@ -127,6 +127,8 @@ export interface PositionSnapshot {
   groups?: GroupSnapshot[];
   /** Deep root's best retained candidate versus its explicit pass probe. */
   ledger?: GainLossLedger | null;
+  /** Played move p evaluated at historical root p-1, separate from root below. */
+  comparison?: MoveComparison | null;
   root?: EngineAnalysis | null;
   passProbe?: EngineAnalysis | null;
   passProbeSkipped?: string | null;

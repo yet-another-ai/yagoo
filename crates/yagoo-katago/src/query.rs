@@ -237,6 +237,21 @@ mod tests {
     }
 
     #[test]
+    fn pv_query_fields_use_the_native_protocol_acronyms() {
+        let query = AnalysisQueryBuilder::new("comparison")
+            .analysis_pv_len(15)
+            .build();
+        let wire = serde_json::to_value(&query).unwrap();
+        assert_eq!(wire["analysisPVLen"], 15);
+        assert_eq!(wire["includePVVisits"], true);
+        assert!(wire.get("analysisPvLen").is_none());
+        assert!(wire.get("includePvVisits").is_none());
+        let decoded: crate::AnalysisQuery = serde_json::from_value(wire).unwrap();
+        assert_eq!(decoded.analysis_pv_len, Some(15));
+        assert_eq!(decoded.include_pv_visits, Some(true));
+    }
+
+    #[test]
     fn from_game_state_lists_setup_stones() {
         let mut g = GameState::new(9, Ruleset::Chinese).unwrap();
         g.setup_stone(Point::new(2, 2), Color::Black).unwrap();

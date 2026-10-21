@@ -16,7 +16,9 @@ import type {
   SacrificeAnnotation,
 } from "../analysis/modules";
 import type { CandidateSnapshot, EngineAnalysis, GroupSnapshot } from "../analysis/types";
-import { formatGtpVertex, parseGtpVertex } from "../analysis/coords";
+import { formatGtpVertex, parseGtpVertex, ownershipToPaintMap } from "../analysis/coords";
+import { comparisonBoard, comparisonMarkers, isAlignedComparison } from "../analysis/comparison";
+import { buildGroupOutlines, groupMemberVertices } from "../analysis/groups";
 import { useGame, type GamePlayerInfo } from "../composables/useGame";
 import Goban from "../goban/Goban.vue";
 import OverlayLayer from "../overlays/OverlayLayer.vue";
@@ -183,6 +185,8 @@ const lowerTab = ref<"groups" | "tree">("groups");
 const view = ref<"board" | "report">("board");
 const tryMode = ref(false);
 const ledgerPreview = ref<Vertex[] | null>(null);
+const inspectorPerspective = ref<InspectorPerspective>(props.initialPerspective);
+const comparisonDifference = ref(true);
 const tryNodes = ref<TryNode[]>([]);
 const tryCursor = ref<string | null>(null);
 const anchorSign = ref<BoardMap<Sign>>([]);
@@ -296,18 +300,50 @@ const tryDepth = computed(() =>
 const suspendAnalysis = computed(
   () => tryDepth.value > 0 || (loaded.value && !onMainLine.value),
 );
-watch([() => props.ledger, suspendAnalysis], () => {
+watch([() => props.ledger, () => props.comparison, suspendAnalysis, inspectorPerspective], () => {
   ledgerPreview.value = null;
 });
+watch(() => props.initialPerspective, (value) => { inspectorPerspective.value = value; });
+
+const alignedComparison = computed(() =>
+  !suspendAnalysis.value && !tryMode.value
+    && isAlignedComparison(props.comparison, moveNumber.value, boardSize.value)
+    ? props.comparison : null,
+);
+const activeComparison = computed(() =>
+  inspectorPerspective.value === "why" ? alignedComparison.value : null,
+);
+const displayedGroups = computed(() => activeComparison.value?.context.groups ?? props.groups);
 
 function previewLedger(line: GainLossLine) {
-  ledgerPreview.value = line.intersections
+  previewStones(line.intersections);
+}
+
+function previewStones(stones: string[]) {
+  ledgerPreview.value = stones
     .map((coordinate) => parseGtpVertex(coordinate, boardSize.value))
     .filter((vertex): vertex is Vertex => vertex != null);
 }
 
+function previewDisplayedGroup(id: string) {
+  if (!activeComparison.value) { emit("preview-group", id); return; }
+  const group = displayedGroups.value.find((entry) => entry.groupId === id);
+  ledgerPreview.value = group ? groupMemberVertices(group, boardSize.value) : null;
+}
+function clearDisplayedGroup() {
+  ledgerPreview.value = null;
+  emit("clear-group-preview");
+}
+function selectDisplayedGroup(id: string) {
+  if (activeComparison.value) previewDisplayedGroup(id);
+  else emit("select-group", id);
+}
+
 const overlayData = computed<OverlayData>(() => {
   if (suspendAnalysis.value) return { groupOutlines: [] };
+  if (activeComparison.value) return {
+    groupOutlines: buildGroupOutlines(activeComparison.value.context.groups, boardSize.value),
+  };
   if (props.groupOutlines.length > 0) {
     return { groupOutlines: props.groupOutlines };
   }
@@ -341,11 +377,13 @@ const tryPosition = computed(() => {
 
 const displaySignMap = computed(() => {
   if (tryPosition.value) return tryPosition.value.signMap;
+  if (activeComparison.value) return comparisonBoard(activeComparison.value);
   return loaded.value ? signMap.value : emptySignMap.value;
 });
 
 const displayPlayer = computed(
-  () => tryPosition.value?.toPlay ?? currentPlayer.value,
+  () => tryPosition.value?.toPlay
+    ?? (activeComparison.value ? (activeComparison.value.mover === "B" ? 1 : -1) : currentPlayer.value),
 );
 
 const displayPlayers = computed<[GamePlayerInfo, GamePlayerInfo]>(() => {
@@ -371,6 +409,10 @@ const canStepForward = computed(() =>
 );
 
 const displayComment = computed(() => {
+  if (activeComparison.value) {
+    const comparison = activeComparison.value;
+    return `Move ${comparison.ply}: ${comparison.actualMove} versus ${comparison.aiMove}, evaluated at root ply ${comparison.rootPly}. The board shows the position before this move.`;
+  }
   if (tryDepth.value > 0) {
     return "This variation is not analyzed.\nAI suggestions for tried moves — Coming in #26.";
   }
@@ -381,23 +423,28 @@ const displayComment = computed(() => {
 });
 
 const boardHeat = computed(() =>
-  suspendAnalysis.value ? [] : (props.heatMap ?? []),
+  suspendAnalysis.value || activeComparison.value ? [] : (props.heatMap ?? []),
 );
-const boardPaint = computed(() =>
-  suspendAnalysis.value ? [] : (props.paintMap ?? []),
-);
+const boardPaint = computed(() => {
+  if (suspendAnalysis.value) return [];
+  if (activeComparison.value) return comparisonDifference.value
+    ? ownershipToPaintMap(activeComparison.value.ownershipDelta.map((value) => value / 2), boardSize.value, 0.04)
+    : [];
+  return props.paintMap ?? [];
+});
 const boardGhosts = computed(() =>
-  suspendAnalysis.value ? [] : (props.ghostStoneMap ?? []),
+  suspendAnalysis.value || activeComparison.value ? [] : (props.ghostStoneMap ?? []),
 );
 const boardMarkers = computed(() =>
-  suspendAnalysis.value ? [] : (props.markerMap ?? []),
+  suspendAnalysis.value ? []
+    : activeComparison.value ? comparisonMarkers(activeComparison.value) : (props.markerMap ?? []),
 );
 const boardLines = computed(() =>
-  suspendAnalysis.value ? [] : props.lines,
+  suspendAnalysis.value || activeComparison.value ? [] : props.lines,
 );
 const boardDimmed = computed(() => {
   if (suspendAnalysis.value) return [];
-  if (ledgerPreview.value == null) return props.dimmedVertices;
+  if (ledgerPreview.value == null) return activeComparison.value ? [] : props.dimmedVertices;
   const included = new Set(ledgerPreview.value.map(([x, y]) => `${x},${y}`));
   const dimmed: Vertex[] = [];
   for (let y = 0; y < boardSize.value; y += 1) {
@@ -408,7 +455,7 @@ const boardDimmed = computed(() => {
   return dimmed;
 });
 const boardSelected = computed(() =>
-  suspendAnalysis.value ? [] : (ledgerPreview.value ?? props.selectedVertices),
+  suspendAnalysis.value ? [] : (ledgerPreview.value ?? (activeComparison.value ? [] : props.selectedVertices)),
 );
 
 function clearTry() {
@@ -636,6 +683,10 @@ defineExpose({
 
     <template v-else>
       <main ref="mainEl" class="yagoo-reviewer__main">
+        <p v-if="activeComparison" class="yagoo-try-banner" data-testid="comparison-board-banner">
+          Move {{ activeComparison.ply }} comparison · board before the move (ply {{ activeComparison.rootPly }}).
+          A = actual {{ activeComparison.actualMove }} · AI = {{ activeComparison.aiMove }}.
+        </p>
         <p
           v-if="suspendAnalysis"
           class="yagoo-try-banner"
@@ -724,7 +775,8 @@ defineExpose({
           :preview-index="previewCandidateIndex"
           :selected-index="selectedCandidateIndex"
           :ledger="ledger"
-          :comparison="comparison"
+          :comparison="alignedComparison"
+          :show-comparison-difference="comparisonDifference"
           :sacrifices="sacrifices"
           :commentary="commentary"
           :initial-perspective="initialPerspective"
@@ -737,6 +789,9 @@ defineExpose({
           @select="(i) => emit('select-candidate', i)"
           @preview-group="(id) => emit('preview-group', id)"
           @preview-ledger="previewLedger"
+          @preview-stones="previewStones"
+          @perspective-change="inspectorPerspective = $event"
+          @toggle-comparison-difference="comparisonDifference = $event"
           @clear-ledger-preview="ledgerPreview = null"
           @prev-key="stepKey(-1)"
           @next-key="stepKey(1)"
@@ -771,12 +826,12 @@ defineExpose({
           <GroupsPanel
             v-show="showGroups()"
             embedded
-            :groups="groups"
-            :preview-id="previewGroupId"
-            :selected-id="selectedGroupId"
-            @preview="(id) => emit('preview-group', id)"
-            @clear-preview="emit('clear-group-preview')"
-            @select="(id) => emit('select-group', id)"
+            :groups="displayedGroups"
+            :preview-id="activeComparison ? null : previewGroupId"
+            :selected-id="activeComparison ? null : selectedGroupId"
+            @preview="previewDisplayedGroup"
+            @clear-preview="clearDisplayedGroup"
+            @select="selectDisplayedGroup"
           />
           <VariationTree
             v-show="showTree()"

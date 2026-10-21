@@ -92,13 +92,30 @@ the pass probe is the explicitly documented counterfactual.
 | `ledger[].bookValue`, `proportion` | Raw signed ownership and share of total absolute contribution |
 | `ledger[].intersections` | Disjoint GTP coordinates assigned to the row, covering the board |
 | `ledger[].strengthChanges` | Optional per-color `{color, reference, candidate, delta}` on fixed root stone membership |
-| `ledger[].tempo` | `unassessed` for group rows; branch pass probes are not available |
+| `ledger[].tempo` | `unassessed` for candidate-only rows; comparison rows may use `branch_pass_probes` |
+| `ledger[].tempoChanges` | Per-color status evidence on fixed root stone membership when explicit branch/pass pairs exist |
 
 The reducer copies this server fact and clears stale values when an authoritative
 snapshot omits it. It does not calculate attribution in TypeScript. Evidence
 paths for later explanation modules can refer to `ledger.value`,
 `ledger.bookTotal`, `ledger.consistent`, and `ledger.ledger[i]` fields. See
 [Gain/loss ledger](../modules/gain-loss-ledger.md) for formulas and limitations.
+
+## Optional played-move comparison
+
+`PositionSnapshot.comparison` is an additive optional schema-v1 field.
+`comparison.ply` is this snapshot's *p*, while `comparison.rootPly` and
+`comparison.context.rootPly` are **p − 1**. `comparison.mover` is the player
+who made move *p*, usually the opposite of the snapshot's next `toPlay`.
+All report/commentary consumers must use comparison context for claims about
+the played move, rather than borrowing `snapshot.root`, `groups` or `ledger`.
+
+The [comparison module](../modules/move-comparison.md) defines signs, root
+identity, candidate visits, optional branch/pass and preferred-PV evidence.
+Paths such as `comparison.scoreLoss`, `comparison.ledgerDiff.ledger[i]`,
+`comparison.groupTempo[i]`, `comparison.context.preferred.pv` and
+`comparison.evidence` provide grounded facts for later explanation modules.
+Omitted/null is unavailable, not zero loss.
 
 ## Optional browser neural sample
 

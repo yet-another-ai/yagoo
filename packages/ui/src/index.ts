@@ -46,6 +46,7 @@ export {
   groupStoneVertices,
   groupValueLabel,
   isBrowserEngineAvailable,
+  isAlignedComparison,
   isLiveNativeAvailable,
   ownershipToHeatMap,
   ownershipToPaintMap,
@@ -58,6 +59,10 @@ export {
   useAnalysisStream,
 } from "./analysis";
 export type {
+  ComparisonBranch,
+  ComparisonContext,
+  ComparisonEvidence,
+  ComparisonGroupTempo,
   AnalysisEventSource,
   AnalysisPhase,
   GainLossLedger,

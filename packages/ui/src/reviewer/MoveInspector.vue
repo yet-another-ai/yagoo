@@ -11,6 +11,7 @@ import type { CandidateSnapshot, EngineAnalysis } from "../analysis/types";
 import CandidatesPanel from "../layout/CandidatesPanel.vue";
 import StubPane from "./StubPane.vue";
 import LedgerPanel from "./LedgerPanel.vue";
+import ComparisonPanel from "./ComparisonPanel.vue";
 
 export type InspectorPerspective =
   | "ai"
@@ -28,6 +29,7 @@ const props = withDefaults(
     selectedIndex?: number;
     ledger?: GainLossLedger | null;
     comparison?: MoveComparison | null;
+    showComparisonDifference?: boolean;
     sacrifices?: SacrificeAnnotation[] | null;
     commentary?: LlmCommentary | null;
     initialPerspective?: InspectorPerspective;
@@ -43,6 +45,7 @@ const props = withDefaults(
     selectedIndex: 0,
     ledger: null,
     comparison: null,
+    showComparisonDifference: true,
     sacrifices: null,
     commentary: null,
     initialPerspective: "ai",
@@ -60,6 +63,9 @@ const emit = defineEmits<{
   (e: "preview-group", groupId: string): void;
   (e: "preview-ledger", line: GainLossLine): void;
   (e: "clear-ledger-preview"): void;
+  (e: "preview-stones", stones: string[]): void;
+  (e: "toggle-comparison-difference", enabled: boolean): void;
+  (e: "perspective-change", perspective: InspectorPerspective): void;
   (e: "prev-key"): void;
   (e: "next-key"): void;
 }>();
@@ -73,7 +79,10 @@ const tabs: { id: InspectorPerspective; label: string }[] = [
 ];
 
 const perspective = ref<InspectorPerspective>(props.initialPerspective);
-watch(perspective, () => emit("clear-ledger-preview"));
+watch(perspective, (next) => {
+  emit("clear-ledger-preview");
+  emit("perspective-change", next);
+});
 
 watch(
   () => props.initialPerspective,
@@ -205,56 +214,17 @@ defineExpose({ perspective });
       aria-labelledby="yagoo-tab-why"
       class="yagoo-inspector__panel"
     >
-      <div v-if="comparison" class="yagoo-compare" data-testid="comparison-body">
-        <table>
-          <thead>
-            <tr>
-              <th></th>
-              <th>Actual {{ comparison.actualMove }}</th>
-              <th>AI {{ comparison.aiMove }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <th>Winrate</th>
-              <td>{{ percent(comparison.actualWinrate) }}</td>
-              <td>{{ percent(comparison.aiWinrate) }}</td>
-            </tr>
-            <tr>
-              <th>Score</th>
-              <td>{{ points(comparison.actualScoreLead) }}</td>
-              <td>{{ points(comparison.aiScoreLead) }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <p v-if="comparison.ownershipDelta == null" class="yagoo-inspector__wait">
-          Ownership diff is part of the #24 payload and is not attached.
-        </p>
-        <ul
-          v-if="comparison.ledgerDiff"
-          class="yagoo-ledger"
-        >
-          <li v-for="(line, i) in comparison.ledgerDiff.ledger" :key="i">
-            <button
-              v-if="line.id"
-              type="button"
-              class="yagoo-ledger__link"
-              @mouseenter="emit('preview-group', line.id)"
-              @focus="emit('preview-group', line.id)"
-            >
-              {{ line.id }}
-            </button>
-            <span>{{ line.kind }}</span>
-            <span v-if="line.change">{{ line.change }}</span>
-            <span>{{ points(line.points) }}</span>
-          </li>
-        </ul>
-      </div>
+      <ComparisonPanel v-if="comparison" :comparison="comparison"
+        :show-difference="showComparisonDifference"
+        @preview="emit('preview-ledger', $event)"
+        @preview-stones="emit('preview-stones', $event)"
+        @clear-preview="emit('clear-ledger-preview')"
+        @toggle-difference="emit('toggle-comparison-difference', $event)" />
       <StubPane
         v-else
         :issue="24"
         title="Why not this move"
-        summary="The actual move will be compared with KataGo's choice: winrate, score lead, ownership, and the per-group ledger. That comparison is not in the event stream yet."
+        summary="No comparison is available for this move. Deep analysis needs actual and preferred candidates from the historical board before this move. Scan-only positions, older recordings, or unsupported restricted queries may omit it."
       />
     </div>
 

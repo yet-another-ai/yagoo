@@ -1,3 +1,8 @@
+import type {
+  BoardSnapshot, CandidateSnapshot, ColorToken, EngineAnalysis,
+  GroupSnapshot, GroupStatus, PvEndSnapshot,
+} from "./types";
+
 /**
  * Data contracts for review teaching modules.
  *
@@ -17,7 +22,7 @@ export type LedgerLineKind =
   | "other";
 
 /** Branch pass probes are required before a tempo transition can be assessed. */
-export type TempoChange = "unassessed";
+export type TempoChange = "unassessed" | "branch_pass_probes";
 
 export interface LedgerStrengthChange {
   color: "B" | "W";
@@ -43,6 +48,7 @@ export interface GainLossLine {
   intersections: string[];
   strengthChanges?: LedgerStrengthChange[];
   tempo?: TempoChange | null;
+  tempoChanges?: ComparisonGroupTempo[];
 }
 
 /**
@@ -70,21 +76,81 @@ export interface GainLossLedger {
  */
 export interface MoveComparison {
   ply: number;
+  rootPly: number;
+  mover: ColorToken;
   actualMove: string;
   aiMove: string;
-  /** Winrate of the side to play, as a fraction in \[0, 1\]. */
-  actualWinrate: number | null;
-  aiWinrate: number | null;
+  /** Winrate of the player who played move p, as a fraction in [0, 1]. */
+  actualWinrate: number;
+  aiWinrate: number;
   /** Score lead from Black's perspective, matching `EngineAnalysis.scoreLead`. */
-  actualScoreLead: number | null;
-  aiScoreLead: number | null;
+  actualScoreLead: number;
+  aiScoreLead: number;
+  /** Preferred minus actual in mover perspective; can be negative. */
+  winrateLoss: number;
+  scoreLoss: number;
   /**
    * Black-positive ownership of the actual line minus the AI line,
-   * row-major from A19. Absent until #24 emits it.
+   * row-major from A19. Both maps come from the same historical root.
    */
-  ownershipDelta?: number[] | null;
+  ownershipDelta: number[];
   /** Per-group ledger of actual versus AI. Depends on #23. */
   ledgerDiff: GainLossLedger | null;
+  context: ComparisonContext;
+  evidence: ComparisonEvidence;
+  groupTempo: ComparisonGroupTempo[];
+}
+
+export interface ComparisonEvidence {
+  rootQueryId: string;
+  actualQueryId: string;
+  actualSource: "root_candidate" | "forced";
+  requestedVisits: number;
+  minimumCandidateVisits: number;
+  rootVisits: number | null;
+  actualVisits: number | null;
+  aiVisits: number | null;
+  rootHash: string | null;
+  actualRootHash: string | null;
+  limitations: string[];
+}
+
+export interface ComparisonBranch {
+  toPlay: ColorToken;
+  board: BoardSnapshot;
+  root: EngineAnalysis;
+  passProbe: EngineAnalysis | null;
+  rootQueryId: string;
+  passQueryId: string | null;
+}
+
+export interface ComparisonContext {
+  rootPly: number;
+  mover: ColorToken;
+  board: BoardSnapshot;
+  groups: GroupSnapshot[];
+  root: EngineAnalysis;
+  passProbe: EngineAnalysis | null;
+  passQueryId: string | null;
+  actual: CandidateSnapshot;
+  preferred: CandidateSnapshot;
+  actualBranch: ComparisonBranch | null;
+  preferredBranch: ComparisonBranch | null;
+  preferredPvEnd: PvEndSnapshot | null;
+  preferredPvQueryId: string | null;
+}
+
+export interface ComparisonGroupTempo {
+  groupId: string;
+  color: ColorToken;
+  /** Root coordinates retained across both branches, including capture. */
+  stones: string[];
+  actualStatus: GroupStatus;
+  preferredStatus: GroupStatus;
+  actualGPlus: number;
+  actualGMinus: number;
+  preferredGPlus: number;
+  preferredGMinus: number;
 }
 
 /** A sacrifice (弃子) along the preferred line (#25). */

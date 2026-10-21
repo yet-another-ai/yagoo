@@ -393,6 +393,7 @@ async fn analyze_position(
         snap.pass_probe_skipped = Some(PassProbeSkipReason::DisabledInPhase);
         snap.groups.clear();
         snap.ledger = None;
+        snap.comparison = None;
         send(
             tx,
             PipelineEvent::StageCompleted {
@@ -411,6 +412,19 @@ async fn analyze_position(
         snap.groups = compute_groups(&snap);
         snap.ledger = best_candidate(&snap)
             .and_then(|candidate| compute_ledger(&snap, candidate, LedgerBaseline::Pass));
+        snap.comparison = None;
+        if config.include_comparison {
+            match Box::pin(crate::analyze_move_comparison(record, pos, client, config)).await {
+                Ok(comparison) => snap.comparison = comparison,
+                Err(error) => send(
+                    tx,
+                    PipelineEvent::Warning {
+                        v: SCHEMA_VERSION,
+                        message: format!("comparison unavailable for move {}: {error}", pos.ply),
+                    },
+                )?,
+            }
+        }
     }
 
     send(

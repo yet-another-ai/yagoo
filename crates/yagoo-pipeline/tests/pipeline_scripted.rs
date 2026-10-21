@@ -43,6 +43,7 @@ async fn deep_only_emits_ordered_events_and_black_positive() {
         report_during_search_every: Some(0.1),
         include_pv_ends: false,
         emit_game_aggregate: true,
+        include_comparison: false,
         ..PipelineConfig::default()
     };
 
@@ -126,6 +127,7 @@ async fn scan_then_deep_auto_picks_swing_ply() {
         emit_game_aggregate: false,
         deepen_all: false,
         deep_select: DeepSelectConfig::default(),
+        include_comparison: false,
         ..PipelineConfig::default()
     };
     let events = analyze_game_collected(sgf, client, cfg).await.unwrap();
@@ -193,6 +195,7 @@ async fn scan_then_deep_auto_picks_ownership_only_swing() {
         emit_game_aggregate: false,
         deepen_all: false,
         deep_select: DeepSelectConfig::default(),
+        include_comparison: false,
         ..PipelineConfig::default()
     };
     let events = analyze_game_collected(sgf, client, cfg).await.unwrap();
@@ -253,6 +256,7 @@ async fn deepen_all_deepens_every_scanned_ply() {
         report_during_search_every: None,
         include_pv_ends: false,
         emit_game_aggregate: false,
+        include_comparison: false,
         ..PipelineConfig::default()
     };
     let events = analyze_game_collected(sgf, client, cfg).await.unwrap();
@@ -295,6 +299,7 @@ async fn skips_pass_probe_after_pass_move() {
         report_during_search_every: None,
         include_pv_ends: false,
         emit_game_aggregate: false,
+        include_comparison: false,
         ..PipelineConfig::default()
     };
     let events = analyze_game_collected(sgf, client, cfg).await.unwrap();
@@ -331,6 +336,7 @@ async fn from_to_filters_scan_and_selection() {
         report_during_search_every: None,
         include_pv_ends: false,
         emit_game_aggregate: false,
+        include_comparison: false,
         ..PipelineConfig::default()
     };
     let events = analyze_game_collected(sgf, client, cfg).await.unwrap();
@@ -404,6 +410,7 @@ async fn deep_phase_emits_pipeline_groups() {
         report_during_search_every: None,
         include_pv_ends: false,
         emit_game_aggregate: false,
+        include_comparison: false,
         ..PipelineConfig::default()
     };
     let events = analyze_game_collected(sgf, client, cfg).await.unwrap();

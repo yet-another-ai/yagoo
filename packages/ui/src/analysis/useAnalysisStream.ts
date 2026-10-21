@@ -67,6 +67,7 @@ export function useAnalysisStream(): UseAnalysisStreamResult {
   function attachSource(source: AnalysisEventSource) {
     stop();
     const current = generation;
+    state.value = createInitialAnalysisState();
     sourceLabel.value = source.label;
     state.value = { ...state.value, status: "streaming", lastError: null };
     const next = source.start({

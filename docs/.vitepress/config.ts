@@ -44,6 +44,7 @@ export default defineConfig({
           { text: "Score distribution", link: "/modules/score-distribution" },
           { text: "Positional zoning", link: "/modules/positional-zoning" },
           { text: "Gain / loss ledger", link: "/modules/gain-loss-ledger" },
+          { text: "Actual vs preferred", link: "/modules/move-comparison" },
           { text: "Concept heads", link: "/modules/concept-heads" },
           {
             text: "Explanation generation",

@@ -2,6 +2,10 @@ export {
   REVIEW_MODULE_ISSUES,
 } from "./modules";
 export type {
+  ComparisonBranch,
+  ComparisonContext,
+  ComparisonEvidence,
+  ComparisonGroupTempo,
   GainLossLedger,
   GainLossLine,
   LedgerBaseline,
@@ -15,6 +19,8 @@ export type {
   SacrificeAnnotation,
   TempoChange,
 } from "./modules";
+
+export { isAlignedComparison } from "./comparison";
 
 export {
   PIPELINE_SCHEMA_VERSION,

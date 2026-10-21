@@ -19,6 +19,18 @@ pub enum PipelineStrategy {
 #[serde(rename_all = "camelCase")]
 #[allow(clippy::struct_excessive_bools)]
 pub struct PipelineConfig {
+    /// Compare each deeply analyzed played move at its historical root p-1.
+    #[serde(default = "enabled")]
+    pub include_comparison: bool,
+    /// Re-search an actual candidate below this count (except exact equality).
+    #[serde(default = "comparison_min_visits")]
+    pub comparison_min_visits: u64,
+    /// Query both played branches and their pass probes for status evidence.
+    #[serde(default = "enabled")]
+    pub comparison_branch_probes: bool,
+    /// Query the preferred PV endpoint for downstream sacrifice evidence.
+    #[serde(default = "enabled")]
+    pub comparison_pv_end: bool,
     pub strategy: PipelineStrategy,
     /// Deep / primary root visits (default mid of 500–2000).
     pub root_visits: u32,
@@ -53,6 +65,10 @@ pub struct PipelineConfig {
 impl Default for PipelineConfig {
     fn default() -> Self {
         Self {
+            include_comparison: true,
+            comparison_min_visits: comparison_min_visits(),
+            comparison_branch_probes: true,
+            comparison_pv_end: true,
             strategy: PipelineStrategy::ScanThenDeep,
             root_visits: 800,
             scan_visits: 100,
@@ -70,4 +86,11 @@ impl Default for PipelineConfig {
             deep_select: DeepSelectConfig::default(),
         }
     }
+}
+
+const fn enabled() -> bool {
+    true
+}
+const fn comparison_min_visits() -> u64 {
+    16
 }

@@ -14,6 +14,10 @@ is incorporated.
 ## Matching
 
 - Empty-start 19x19 games only; setup stones and handicap are outside the catalogue.
+- Native and UI recognition reject `AB`, `AW`, or `AE` properties, including
+  empty values, on the first game's main line through the 30th move node.
+  Comments, sibling variations, later games, and edits after that node do not
+  affect the opening label. This guard does not add mid-game setup-edit replay.
 - At most the first 30 plies. Fuseki matches every colored move in the whole-board
   prefix. Joseki starts match moves in an 8x8 corner, ignoring plays elsewhere.
 - All eight board symmetries and both color assignments are considered.

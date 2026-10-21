@@ -36,7 +36,7 @@ pub use ledger::{
     LedgerInconsistency, LedgerLineKind, LedgerScaling, LedgerStrengthChange, LedgerTempo,
     LEDGER_CONSISTENCY_TOLERANCE, LEDGER_STRENGTH_THRESHOLD,
 };
-pub use openings::match_opening;
+pub use openings::{match_opening, opening_max_ply};
 pub use pv_lineage::{trace_candidate_pv, CandidatePvLineage, RootStoneCapture};
 pub use sacrifice::{
     compute_sacrifices, compute_sacrifices_with_params, SacrificeAnnotation, SacrificeAssessment,

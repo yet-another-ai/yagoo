@@ -33,6 +33,12 @@ fn catalogue() -> &'static Catalogue {
     })
 }
 
+/// Number of main-line moves observed by the bundled opening catalogue.
+#[must_use]
+pub fn opening_max_ply() -> usize {
+    catalogue().max_ply
+}
+
 fn transform(mut x: u8, mut y: u8, size: u8, symmetry: u8) -> (u8, u8) {
     if symmetry >= 4 {
         x = size - 1 - x;

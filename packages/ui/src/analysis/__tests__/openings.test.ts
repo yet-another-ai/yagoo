@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import cases from "../../../../../data/openings-cases.json";
+import sgfCases from "../../../../../data/openings-sgf-cases.json";
 import { matchOpening, matchSgfOpening, type OpeningMove } from "../openings";
 import type { Vertex } from "../../types";
 
@@ -52,6 +53,10 @@ describe("opening matcher (shared Rust/browser cases)", () => {
 });
 
 describe("SGF opening recognition without an engine", () => {
+  it.each(sgfCases)("agrees with native setup support: $description", ({ sgf, name }) => {
+    expect(matchSgfOpening(sgf)?.name ?? null).toBe(name);
+  });
+
   it("uses only the first game's main line and ignores comments", () => {
     const actual = matchSgfOpening("(;SZ[19]C[B[dd\\] is commentary];B[dd];W[cc];B[dc](;W[cd])(;W[ce]))(;SZ[19];B[pd])");
     expect(actual?.joseki).toBe("3-3 invasion: block and extend");

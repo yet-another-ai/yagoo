@@ -25,6 +25,55 @@ fn partial_then_final(id: &str) -> Vec<String> {
 }
 
 #[tokio::test]
+async fn opening_setup_support_matches_browser_sgf_cases() {
+    #[derive(serde::Deserialize)]
+    struct Case {
+        description: String,
+        sgf: String,
+        name: Option<String>,
+    }
+    let cases: Vec<Case> =
+        serde_json::from_str(include_str!("../../../data/openings-sgf-cases.json")).unwrap();
+    for case in cases {
+        // Scripted responses exercise event/aggregate wiring, never an engine or model.
+        let client = Arc::new(AnalysisClient::scripted(vec![
+            root_line("p0-deep-root", 10),
+            root_line("p0-deep-pass", 10),
+        ]));
+        let config = PipelineConfig {
+            strategy: PipelineStrategy::DeepOnly,
+            to_ply: Some(0),
+            include_pv_ends: false,
+            include_comparison: false,
+            emit_game_aggregate: true,
+            ..PipelineConfig::default()
+        };
+        let events = analyze_game_collected(&case.sgf, client, config)
+            .await
+            .unwrap_or_else(|error| panic!("{}: {error}", case.description));
+        let PipelineEvent::OpeningMatched {
+            match_: opening, ..
+        } = &events[1]
+        else {
+            panic!("{}: expected opening event", case.description);
+        };
+        assert_eq!(
+            opening.as_ref().map(|value| value.name.as_str()),
+            case.name.as_deref(),
+            "{}",
+            case.description,
+        );
+        let PipelineEvent::GameCompleted {
+            game: Some(game), ..
+        } = events.last().unwrap()
+        else {
+            panic!("{}: expected aggregate", case.description);
+        };
+        assert_eq!(&game.opening, opening, "{}", case.description);
+    }
+}
+
+#[tokio::test]
 async fn opening_precedes_analysis_and_uses_full_game_outside_requested_range() {
     let client = Arc::new(AnalysisClient::scripted(vec![
         root_line("p4-deep-root", 10),

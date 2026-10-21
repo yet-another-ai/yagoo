@@ -1,5 +1,5 @@
 import {
-  renderCommentary, type CommentaryFact, type GroundedCommentary,
+  renderCommentary, resolveCommentary, type CommentaryFact, type GroundedCommentary,
 } from "./facts";
 
 export interface CommentaryRequest {
@@ -80,17 +80,19 @@ export class CommentarySession {
   private generation = 0;
   private pendingId: string | null = null;
   private controller: AbortController | null = null;
+  private saved: GroundedCommentary | null = null;
   private state: CommentarySessionState = {
     enabled: false, busy: false, awaitingManual: false, result: null, requestText: "",
   };
 
   constructor(
-    private readonly changed: (state: CommentarySessionState) => void,
+    private readonly changed: (state: CommentarySessionState, persist: boolean) => void,
     private readonly idFactory: () => string = () => crypto.randomUUID(),
   ) {}
 
-  private publish() {
-    this.changed({ ...this.state });
+  private publish(persist = false) {
+    if (persist) this.saved = this.state.result;
+    this.changed({ ...this.state }, persist);
   }
 
   private invalidate() {
@@ -103,22 +105,31 @@ export class CommentarySession {
     this.state.requestText = "";
   }
 
-  private template(reason?: string) {
+  private showResult(reason?: string) {
     this.state.result = this.state.enabled && this.facts.length
-      ? renderCommentary(this.facts, undefined, "templates", false, reason)
+      ? reason ? renderCommentary(this.facts, undefined, "templates", false, reason)
+        : this.saved ?? renderCommentary(this.facts)
       : null;
   }
 
-  setContext(facts: readonly CommentaryFact[], gameKey: unknown): boolean {
+  /** Hydration changes presentation only; it never writes fallback notes. */
+  setContext(facts: readonly CommentaryFact[], gameKey: unknown, stored?: unknown): boolean {
     const signature = JSON.stringify(facts);
-    if (signature === this.signature && gameKey === this.gameKey) return false;
+    // A parent's echo of our committed result must not restart requests or
+    // remove a visible provider-failure explanation during hydration.
+    if (signature === this.signature && gameKey === this.gameKey &&
+        (stored === undefined || JSON.stringify(stored) === JSON.stringify(this.saved))) return false;
+    const saved = stored == null ? null : resolveCommentary(facts, stored);
+    if (signature === this.signature && gameKey === this.gameKey &&
+        JSON.stringify(saved) === JSON.stringify(this.saved)) return false;
     const newGame = gameKey !== this.gameKey;
     this.invalidate();
     this.signature = signature;
     this.gameKey = gameKey;
     this.facts = structuredClone([...facts]);
+    this.saved = saved;
     if (newGame) this.state.enabled = false;
-    this.template();
+    this.showResult();
     this.publish();
     return true;
   }
@@ -126,13 +137,12 @@ export class CommentarySession {
   setEnabled(enabled: boolean) {
     this.invalidate();
     this.state.enabled = enabled;
-    this.template();
-    this.publish();
+    this.showResult();
+    this.publish(enabled && this.state.result !== null);
   }
 
   cancel() {
     this.invalidate();
-    this.template();
     this.publish();
   }
 
@@ -152,7 +162,6 @@ export class CommentarySession {
         selections: this.facts.slice(0, 3).map((f) => ({ factId: f.id, variant: 0 })),
       },
     };
-    this.template();
     return request;
   }
 
@@ -171,7 +180,7 @@ export class CommentarySession {
     this.pendingId = null;
     this.state.awaitingManual = false;
     this.state.requestText = "";
-    this.publish();
+    this.publish(true);
     return this.state.result.verified;
   }
 
@@ -192,13 +201,13 @@ export class CommentarySession {
       this.state.result = verifyCommentarySelection(this.facts, requestId, response, providerId);
     } catch {
       if (generation !== this.generation || controller.signal.aborted) return;
-      this.template("Provider request failed; showing deterministic templates.");
+      this.showResult("Provider request failed; showing deterministic templates.");
     } finally {
       if (generation === this.generation) {
         this.state.busy = false;
         this.pendingId = null;
         this.controller = null;
-        this.publish();
+        this.publish(true);
       }
     }
   }

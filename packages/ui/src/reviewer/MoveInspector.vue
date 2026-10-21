@@ -36,6 +36,7 @@ const props = withDefaults(
     showComparisonDifference?: boolean;
     sacrifices?: SacrificeAnnotation[] | null;
     commentary?: LlmCommentary | null;
+    commentaryActive?: boolean;
     commentaryInput?: CommentaryInput;
     commentaryProvider?: CommentaryProvider | null;
     commentaryContextKey?: string | number;
@@ -55,6 +56,7 @@ const props = withDefaults(
     showComparisonDifference: true,
     sacrifices: null,
     commentary: null,
+    commentaryActive: true,
     initialPerspective: "ai",
     ply: 0,
     keyIndex: -1,
@@ -280,6 +282,8 @@ defineExpose({ perspective });
     >
       <CommentaryPanel
         :input="commentaryInput ?? { ply, root, candidates, ledger, comparison, sacrifices }"
+        :stored="commentary"
+        :active="commentaryActive"
         :context-key="commentaryContextKey"
         :provider="commentaryProvider"
         @result="(result, origin) => emit('commentary', result, origin)"

@@ -80,6 +80,77 @@ describe("bounded provider response verification", () => {
 });
 
 describe("commentary session consent and lifetime", () => {
+  it("rehydrates only matching exact evidence without persisting lifecycle changes", () => {
+    const saved = renderCommentary(facts, [{ factId: facts[0]!.id, variant: 1 }], "mock saved provider", true);
+    let latest!: CommentarySessionState;
+    const writes: unknown[] = [];
+    const session = new CommentarySession((next, persist) => {
+      latest = next;
+      if (persist) writes.push(next.result);
+    });
+    session.setContext(facts, "game-a", saved);
+    expect(latest.enabled).toBe(false);
+    expect(latest.result).toBeNull();
+    expect(writes).toHaveLength(0);
+    session.setEnabled(true);
+    expect(latest.result).toEqual(saved);
+    expect(writes).toHaveLength(1);
+    session.setContext([], "game-a", null);
+    session.setContext(facts, "game-a", saved);
+    expect(latest.result).toEqual(saved);
+    expect(writes).toHaveLength(1);
+
+    const changed = structuredClone(facts);
+    changed[0]!.evidence[0]!.value = 999; // Same displayed clauses, different exact source identity.
+    session.setContext(changed, "game-a", saved);
+    expect(latest.result?.verified).toBe(false);
+    expect(latest.result?.fallbackReason).toContain("current approved facts");
+    expect(writes).toHaveLength(1);
+    session.setContext(facts, "game-b", saved);
+    expect(latest.enabled).toBe(false);
+    expect(latest.result).toBeNull();
+    expect(writes).toHaveLength(1);
+  });
+
+  it("preserves saved choices during preparation, cancellation and opt-out", async () => {
+    const saved = renderCommentary(facts, [{ factId: facts[0]!.id, variant: 1 }], "mock saved provider", true);
+    let latest!: CommentarySessionState;
+    const writes: unknown[] = [];
+    const session = new CommentarySession((next, persist) => {
+      latest = next;
+      if (persist) writes.push(next.result);
+    });
+    session.setContext(facts, "game-a", saved);
+    session.setEnabled(true);
+    const { provider, pending } = deferredProvider();
+    const work = session.request(provider);
+    expect(latest.result).toEqual(saved);
+    session.cancel();
+    expect(pending[0]!.signal.aborted).toBe(true);
+    pending[0]!.resolve(accepted(pending[0]!.request.requestId));
+    await work;
+    expect(latest.result).toEqual(saved);
+    expect(writes).toHaveLength(1);
+    session.setEnabled(false);
+    expect(latest.result).toBeNull();
+    expect(writes).toHaveLength(1);
+    session.setEnabled(true);
+    expect(latest.result).toEqual(saved);
+    session.setContext(facts, "game-a", null);
+    expect(latest.result?.provider).toBe("templates");
+    expect(writes).toHaveLength(2);
+  });
+
+  it("keeps a failure explanation when the parent echoes its persisted result", async () => {
+    const { session, latest } = setup();
+    session.setEnabled(true);
+    await session.request({ id: "mock failure", async select() { throw new Error("failed"); } });
+    const failed = latest().result;
+    expect(failed?.fallbackReason).toContain("failed");
+    expect(session.setContext(facts, "game-a", failed)).toBe(false);
+    expect(latest().result).toEqual(failed);
+  });
+
   it("makes no call until enabled and explicitly requested", async () => {
     const { session, latest } = setup();
     const select = vi.fn(async (request: CommentaryRequest) => accepted(request.requestId));

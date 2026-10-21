@@ -8,11 +8,14 @@ import {
   CommentarySession, type CommentaryProvider, type CommentarySessionState,
 } from "../commentary/session";
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   input: CommentaryInput;
+  stored?: unknown;
+  /** Hidden branch views must not edit main-line notes or keep requests alive. */
+  active?: boolean;
   contextKey?: string | number;
   provider?: CommentaryProvider | null;
-}>();
+}>(), { active: true });
 const emit = defineEmits<{
   (e: "result", value: GroundedCommentary | null, origin: CommentaryOrigin): void;
   (e: "cite", target: CommentaryTarget): void;
@@ -23,16 +26,25 @@ const state = shallowRef<CommentarySessionState>({
 });
 const response = ref("");
 const facts = computed(() => buildCommentaryFacts(props.input));
-const session = new CommentarySession((next) => {
+const session = new CommentarySession((next, persist) => {
   state.value = next;
-  emit("result", next.result, { ply: props.input.ply, contextKey: props.contextKey });
+  if (persist && props.active !== false) {
+    emit("result", next.result, { ply: props.input.ply, contextKey: props.contextKey });
+  }
 });
-watch([facts, () => props.contextKey], ([value, key]) => {
-  if (session.setContext(value, key)) {
+watch([facts, () => props.contextKey, () => props.stored], ([value, key, stored]) => {
+  if (session.setContext(value, key, stored)) {
     response.value = "";
     emit("clear-citation");
   }
-}, { immediate: true, flush: "sync" });
+}, { immediate: true });
+watch(() => props.active, (active) => {
+  if (active === false) {
+    session.cancel();
+    response.value = "";
+    emit("clear-citation");
+  }
+}, { flush: "sync" });
 watch(() => props.provider, () => session.cancel());
 onBeforeUnmount(() => session.setEnabled(false));
 const cited = computed(() => state.value.result?.sentences.map((sentence) => ({
@@ -55,7 +67,7 @@ function importSelection() {
 </script>
 
 <template>
-  <section class="yagoo-commentary" data-testid="commentary-panel">
+  <section v-if="active !== false" class="yagoo-commentary" data-testid="commentary-panel">
     <label>
       <input data-testid="commentary-enable" type="checkbox" :checked="state.enabled" @change="enable" />
       Show grounded notes

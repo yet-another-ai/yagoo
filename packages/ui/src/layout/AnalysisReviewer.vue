@@ -270,8 +270,10 @@ const commentaryInput = computed<CommentaryInput>(() => ({
 // Kept inside the reviewer; this context key is never in the provider packet.
 const commentaryContextKey = computed(() => `${gameGeneration.value}:${sgfText.value}`);
 function saveCommentary(result: GroundedCommentary | null, origin: CommentaryOrigin) {
+  // Hiding/disposing the panel is not an edit to the main-line record.
+  if (!result || variationActive.value) return;
   if (origin.contextKey !== commentaryContextKey.value || origin.ply !== currentPly.value) return;
-  if (result && resolveCommentary(buildCommentaryFacts(commentaryInput.value), result).fallbackReason) return;
+  if (resolveCommentary(buildCommentaryFacts(commentaryInput.value), result).fallbackReason) return;
   const ply = state.value.plies[currentPly.value];
   if (!ply || JSON.stringify(ply.commentary) === JSON.stringify(result)) return;
   state.value = {

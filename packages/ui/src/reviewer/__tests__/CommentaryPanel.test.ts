@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import recorded from "../../analysis/__fixtures__/ledger-position.json";
 import { reducePipelineEvent } from "../../analysis/reduce";
 import { createInitialAnalysisState, type PositionSnapshot } from "../../analysis/types";
-import { buildCommentaryFacts, type CommentaryInput } from "../../commentary/facts";
+import { buildCommentaryFacts, renderCommentary, type CommentaryInput } from "../../commentary/facts";
 import type { CommentaryRequest } from "../../commentary/session";
 import CommentaryPanel from "../CommentaryPanel.vue";
 
@@ -54,21 +54,23 @@ describe("grounded Notes panel", () => {
     await wrapper.get('[data-testid="commentary-provider"]').trigger("click");
     expect(select).toHaveBeenCalledTimes(1);
     expect(wrapper.find('[data-testid="commentary-cancel"]').exists()).toBe(true);
+    const writes = wrapper.emitted("result")?.length;
     await wrapper.setProps({ contextKey: "sgf-b" });
     expect(signal.aborted).toBe(true);
     resolve(request.responseExample);
     await flushPromises();
     expect(wrapper.get<HTMLInputElement>('[data-testid="commentary-enable"]').element.checked).toBe(false);
     expect(wrapper.find('[data-testid="commentary-body"]').exists()).toBe(false);
-    expect(wrapper.emitted("result")?.at(-1)).toEqual([null, { ply: 50, contextKey: "sgf-b" }]);
+    expect(wrapper.emitted("result")?.length).toBe(writes);
     wrapper.unmount();
   });
 
   it("clears consent and aborts work on unmount", async () => {
     let signal!: AbortSignal;
+    const onResult = vi.fn();
     const wrapper = mount(CommentaryPanel, {
       props: {
-        input, contextKey: "sgf-a",
+        input, contextKey: "sgf-a", onResult,
         provider: {
           id: "mock never resolves",
           select: (_: CommentaryRequest, abort: AbortSignal) => {
@@ -80,8 +82,43 @@ describe("grounded Notes panel", () => {
     });
     await wrapper.get('[data-testid="commentary-enable"]').setValue(true);
     await wrapper.get('[data-testid="commentary-provider"]').trigger("click");
+    const writes = onResult.mock.calls.length;
     wrapper.unmount();
     expect(signal.aborted).toBe(true);
-    expect(wrapper.emitted("result")?.at(-1)).toEqual([null, { ply: 50, contextKey: "sgf-a" }]);
+    expect(onResult).toHaveBeenCalledTimes(writes);
+  });
+
+  it("hides and cancels a pending request without replacing a restored selection", async () => {
+    const facts = buildCommentaryFacts(input);
+    const stored = renderCommentary(facts, [{ factId: facts[1]!.id, variant: 0 }], "mock saved provider", true);
+    let finish!: (value: unknown) => void;
+    let signal!: AbortSignal;
+    const onResult = vi.fn();
+    const wrapper = mount(CommentaryPanel, { props: {
+      input, stored, contextKey: "game-a", onResult, provider: {
+        id: "mock deferred",
+        select: (_request: CommentaryRequest, abort: AbortSignal) => {
+          signal = abort;
+          return new Promise((resolve) => { finish = resolve; });
+        },
+      },
+    } });
+    expect(wrapper.emitted("result")).toBeUndefined();
+    expect(wrapper.find('[data-testid="commentary-body"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="commentary-enable"]').setValue(true);
+    expect(wrapper.emitted("result")?.at(-1)?.[0]).toEqual(stored);
+    const writes = wrapper.emitted("result")!.length;
+    await wrapper.get('[data-testid="commentary-provider"]').trigger("click");
+    expect(wrapper.get('[data-testid="commentary-verification"]').text()).toContain("mock saved provider");
+    await wrapper.setProps({ active: false });
+    expect(signal.aborted).toBe(true);
+    expect(wrapper.find('[data-testid="commentary-body"]').exists()).toBe(false);
+    finish("late rejected response");
+    await flushPromises();
+    await wrapper.setProps({ active: true });
+    expect(wrapper.get('[data-testid="commentary-verification"]').text()).toContain("mock saved provider");
+    expect(wrapper.emitted("result")).toHaveLength(writes);
+    wrapper.unmount();
+    expect(onResult).toHaveBeenCalledTimes(writes);
   });
 });

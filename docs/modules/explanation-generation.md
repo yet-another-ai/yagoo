@@ -67,6 +67,8 @@ Each sentence exposes its fact ID and exact source paths/values. **Highlight cit
 
 The reviewer saves local results in the existing `PlyAnalysis.commentary` field. `GroundedCommentary` adds `sentences` and `factEvidence` to the base `text`, `citedFactIds`, `provider`, and `verified` fields. New authoritative position/stage evidence clears stored notes. A UI origin check prevents late events from saving into another position or game.
 
+Navigating back to a position restores its saved selection only after checking its exact facts. Preparing or cancelling a request, hiding notes for Try or an SGF variation, disabling notes, and opening the report do not overwrite that selection. These presentation changes are separate from explicit result writes. Hidden branches cancel pending requests; leaving a game or remounting the panel still requires fresh opt-in before notes are displayed.
+
 `resolveCommentary(facts, stored)` revalidates stored sentences, IDs, and exact evidence before a report reuses them. It reconstructs text from current approved variants. Changed source values are rejected even if their one-decimal display rounding would look unchanged. A stored `verified: true` flag alone is never sufficient.
 
 ## Validation and limitations

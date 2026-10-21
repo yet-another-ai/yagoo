@@ -15,6 +15,33 @@ async function drainProgressiveBatches(rounds = 350) {
 }
 
 describe("AnalysisReviewer", () => {
+  it("keeps the SGF file confirmation after the new game has rendered", async () => {
+    const wrapper = mount(AnalysisReviewer, {
+      props: { initialSgf: "(;SZ[9])", vertexSize: 16 },
+    });
+    try {
+      await wrapper.get('[data-testid="engine-source-button"]').trigger("click");
+      const input = wrapper.get('[data-testid="source-sgf-input"]');
+      for (const [name, text, rules] of [
+        ["first.sgf", "(;SZ[9];B[cc])", "chinese"],
+        ["second.sgf", "(;SZ[9]RU[Japanese];B[dd])", "Japanese"],
+      ]) {
+        Object.defineProperty(input.element, "files", {
+          configurable: true,
+          value: [new File([text!], name!, { type: "text/plain" })],
+        });
+        await input.trigger("change");
+        await flushPromises();
+        expect(wrapper.find(".yagoo-analysis-app__status").exists()).toBe(true);
+        expect(wrapper.get(".yagoo-analysis-app__status").text())
+          .toBe(`Loaded SGF ${name} (rules: ${rules})`);
+      }
+      expect(wrapper.text()).not.toContain("Loaded SGF first.sgf");
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
   it("does not replace recorded analysis when a model bundle is dropped on the engine panel", async () => {
     const wrapper = mount(AnalysisReviewer, {
       props: {
@@ -33,6 +60,44 @@ describe("AnalysisReviewer", () => {
     expect(emitted?.[0]?.[0]).toEqual([file]);
     expect(wrapper.text()).toMatch(/bundled sample analysis/);
     expect(wrapper.text()).not.toMatch(/Streaming from manifest\.json|Loading manifest\.json/);
+    wrapper.unmount();
+  });
+
+  it("recognizes SGF without an engine and clears the label on another loaded game", async () => {
+    const wrapper = mount(AnalysisReviewer, {
+      props: {
+        initialSgf: "(;SZ[19];B[dd];W[cc];B[dc];W[ce])",
+        vertexSize: 16,
+      },
+    });
+    const badge = () => wrapper.get('[data-testid="opening-badge"]');
+    expect(badge().text()).toContain("3-3 invasion: block and extend");
+    expect(badge().text()).toContain("outside the stored line at move 4");
+    await wrapper.setProps({ initialSgf: "(;SZ[19];B[jj])" });
+    expect(badge().text()).toContain("No unique match");
+    expect(badge().text()).not.toContain("3-3 invasion");
+    expect(badge().text()).not.toContain("move 4");
+    await wrapper.setProps({ initialSgf: "(;SZ[19];B[pd];W[dd];B[pp];W[dp];B[pj])" });
+    expect(badge().text()).toContain("Sanrensei");
+    await wrapper.setProps({ initialSgf: "" });
+    expect(badge().text()).toContain("No unique match");
+    wrapper.unmount();
+  });
+
+  it("does not show an unrelated NDJSON opening over the loaded SGF", async () => {
+    const wrapper = mount(AnalysisReviewer, {
+      props: {
+        initialSgf: "(;SZ[19];B[jj])",
+        initialNdjson: JSON.stringify({
+          type: "openingMatched", v: 1,
+          match: { name: "Unrelated game", joseki: null, deviationPly: 9, source: "test" },
+        }),
+        vertexSize: 16,
+      },
+    });
+    await drainProgressiveBatches(3);
+    expect(wrapper.get('[data-testid="opening-badge"]').text()).not.toContain("Unrelated game");
+    wrapper.unmount();
   });
 
   // Progressive NDJSON (~400+ events @ 4/frame) needs headroom under CI load.
@@ -131,9 +196,7 @@ describe("AnalysisReviewer", () => {
       // Goban should be sized for 19×19.
       expect(wrapper.findAll(".shudan-vertex")).toHaveLength(19 * 19);
 
-      expect(wrapper.get('[data-testid="opening-badge"]').text()).toMatch(
-        /Coming in #27/,
-      );
+      expect(wrapper.get('[data-testid="opening-badge"]').text()).not.toMatch(/Coming in #27/);
       wrapper.get('[data-testid="move-inspector"]');
 
       for (const [tab, issue] of [

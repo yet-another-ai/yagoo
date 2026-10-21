@@ -1,5 +1,10 @@
 # Third-party notices
 
+The starter opening catalogue in `data/openings.json` is an original Yagoo
+contribution under the repository's Apache-2.0 license, not an imported
+third-party database. See `data/OPENINGS_PROVENANCE.md` for source review,
+coverage, and redistribution information.
+
 The V7 feature algorithms in `crates/yagoo-core/src/nn_features.rs` are adapted
 from KataGo `python/katago/game/{board,features}.py` and
 `cpp/neuralnet/nninputs.cpp`, revision d91ea855110dae533f0aada947b2b7d78cc8a4e1.

@@ -5,6 +5,8 @@ The pipeline is an **async stream** of [`PipelineEvent`](./snapshots.md) values.
 ## Event order (`scan_then_deep`)
 
 1. `gameStarted`
+   - `openingMatched` (engine-independent result from the full game's prefix;
+     `match: null` when the starter catalogue has no unique match)
 2. `phaseStarted` (`scan`, low visits)
 3. For each ply in `--from`/`--to` (optional range filter):
    - `positionStarted`

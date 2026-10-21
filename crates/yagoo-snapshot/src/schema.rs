@@ -270,6 +270,17 @@ impl PositionSnapshot {
     }
 }
 
+/// Recognized short opening line; leaving the catalogue is not a mistake.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpeningMatch {
+    pub name: String,
+    pub joseki: Option<String>,
+    /// First global ply differing from a stored continuation, if observed.
+    pub deviation_ply: Option<u32>,
+    pub source: String,
+}
+
 /// Aggregated game document (written optionally at the end).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -280,5 +291,8 @@ pub struct GameSnapshot {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rules: Option<String>,
     pub ownership_convention: OwnershipConvention,
+    /// Engine-independent opening recognition; absent in older documents.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opening: Option<OpeningMatch>,
     pub positions: Vec<PositionSnapshot>,
 }

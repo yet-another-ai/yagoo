@@ -25,6 +25,94 @@ fn partial_then_final(id: &str) -> Vec<String> {
 }
 
 #[tokio::test]
+async fn opening_setup_support_matches_browser_sgf_cases() {
+    #[derive(serde::Deserialize)]
+    struct Case {
+        description: String,
+        sgf: String,
+        name: Option<String>,
+    }
+    let cases: Vec<Case> =
+        serde_json::from_str(include_str!("../../../data/openings-sgf-cases.json")).unwrap();
+    for case in cases {
+        // Scripted responses exercise event/aggregate wiring, never an engine or model.
+        let client = Arc::new(AnalysisClient::scripted(vec![
+            root_line("p0-deep-root", 10),
+            root_line("p0-deep-pass", 10),
+        ]));
+        let config = PipelineConfig {
+            strategy: PipelineStrategy::DeepOnly,
+            to_ply: Some(0),
+            include_pv_ends: false,
+            include_comparison: false,
+            emit_game_aggregate: true,
+            ..PipelineConfig::default()
+        };
+        let events = analyze_game_collected(&case.sgf, client, config)
+            .await
+            .unwrap_or_else(|error| panic!("{}: {error}", case.description));
+        let PipelineEvent::OpeningMatched {
+            match_: opening, ..
+        } = &events[1]
+        else {
+            panic!("{}: expected opening event", case.description);
+        };
+        assert_eq!(
+            opening.as_ref().map(|value| value.name.as_str()),
+            case.name.as_deref(),
+            "{}",
+            case.description,
+        );
+        let PipelineEvent::GameCompleted {
+            game: Some(game), ..
+        } = events.last().unwrap()
+        else {
+            panic!("{}: expected aggregate", case.description);
+        };
+        assert_eq!(&game.opening, opening, "{}", case.description);
+    }
+}
+
+#[tokio::test]
+async fn opening_precedes_analysis_and_uses_full_game_outside_requested_range() {
+    let client = Arc::new(AnalysisClient::scripted(vec![
+        root_line("p4-deep-root", 10),
+        root_line("p4-deep-pass", 10),
+    ]));
+    let config = PipelineConfig {
+        strategy: PipelineStrategy::DeepOnly,
+        from_ply: 4,
+        to_ply: Some(4),
+        include_pv_ends: false,
+        include_comparison: false,
+        emit_game_aggregate: true,
+        ..PipelineConfig::default()
+    };
+    let events = analyze_game_collected("(;SZ[19];B[dd];W[cc];B[dc];W[ce])", client, config)
+        .await
+        .unwrap();
+    let PipelineEvent::OpeningMatched {
+        match_: Some(opening),
+        ..
+    } = &events[1]
+    else {
+        panic!("opening must follow gameStarted, before engine work");
+    };
+    assert_eq!(
+        opening.joseki.as_deref(),
+        Some("3-3 invasion: block and extend")
+    );
+    assert_eq!(opening.deviation_ply, Some(4));
+    let PipelineEvent::GameCompleted {
+        game: Some(game), ..
+    } = events.last().unwrap()
+    else {
+        panic!("expected aggregate");
+    };
+    assert_eq!(game.opening.as_ref(), Some(opening));
+}
+
+#[tokio::test]
 async fn deep_only_emits_ordered_events_and_black_positive() {
     // ply 0 and 1; each: root + pass → 4 queries. Include one partial on first root.
     let mut lines = Vec::new();

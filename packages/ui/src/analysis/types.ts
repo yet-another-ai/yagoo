@@ -143,6 +143,7 @@ export interface GameSnapshot {
   komi: number;
   rules?: string | null;
   ownershipConvention: OwnershipConvention;
+  opening?: OpeningMatch | null;
   positions: PositionSnapshot[];
 }
 
@@ -155,6 +156,7 @@ export interface DeepPlySelection {
 }
 
 export type PipelineEvent =
+  | { type: "openingMatched"; v: number; match: OpeningMatch | null }
   | {
       type: "gameStarted";
       v: number;

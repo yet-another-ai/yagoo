@@ -13,13 +13,14 @@ use std::sync::Arc;
 use yagoo_core::Color;
 use yagoo_katago::{AnalysisQueryBuilder, AnalysisUpdate};
 use yagoo_sgf::{
-    filter_ply_range, move_to_gtp, parse_sgf, replay_main_line, GameRecord, ReplayedPosition,
+    filter_ply_range, move_to_gtp, parse_sgf, parse_sgf_tree, replay_main_line, GameRecord,
+    GameTreeNode, ReplayedPosition,
 };
 use yagoo_snapshot::{
     best_candidate, board_from_game, candidates_from_response, chains_from_game, compute_groups,
-    compute_ledger, engine_from_response, AnalysisPhase, AnalysisStage, ColorToken, GameSnapshot,
-    LedgerBaseline, OwnershipConvention, PassProbeSkipReason, PipelineEvent, PositionSnapshot,
-    PvEndSnapshot, SCHEMA_VERSION,
+    compute_ledger, engine_from_response, match_opening, opening_max_ply, AnalysisPhase,
+    AnalysisStage, ColorToken, GameSnapshot, LedgerBaseline, OwnershipConvention,
+    PassProbeSkipReason, PipelineEvent, PositionSnapshot, PvEndSnapshot, SCHEMA_VERSION,
 };
 
 /// Boxed stream of pipeline events.
@@ -102,6 +103,27 @@ async fn drive<E: AnalysisEngine>(
         },
     )?;
 
+    // The flattened record omits AE and non-root setup properties. Inspect the
+    // parsed main-line prefix so these unsupported edits cannot acquire a label.
+    let has_setup = record.handicap.is_some_and(|handicap| handicap > 0)
+        || has_opening_setup(&parse_sgf_tree(sgf)?);
+    let opening = match_opening(
+        record.size,
+        has_setup,
+        &record
+            .moves
+            .iter()
+            .map(|m| (m.color, m.point))
+            .collect::<Vec<_>>(),
+    );
+    send(
+        &tx,
+        PipelineEvent::OpeningMatched {
+            v: SCHEMA_VERSION,
+            match_: opening.clone(),
+        },
+    )?;
+
     let mut snapshots: BTreeMap<u32, PositionSnapshot> = BTreeMap::new();
     let position_refs: Vec<&ReplayedPosition> = positions.iter().collect();
 
@@ -171,6 +193,7 @@ async fn drive<E: AnalysisEngine>(
             komi: record.komi,
             rules: record.rules.clone(),
             ownership_convention: OwnershipConvention::BlackPositive,
+            opening,
             positions: snapshots.into_values().collect(),
         }))
     } else {
@@ -185,6 +208,26 @@ async fn drive<E: AnalysisEngine>(
         },
     )?;
     Ok(())
+}
+
+fn has_opening_setup(root: &GameTreeNode) -> bool {
+    let mut node = Some(root);
+    let mut moves = 0;
+    let limit = opening_max_ply();
+    while moves < limit {
+        let Some(current) = node else { break };
+        if ["AB", "AW", "AE"]
+            .iter()
+            .any(|key| current.get(key).is_some_and(|values| !values.is_empty()))
+        {
+            return true;
+        }
+        if current.get("B").is_some() || current.get("W").is_some() {
+            moves += 1;
+        }
+        node = current.children.first();
+    }
+    false
 }
 
 fn choose_deep_positions<'a>(

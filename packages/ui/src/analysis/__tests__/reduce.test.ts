@@ -63,6 +63,36 @@ describe("review module availability", () => {
 });
 
 describe("reducePipelineEvent ordering", () => {
+  it("loads opening events/aggregates and clears previous game data on a new game", () => {
+    const opening = {
+      name: "4-4 point", joseki: "3-3 invasion: block and extend",
+      deviationPly: 6, source: "yagoo-starter-1 (Apache-2.0)",
+    };
+    const previous = reducePipelineEvents(fixtureEvents);
+    const matched = reducePipelineEvent(previous, { type: "openingMatched", v: 1, match: opening });
+    expect(matched.opening).toEqual(opening);
+    expect(previous.opening).toBeNull();
+    const completed = reducePipelineEvent(matched, {
+      type: "gameCompleted", v: 1,
+      game: { schemaVersion: 1, size: 19, komi: 7.5, ownershipConvention: "black_positive", positions: [] },
+    });
+    expect(completed.opening).toEqual(opening);
+    const started = reducePipelineEvent(completed, {
+      type: "gameStarted", v: 1, size: 9, komi: 6.5, moveCount: 0, positionCount: 1, strategy: "deep_only",
+    });
+    expect(started.opening).toBeNull();
+    expect(started.game).toBeNull();
+    expect(started.plies).toEqual({});
+    expect(started.deepPlies).toEqual([]);
+    expect(started.eventCount).toBe(1);
+    const aggregate = reducePipelineEvent(started, {
+      type: "gameCompleted", v: 1,
+      game: { schemaVersion: 1, size: 19, komi: 7.5, ownershipConvention: "black_positive", positions: [], opening },
+    });
+    expect(aggregate.opening).toEqual(opening);
+    expect(reducePipelineEvent(aggregate, { type: "openingMatched", v: 1, match: null }).opening).toBeNull();
+  });
+
   it("applies scan results before deepPliesSelected and deepen updates", () => {
     const types = fixtureEvents.map((e) => e.type);
     const deepSel = types.indexOf("deepPliesSelected");

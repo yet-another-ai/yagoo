@@ -14,6 +14,7 @@ mod convert;
 mod events;
 mod groups;
 mod ledger;
+mod openings;
 mod pv_lineage;
 mod sacrifice;
 mod schema;
@@ -35,6 +36,7 @@ pub use ledger::{
     LedgerInconsistency, LedgerLineKind, LedgerScaling, LedgerStrengthChange, LedgerTempo,
     LEDGER_CONSISTENCY_TOLERANCE, LEDGER_STRENGTH_THRESHOLD,
 };
+pub use openings::{match_opening, opening_max_ply};
 pub use pv_lineage::{trace_candidate_pv, CandidatePvLineage, RootStoneCapture};
 pub use sacrifice::{
     compute_sacrifices, compute_sacrifices_with_params, SacrificeAnnotation, SacrificeAssessment,
@@ -44,7 +46,8 @@ pub use sacrifice::{
 pub use schema::{
     BoardSnapshot, CandidateSnapshot, ChainSnapshot, ColorToken, EngineAnalysis, GameSnapshot,
     GroupKind, GroupMembers, GroupPart, GroupSnapshot, GroupSource, GroupStatus, GroupStrength,
-    OwnershipConvention, PassProbeSkipReason, PositionSnapshot, PvEndSnapshot, SCHEMA_VERSION,
+    OpeningMatch, OwnershipConvention, PassProbeSkipReason, PositionSnapshot, PvEndSnapshot,
+    SCHEMA_VERSION,
 };
 
 /// Crate version string from Cargo.

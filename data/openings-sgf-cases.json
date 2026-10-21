@@ -1,0 +1,92 @@
+[
+  {
+    "description": "root removal property",
+    "sgf": "(;SZ[19]AE[ss];B[dd];W[cc];B[dc];W[cd])",
+    "name": null
+  },
+  {
+    "description": "empty root removal property",
+    "sgf": "(;SZ[19]AE[];B[dd];W[cc];B[dc];W[cd])",
+    "name": null
+  },
+  {
+    "description": "empty root black setup property",
+    "sgf": "(;SZ[19]AB[];B[dd];W[cc];B[dc];W[cd])",
+    "name": null
+  },
+  {
+    "description": "empty root white setup property",
+    "sgf": "(;SZ[19]AW[];B[dd];W[cc];B[dc];W[cd])",
+    "name": null
+  },
+  {
+    "description": "mainline AB edit-only node",
+    "sgf": "(;SZ[19];B[dd];AB[ss];W[cc];B[dc];W[cd])",
+    "name": null
+  },
+  {
+    "description": "mainline AW edit-only node",
+    "sgf": "(;SZ[19];B[dd];AW[ss];W[cc];B[dc];W[cd])",
+    "name": null
+  },
+  {
+    "description": "mainline AE edit-only node",
+    "sgf": "(;SZ[19];B[dd];AE[ss];W[cc];B[dc];W[cd])",
+    "name": null
+  },
+  {
+    "description": "setup edit on a move node",
+    "sgf": "(;SZ[19];B[dd];W[cc]AE[ss];B[dc];W[cd])",
+    "name": null
+  },
+  {
+    "description": "compressed removal property",
+    "sgf": "(;SZ[19]AE[rr:ss];B[dd];W[cc];B[dc];W[cd])",
+    "name": null
+  },
+  {
+    "description": "setup text inside a comment",
+    "sgf": "(;SZ[19]C[AB[ss\\] AW[ss\\] AE[ss\\] are comments];B[dd];W[cc];B[dc];W[cd])",
+    "name": "4-4 point"
+  },
+  {
+    "description": "setup in a sibling variation",
+    "sgf": "(;SZ[19];B[dd];W[cc];B[dc](;W[cd])(;AE[ss];W[ce]))",
+    "name": "4-4 point"
+  },
+  {
+    "description": "setup in a later game",
+    "sgf": "(;SZ[19];B[dd];W[cc];B[dc];W[cd])(;SZ[19]AE[ss];B[dd];W[cc];B[dc];W[cd])",
+    "name": "4-4 point"
+  },
+  {
+    "description": "White first without setup",
+    "sgf": "(;SZ[19]PL[W];W[dd];B[cc];W[dc];B[cd])",
+    "name": "4-4 point"
+  },
+  {
+    "description": "zero handicap without setup",
+    "sgf": "(;SZ[19]HA[0];B[dd];W[cc];B[dc];W[cd])",
+    "name": "4-4 point"
+  },
+  {
+    "description": "edit-only node after move 29",
+    "sgf": "(;SZ[19];B[dd];W[cc];B[dc];W[cd];B[ak];W[ck];B[ek];W[gk];B[ik];W[kk];B[mk];W[ok];B[qk];W[sk];B[am];W[cm];B[em];W[gm];B[im];W[km];B[mm];W[om];B[qm];W[sm];B[ao];W[co];B[eo];W[go];B[io];AE[ss];W[ko])",
+    "name": null
+  },
+  {
+    "description": "edit on move 30 with intervening comments",
+    "sgf": "(;SZ[19];B[dd];C[note];W[cc];C[note];B[dc];C[note];W[cd];C[note];B[ak];C[note];W[ck];C[note];B[ek];C[note];W[gk];C[note];B[ik];C[note];W[kk];C[note];B[mk];C[note];W[ok];C[note];B[qk];C[note];W[sk];C[note];B[am];C[note];W[cm];C[note];B[em];C[note];W[gm];C[note];B[im];C[note];W[km];C[note];B[mm];C[note];W[om];C[note];B[qm];C[note];W[sm];C[note];B[ao];C[note];W[co];C[note];B[eo];C[note];W[go];C[note];B[io];C[note];W[ko]AE[ss])",
+    "name": null
+  },
+  {
+    "description": "edit-only node after move 30",
+    "sgf": "(;SZ[19];B[dd];W[cc];B[dc];W[cd];B[ak];W[ck];B[ek];W[gk];B[ik];W[kk];B[mk];W[ok];B[qk];W[sk];B[am];W[cm];B[em];W[gm];B[im];W[km];B[mm];W[om];B[qm];W[sm];B[ao];W[co];B[eo];W[go];B[io];W[ko];AE[ss])",
+    "name": "4-4 point"
+  },
+  {
+    "description": "edit on move 31",
+    "sgf": "(;SZ[19];B[dd];W[cc];B[dc];W[cd];B[ak];W[ck];B[ek];W[gk];B[ik];W[kk];B[mk];W[ok];B[qk];W[sk];B[am];W[cm];B[em];W[gm];B[im];W[km];B[mm];W[om];B[qm];W[sm];B[ao];W[co];B[eo];W[go];B[io];W[ko];B[ss]AE[rr])",
+    "name": "4-4 point"
+  }
+]

@@ -1,0 +1,61 @@
+{
+  "source": "yagoo-starter-1 (Apache-2.0)",
+  "boardSize": 19,
+  "cornerSize": 8,
+  "maxPly": 30,
+  "lines": [
+    {
+      "id": "parallel-stars",
+      "name": "Parallel 4-4 opening",
+      "kind": "fuseki",
+      "minimum": 4,
+      "moves": [["B", 15, 3], ["W", 3, 3], ["B", 15, 15], ["W", 3, 15]]
+    },
+    {
+      "id": "diagonal-stars",
+      "name": "Diagonal 4-4 opening",
+      "kind": "fuseki",
+      "minimum": 4,
+      "moves": [["B", 15, 3], ["W", 3, 3], ["B", 3, 15], ["W", 15, 15]]
+    },
+    {
+      "id": "sanrensei",
+      "name": "Sanrensei",
+      "kind": "fuseki",
+      "minimum": 5,
+      "moves": [["B", 15, 3], ["W", 3, 3], ["B", 15, 15], ["W", 3, 15], ["B", 15, 9]]
+    },
+    {
+      "id": "star-three-three",
+      "name": "4-4 point",
+      "joseki": "3-3 invasion: block and extend",
+      "kind": "joseki",
+      "minimum": 3,
+      "moves": [["B", 3, 3], ["W", 2, 2], ["B", 3, 2], ["W", 2, 3]]
+    },
+    {
+      "id": "star-low-approach-jump",
+      "name": "4-4 point",
+      "joseki": "Low approach: one-space jump",
+      "kind": "joseki",
+      "minimum": 2,
+      "moves": [["B", 3, 3], ["W", 5, 2], ["B", 3, 5]]
+    },
+    {
+      "id": "star-low-approach-knight",
+      "name": "4-4 point",
+      "joseki": "Low approach: small-knight response",
+      "kind": "joseki",
+      "minimum": 2,
+      "moves": [["B", 3, 3], ["W", 5, 2], ["B", 2, 5]]
+    },
+    {
+      "id": "komoku-low-approach",
+      "name": "3-4 point",
+      "joseki": "Low approach: diagonal defense",
+      "kind": "joseki",
+      "minimum": 2,
+      "moves": [["B", 3, 2], ["W", 5, 2], ["B", 4, 3]]
+    }
+  ]
+}

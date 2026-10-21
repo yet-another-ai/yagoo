@@ -50,11 +50,12 @@ Keyboard: Left / Right move through the game, or through the try branch when one
 | Key moves | `reviewer/keyMoves.ts` | Reads `deepPlies` / `deepReasons` / candidate `order` |
 | Try branch | `reviewer/tryBranch.ts` | Replayed anchor history, legal moves, and node ancestry |
 
-`useAnalysisStream` still reduces NDJSON into `AnalysisState`. Per-ply `ledger`, `comparison`, `sacrifices`, and `commentary`, plus `opening` and `report` on the state, stay `null` until a future event fills them.
+`useAnalysisStream` still reduces NDJSON into `AnalysisState`. Per-ply `ledger`, `comparison`, `sacrifices`, and `commentary`, plus `report` on the state, stay `null` until a future event fills them. `openingMatched` fills `opening`; loaded SGFs are also recognized locally without an engine using the same [starter opening catalogue](../modules/openings.md).
 
 ## What works today
 
 - Open SGF (picker and drag-and-drop). Board size comes from `SZ` (default 19). The board fills its pane.
+- Opening/joseki-start header and stored-line deviation marker, from a small original Apache-2.0 catalogue; ambiguous or unsupported games show an explicit unmatched state.
 - Import NDJSON (picker, drag-and-drop, bundled ear-reddening sample) and stream scan then deepen.
 - Winrate and score graph. Deepened plies are marked. Clicking the graph seeks.
 - Candidate ghosts, visit filtering, and Sabaki-style numbered PV preview on hover or click. A winrate is shown only when that candidate's visits are at least 5% of the top move (the top move itself always qualifies). Thinner lines are left off the list and the analysis comment, and their winrate is not printed on the board.
@@ -69,7 +70,6 @@ Keyboard: Left / Right move through the game, or through the try branch when one
 
 | Surface | Empty when | Issue |
 | --- | --- | --- |
-| Header opening / joseki | `AnalysisState.opening == null` | [#27](https://github.com/yet-another-ai/yagoo/issues/27) |
 | Why not | `PlyAnalysis.comparison == null` | [#24](https://github.com/yet-another-ai/yagoo/issues/24) |
 | Ledger | `PlyAnalysis.ledger == null` | [#23](https://github.com/yet-another-ai/yagoo/issues/23) |
 | Sacrifice (弃子) | `PlyAnalysis.sacrifices == null` | [#25](https://github.com/yet-another-ai/yagoo/issues/25) |
@@ -88,7 +88,7 @@ Defined in `packages/ui/src/analysis/modules.ts` and stored on `PlyAnalysis` / `
 - **Ledger (#23).** `GainLossLedger`: `move`, `vs` (`pass` or `best`), `value`, `ledger[]` (`kind`, optional `id`, `change`, `points`, optional `tempo`), `consistent`. Matches the fact JSON in `docs/modules/gain-loss-ledger.md`, plus tempo from the group status change.
 - **Why not (#24).** `MoveComparison`: actual and AI move, winrates (fraction for the side to play), score leads (Black’s perspective), optional `ownershipDelta[]` (black-positive, row-major from A19), `ledgerDiff`.
 - **Sacrifice (#25).** `SacrificeAnnotation`: `groupId`, `ownershipFlip` (positive means the mover gives the group away), `compensationPoints`, `exchangedWith`, `pv`.
-- **Opening (#27).** `OpeningMatch`: `name`, `joseki`, `deviationPly`, `source`. The matcher owns licensing; the badge only displays `source`.
+- **Opening (#27).** `OpeningMatch`: `name`, `joseki`, `deviationPly`, `source`. The matcher owns licensing; the badge only displays `source`. The loaded SGF's local match takes precedence over NDJSON, so another game's analysis cannot supply its opening. See [matching and limits](../modules/openings.md).
 - **Notes (#28).** `LlmCommentary`: `text`, `citedFactIds`, `provider`, `verified`. The checkbox stays disabled. Nothing is sent to a model.
 - **Report (#29).** `ReviewReportDocument`: `markdown`, `moves[]` of the structured pieces above. The view already lists key moves from `deepPlies` so the shell is usable before the document exists. Export stays disabled.
 - **Try (#26).** `PositionAnalysisRequest` contains the SGF ancestry, anchor `ply`, GTP `moves` including pass, and an optional visit budget. `useVariationAnalysis` keeps `AnalysisState` per variation node, separate from the main-line graph. The shared root-only pipeline emits one `positionCompleted` snapshot. See [live variations](../pipeline/live-variations).

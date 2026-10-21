@@ -28,6 +28,8 @@ import type { GamePosition } from "../composables/gamePosition";
 import Goban from "../goban/Goban.vue";
 import OverlayLayer from "../overlays/OverlayLayer.vue";
 import type { OverlayData } from "../overlays/OverlayRenderer";
+import type { CommentaryInput, CommentaryTarget, CommentaryOrigin, GroundedCommentary } from "../commentary/facts";
+import type { CommentaryProvider } from "../commentary/session";
 import MoveInspector, {
   type InspectorPerspective,
 } from "../reviewer/MoveInspector.vue";
@@ -111,6 +113,9 @@ const props = withDefaults(
     comparison?: MoveComparison | null;
     sacrifices?: SacrificeAnnotation[] | null;
     commentary?: LlmCommentary | null;
+    commentaryInput?: CommentaryInput;
+    commentaryProvider?: CommentaryProvider | null;
+    commentaryContextKey?: string | number;
     reportDocument?: ReviewReportDocument | null;
     initialPerspective?: InspectorPerspective;
     /** Live source for the selected variation, separate from main-line results. */
@@ -163,6 +168,7 @@ const emit = defineEmits<{
   (e: "select-group", groupId: string): void;
   (e: "variation-analysis"): void;
   (e: "variation-change", active: boolean): void;
+  (e: "commentary", result: GroundedCommentary | null, origin: CommentaryOrigin): void;
 }>();
 
 const {
@@ -198,7 +204,7 @@ const section = ref<CompactSection>("inspector");
 const lowerTab = ref<"groups" | "tree">("groups");
 const view = ref<"board" | "report">("board");
 const tryMode = ref(false);
-const ledgerPreview = ref<Vertex[] | null>(null);
+const ledgerPreview = ref<{ vertices: Vertex[] } | { groupId: string } | null>(null);
 const inspectorPerspective = ref<InspectorPerspective>(props.initialPerspective);
 const comparisonDifference = ref(true);
 const tryNodes = ref<TryNode[]>([]);
@@ -320,7 +326,13 @@ const tryDepth = computed(() =>
 const suspendAnalysis = computed(
   () => tryMode.value || (loaded.value && !onMainLine.value),
 );
-watch([() => props.ledger, () => props.comparison, suspendAnalysis, inspectorPerspective], () => {
+watch([
+  () => props.ledger, () => props.comparison,
+  // The reducer copies groups on unrelated events; only changed evidence
+  // invalidates a preview. Preserve order because fact paths use indices.
+  () => JSON.stringify(props.groups),
+  () => props.commentaryContextKey, suspendAnalysis, inspectorPerspective,
+], () => {
   ledgerPreview.value = null;
 });
 watch(() => props.initialPerspective, (value) => { inspectorPerspective.value = value; });
@@ -334,15 +346,25 @@ const activeComparison = computed(() =>
   ["why", "sacrifice"].includes(inspectorPerspective.value) ? alignedComparison.value : null,
 );
 const displayedGroups = computed(() => activeComparison.value?.context.groups ?? props.groups);
+const citedGroup = computed(() => {
+  const preview = ledgerPreview.value;
+  return preview && "groupId" in preview
+    ? props.groups.find((group) => group.groupId === preview.groupId) ?? null : null;
+});
+const previewVertices = computed(() => {
+  const preview = ledgerPreview.value;
+  if (preview && "vertices" in preview) return preview.vertices;
+  return citedGroup.value ? groupMemberVertices(citedGroup.value, boardSize.value) : null;
+});
 
 function previewLedger(line: GainLossLine) {
   previewStones(line.intersections);
 }
 
 function previewStones(stones: string[]) {
-  ledgerPreview.value = stones
+  ledgerPreview.value = { vertices: stones
     .map((coordinate) => parseGtpVertex(coordinate, boardSize.value))
-    .filter((vertex): vertex is Vertex => vertex != null);
+    .filter((vertex): vertex is Vertex => vertex != null) };
 }
 watch(suspendAnalysis, (active) => emit("variation-change", active), { immediate: true });
 const variationPly = computed(() => moveNumber.value + tryDepth.value);
@@ -387,23 +409,44 @@ watch(() => props.positionSource, () => { variation.clear(); analyzeVariation();
 watch(variationKey, () => analyzeVariation());
 
 function previewDisplayedGroup(id: string) {
+  ledgerPreview.value = null;
   if (!activeComparison.value) { emit("preview-group", id); return; }
   const group = displayedGroups.value.find((entry) => entry.groupId === id);
-  ledgerPreview.value = group ? groupMemberVertices(group, boardSize.value) : null;
+  ledgerPreview.value = group ? { vertices: groupMemberVertices(group, boardSize.value) } : null;
 }
 function clearDisplayedGroup() {
   ledgerPreview.value = null;
   emit("clear-group-preview");
 }
 function selectDisplayedGroup(id: string) {
+  ledgerPreview.value = null;
   if (activeComparison.value) previewDisplayedGroup(id);
   else emit("select-group", id);
+}
+
+function citeCommentary(target: CommentaryTarget) {
+  if (suspendAnalysis.value || inspectorPerspective.value !== "notes") return;
+  clearCommentaryCitation();
+  if (target.intersections?.length) {
+    previewStones(target.intersections);
+  } else if (target.groupId) {
+    // A citation temporarily overrides the board; the parent retains its pin.
+    ledgerPreview.value = { groupId: target.groupId };
+  }
+}
+
+function clearCommentaryCitation() {
+  ledgerPreview.value = null;
+  emit("clear-group-preview");
 }
 
 const overlayData = computed<OverlayData>(() => {
   if (suspendAnalysis.value) return { groupOutlines: [] };
   if (activeComparison.value) return {
     groupOutlines: buildGroupOutlines(activeComparison.value.context.groups, boardSize.value),
+  };
+  if (citedGroup.value) return {
+    groupOutlines: buildGroupOutlines(props.groups, boardSize.value, citedGroup.value.groupId),
   };
   if (props.groupOutlines.length > 0) {
     return { groupOutlines: props.groupOutlines };
@@ -506,8 +549,8 @@ const boardLines = computed(() =>
 );
 const boardDimmed = computed(() => {
   if (suspendAnalysis.value) return [];
-  if (ledgerPreview.value == null) return activeComparison.value ? [] : props.dimmedVertices;
-  const included = new Set(ledgerPreview.value.map(([x, y]) => `${x},${y}`));
+  if (previewVertices.value == null) return activeComparison.value ? [] : props.dimmedVertices;
+  const included = new Set(previewVertices.value.map(([x, y]) => `${x},${y}`));
   const dimmed: Vertex[] = [];
   for (let y = 0; y < boardSize.value; y += 1) {
     for (let x = 0; x < boardSize.value; x += 1) {
@@ -517,7 +560,7 @@ const boardDimmed = computed(() => {
   return dimmed;
 });
 const boardSelected = computed(() =>
-  suspendAnalysis.value ? [] : (ledgerPreview.value ?? (activeComparison.value ? [] : props.selectedVertices)),
+  suspendAnalysis.value ? [] : (previewVertices.value ?? (activeComparison.value ? [] : props.selectedVertices)),
 );
 
 function clearTry() {
@@ -904,7 +947,11 @@ defineExpose({
           :comparison="alignedComparison"
           :show-comparison-difference="comparisonDifference"
           :sacrifices="suspendAnalysis ? null : sacrifices"
-          :commentary="suspendAnalysis ? null : commentary"
+          :commentary="commentary"
+          :commentary-input="commentaryInput"
+          :commentary-active="!suspendAnalysis"
+          :commentary-provider="commentaryProvider"
+          :commentary-context-key="commentaryContextKey ?? sgf"
           :initial-perspective="initialPerspective"
           :ply="variationPly"
           :key-index="keyIndex"
@@ -919,6 +966,9 @@ defineExpose({
           @perspective-change="inspectorPerspective = $event"
           @toggle-comparison-difference="comparisonDifference = $event"
           @clear-ledger-preview="ledgerPreview = null"
+          @commentary="(result, origin) => { if (!suspendAnalysis) emit('commentary', result, origin) }"
+          @cite-commentary="citeCommentary"
+          @clear-commentary-citation="clearCommentaryCitation"
           @prev-key="stepKey(-1)"
           @next-key="stepKey(1)"
         />

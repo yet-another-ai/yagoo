@@ -269,14 +269,14 @@ export interface OpeningMatch {
 }
 
 /**
- * Natural-language paraphrase of structured facts (#28).
- * Every claim in `text` is supposed to be traceable to `citedFactIds`.
+ * Grounded sentences selected from structured facts (#28).
+ * The bounded renderer, not a provider, constructs `text` from cited facts.
  */
 export interface LlmCommentary {
   text: string;
   citedFactIds: string[];
   provider: string;
-  /** False when verification failed and `text` is the template fallback. */
+  /** True only for a validated clause-selection response; not a free-prose truth score. */
   verified: boolean;
 }
 

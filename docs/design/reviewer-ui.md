@@ -2,7 +2,7 @@
 
 The `/app/` page is the game-review workspace from [issue #30](https://github.com/yet-another-ai/yagoo/issues/30). It stays a client-only VitePress page (`layout: page`, no sidebar) and renders `@yagoo/ui`. `/demo/` embeds the same reviewer. The experimental browser engine loads from the **Engine** panel on both pages. There is no separate engine UI; `/engine/` redirects to `/demo/`.
 
-The event-stream reducer (`AnalysisState`) is the only source of analysis. Panels read it. They do not estimate winrate, groups, ledgers, or commentary on the client.
+The event-stream reducer (`AnalysisState`) is the source of analysis. Panels do not estimate winrate, groups, or ledgers. Opt-in commentary renders approved sentences from those structured values, with exact source citations.
 
 ## Layout
 
@@ -50,7 +50,8 @@ Keyboard: Left / Right move through the game, or through the try branch when one
 | Key moves | `reviewer/keyMoves.ts` | Reads `deepPlies` / `deepReasons` / candidate `order` |
 | Try branch | `reviewer/tryBranch.ts` | Replayed anchor history, legal moves, and node ancestry |
 
-`useAnalysisStream` still reduces NDJSON into `AnalysisState`. Per-ply `ledger`, `comparison`, `sacrifices`, and `commentary`, plus `report` on the state, stay `null` until a future event fills them. `openingMatched` fills `opening`; loaded SGFs are also recognized locally without an engine using the same [starter opening catalogue](../modules/openings.md).
+`useAnalysisStream` reduces NDJSON into `AnalysisState`. Per-ply module fields remain `null` until their producer fills them. Opt-in Notes saves locally rendered, grounded sentences in `PlyAnalysis.commentary`; new analysis invalidates them.
+`openingMatched` fills `opening`; loaded SGFs are also recognized locally without an engine using the same [starter opening catalogue](../modules/openings.md).
 
 ## What works today
 
@@ -65,6 +66,7 @@ Keyboard: Left / Right move through the game, or through the try branch when one
 - Try mode: click an empty point or Pass to grow a branch and walk its tree. Side to move and captures follow the selected node. A staged browser model or connected native source analyzes just that position; candidates, PV and ownership come from its snapshot. Stop, retry, navigation and new SGFs cancel stale requests.
 - Report view: lists those same key moves and the deltas already on `deepReasons`, across the full width of the page.
 - Engine menu: NDJSON is the default. The browser engine stays disabled until a local bundle (or a configured manifest URL) is staged, then **Use browser engine** runs it. Live native connects to the local `yagoo analyze --serve` endpoint.
+- Notes: local templates after explicit opt-in, inspectable manual prompt/selection JSON, and an optional injected provider selector. Provider responses can only select and order approved clauses. Group/zone citations highlight their source coordinates.
 
 ## Stubs and the issue that fills them
 
@@ -73,13 +75,12 @@ Keyboard: Left / Right move through the game, or through the try branch when one
 | Why not | `PlyAnalysis.comparison == null` | [#24](https://github.com/yet-another-ai/yagoo/issues/24) |
 | Ledger | `PlyAnalysis.ledger == null` | [#23](https://github.com/yet-another-ai/yagoo/issues/23) |
 | Sacrifice (弃子) | `PlyAnalysis.sacrifices == null` | [#25](https://github.com/yet-another-ai/yagoo/issues/25) |
-| Notes | `PlyAnalysis.commentary == null` | [#28](https://github.com/yet-another-ai/yagoo/issues/28) |
 | Report prose and export | `AnalysisState.report == null` | [#29](https://github.com/yet-another-ai/yagoo/issues/29) |
 | Live catalog download, cancel, OPFS clear | Package harness only (`packages/browser-engine`). The published panel loads local files and does not host weights. | [#22](https://github.com/yet-another-ai/yagoo/pull/22) |
 
 An empty array is different from `null` where the type allows it. `sacrifices: []` means the pipeline looked and found none. `null` means it has not spoken.
 
-When a contract object is present, the pane renders its fields (ledger rows highlight a group id, comparison shows winrate and score, commentary shows the text and fact ids). The app does not construct those objects.
+When a module contract object is present, its pane renders the fields. Notes builds a bounded fact registry from supported values, constructs approved text locally, and shows exact source paths and values for every sentence.
 
 ## Data contracts
 
@@ -89,7 +90,7 @@ Defined in `packages/ui/src/analysis/modules.ts` and stored on `PlyAnalysis` / `
 - **Why not (#24).** `MoveComparison`: actual and AI move, winrates (fraction for the side to play), score leads (Black’s perspective), optional `ownershipDelta[]` (black-positive, row-major from A19), `ledgerDiff`.
 - **Sacrifice (#25).** `SacrificeAnnotation`: `groupId`, `ownershipFlip` (positive means the mover gives the group away), `compensationPoints`, `exchangedWith`, `pv`.
 - **Opening (#27).** `OpeningMatch`: `name`, `joseki`, `deviationPly`, `source`. The matcher owns licensing; the badge only displays `source`. The loaded SGF's local match takes precedence over NDJSON, so another game's analysis cannot supply its opening. See [matching and limits](../modules/openings.md).
-- **Notes (#28).** `LlmCommentary`: `text`, `citedFactIds`, `provider`, `verified`. The checkbox stays disabled. Nothing is sent to a model.
+- **Notes (#28).** `GroundedCommentary` extends `LlmCommentary` with selected sentences and exact evidence values. Notes is off by default; enabling it runs local templates. Sending structured facts through a host-injected provider requires a separate explicit action. No provider or credentials are bundled. See [Explanation generation](../modules/explanation-generation).
 - **Report (#29).** `ReviewReportDocument`: `markdown`, `moves[]` of the structured pieces above. The view already lists key moves from `deepPlies` so the shell is usable before the document exists. Export stays disabled.
 - **Try (#26).** `PositionAnalysisRequest` contains the SGF ancestry, anchor `ply`, GTP `moves` including pass, and an optional visit budget. `useVariationAnalysis` keeps `AnalysisState` per variation node, separate from the main-line graph. The shared root-only pipeline emits one `positionCompleted` snapshot. See [live variations](../pipeline/live-variations).
 

@@ -337,13 +337,13 @@ async function onDrop(ev: DragEvent) {
 function tryLiveNative(url: string) {
   sourceReadGeneration++;
   sourceGeneration.value++;
-  reset();
   nativeUrl.value = url;
   activeNative.value = true;
   if (variationActive.value) {
     statusMessage.value = "Analyzing the selected variation with the native engine…";
     return;
   }
+  reset();
   statusMessage.value = "Connecting to local native engine…";
   attachSource(createLiveNativeSource({ url, sgf: sgfText.value }));
 }
@@ -357,11 +357,11 @@ function tryBrowserEngine() {
   sourceReadGeneration++;
   sourceGeneration.value++;
   activeNative.value = false;
-  reset();
   if (variationActive.value && props.browserEngine.analyzePosition) {
     statusMessage.value = "Analyzing the selected variation with the browser engine…";
     return;
   }
+  reset();
   statusMessage.value = "Starting experimental browser engine…";
   attachSource(
     createBrowserEngineSource({

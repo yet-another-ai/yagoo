@@ -177,6 +177,7 @@ const {
   moveNumber,
   onMainLine,
   children,
+  error: gameError,
   loadSgf,
   goForward,
   goBack,
@@ -222,12 +223,11 @@ const sections: { id: CompactSection; label: string }[] = [
 ];
 
 function load(contents: string | undefined) {
+  if (!loadSgf(contents?.trim() ? contents : "(;)")) return;
   ledgerPreview.value = null;
   tryMode.value = false;
   clearTry();
   // A cleared file must invalidate its old game and any pending variation too.
-  loaded.value = false;
-  loadSgf(contents?.trim() ? contents : "(;)");
   loaded.value = Boolean(contents?.trim());
   emit("ply-change", moveNumber.value);
   void nextTick(() => updateAutoVertexSize());
@@ -799,6 +799,9 @@ defineExpose({
 
     <template v-else>
       <main ref="mainEl" class="yagoo-reviewer__main">
+        <p v-if="gameError" class="yagoo-try-banner" role="alert">
+          Unable to show SGF position: {{ gameError }}. Choose another move or load a valid SGF.
+        </p>
         <p v-if="activeComparison" class="yagoo-try-banner" data-testid="comparison-board-banner">
           Move {{ activeComparison.ply }} comparison · board before the move (ply {{ activeComparison.rootPly }}).
           A = actual {{ activeComparison.actualMove }} · AI = {{ activeComparison.aiMove }}.

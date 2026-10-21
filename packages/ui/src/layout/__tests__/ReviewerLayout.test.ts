@@ -6,6 +6,49 @@ import ReviewerLayout from "../ReviewerLayout.vue";
 const SGF = "(;FF[4]GM[1]SZ[9];B[dd];W[ff])";
 
 describe("ReviewerLayout", () => {
+  it("shows a recoverable error for illegal recorded moves without losing navigation", async () => {
+    const wrapper = mount(ReviewerLayout, {
+      props: { sgf: "(;SZ[9];B[dd];W[dd])", vertexSize: 16 },
+    });
+    try {
+      await flushPromises();
+      await wrapper.get('[aria-label="Next move"]').trigger("click");
+      await wrapper.get('[aria-label="Next move"]').trigger("click");
+      expect(wrapper.get('[role="alert"]').text()).toContain("Illegal SGF move 2");
+      expect(wrapper.vm.moveNumber).toBe(1);
+      expect(wrapper.get('.shudan-vertex[data-x="3"][data-y="3"]').classes()).toContain("shudan-sign_1");
+      await wrapper.get('[aria-label="Previous move"]').trigger("click");
+      expect(wrapper.vm.moveNumber).toBe(0);
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+
+      await wrapper.setProps({ sgf: "(;SZ[5]AB[aa]B[aa])" });
+      expect(wrapper.get('[role="alert"]').text()).toContain("Illegal SGF move 1");
+      expect(wrapper.vm.boardSize).toBe(9);
+      await wrapper.get('[aria-label="Next move"]').trigger("click");
+      expect(wrapper.vm.moveNumber).toBe(1);
+      await wrapper.setProps({ sgf: SGF });
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
+  it("can recover when the first SGF has an illegal root move", async () => {
+    const wrapper = mount(ReviewerLayout, {
+      props: { sgf: "(;SZ[5]AB[aa]B[aa])", vertexSize: 16 },
+    });
+    try {
+      await flushPromises();
+      expect(wrapper.get('[role="alert"]').text()).toContain("Illegal SGF move 1");
+      await wrapper.setProps({ sgf: SGF });
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+      await wrapper.get('[aria-label="Next move"]').trigger("click");
+      expect(wrapper.vm.moveNumber).toBe(1);
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
   it("analyzes the selected SGF sibling's ancestry and lets it stop or restart", async () => {
     const runs: Array<{ request: PositionAnalysisRequest; stop: ReturnType<typeof vi.fn> }> = [];
     const source: PositionSourceFactory = (request) => ({

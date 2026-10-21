@@ -34,7 +34,9 @@ export interface UseGameResult {
   onMainLine: Ref<boolean>;
   /** Variations available at the current node. */
   children: Ref<GameChildInfo[]>;
-  loadSgf: (contents: string) => void;
+  /** Last failed load/navigation; the previous valid position is retained. */
+  error: Ref<string | null>;
+  loadSgf: (contents: string) => boolean;
   goForward: (childIndex?: number) => boolean;
   goBack: () => boolean;
   goToPly: (ply: number) => boolean;
@@ -162,18 +164,27 @@ export function useGame(): UseGameResult {
   const currentPlayer = ref<Sign>(1);
   const moveNumber = ref(0);
   const comment = ref("");
+  const error = ref<string | null>(null);
   const players = ref<[GamePlayerInfo, GamePlayerInfo]>([
     { name: "Black", rank: "", captures: 0 },
     { name: "White", rank: "", captures: 0 },
   ]);
 
-  function syncFromNode(id: number | string) {
-    const t = tree.value;
-    if (t == null) return;
+  function syncFromNode(id: number | string, t = tree.value): boolean {
+    if (t == null) return false;
     const node = t.get(id);
-    if (node == null) return;
+    if (node == null) return false;
 
-    const { position: nextPosition, moveNumber: mn } = boardFromPath(t, id);
+    let replay: ReturnType<typeof boardFromPath>;
+    try {
+      replay = boardFromPath(t, id);
+    } catch (cause) {
+      error.value = cause instanceof Error ? cause.message : String(cause);
+      return false;
+    }
+    // Commit the tree and position together only after the complete path is valid.
+    const { position: nextPosition, moveNumber: mn } = replay;
+    tree.value = t;
     position.value = nextPosition;
     const { board, toPlay: cp } = nextPosition;
     signMap.value = board.signMap as BoardMap<Sign>;
@@ -194,23 +205,29 @@ export function useGame(): UseGameResult {
       },
     ];
     currentId.value = id;
+    error.value = null;
+    return true;
   }
 
-  function loadSgf(contents: string) {
-    const idFactory = createIdFactory();
-    const roots = sgf.parse(contents, { getId: idFactory });
-    const root = roots[0];
-    if (root == null) {
-      throw new Error("SGF contained no game trees");
+  function loadSgf(contents: string): boolean {
+    try {
+      const idFactory = createIdFactory();
+      const roots = sgf.parse(contents, { getId: idFactory });
+      const root = roots[0];
+      if (root == null) {
+        throw new Error("SGF contained no game trees");
+      }
+      const gt = new GameTree({
+        getId: idFactory,
+        // Parsed SGF roots match GameTree node objects.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        root: root as any,
+      });
+      return syncFromNode(gt.root.id, gt);
+    } catch (cause) {
+      error.value = cause instanceof Error ? cause.message : String(cause);
+      return false;
     }
-    const gt = new GameTree({
-      getId: idFactory,
-      // Parsed SGF roots match GameTree node objects.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      root: root as any,
-    });
-    tree.value = gt;
-    syncFromNode(gt.root.id);
   }
 
   function goForward(childIndex = 0): boolean {
@@ -220,8 +237,7 @@ export function useGame(): UseGameResult {
     const node = t.get(id);
     const child = node?.children[childIndex];
     if (child == null) return false;
-    syncFromNode(child.id);
-    return true;
+    return syncFromNode(child.id);
   }
 
   function goBack(): boolean {
@@ -230,8 +246,7 @@ export function useGame(): UseGameResult {
     if (t == null || id == null) return false;
     const node = t.get(id);
     if (node?.parentId == null) return false;
-    syncFromNode(node.parentId);
-    return true;
+    return syncFromNode(node.parentId);
   }
 
   function goToVariation(childIndex: number): boolean {
@@ -252,8 +267,7 @@ export function useGame(): UseGameResult {
       id = child.id;
       if (t.get(id)?.data.B != null || t.get(id)?.data.W != null) depth += 1;
     }
-    syncFromNode(id);
-    return depth === target;
+    return syncFromNode(id) && depth === target;
   }
 
   const canGoBack = computed(() => {
@@ -339,6 +353,7 @@ export function useGame(): UseGameResult {
     moveNumber,
     onMainLine,
     children,
+    error,
     loadSgf,
     goForward,
     goBack,

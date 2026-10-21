@@ -3,7 +3,7 @@ import { BrowserEngine } from '../src/client';
 
 class TestWorker {
   static instances: TestWorker[] = [];
-  onerror?: (event: { message: string }) => void;
+  onerror?: (event: { message?: string; filename?: string; lineno?: number; colno?: number; error?: unknown }) => void;
   onmessage?: (event: { data: Record<string, unknown> }) => void;
   terminated = false;
   sent: Record<string, unknown>[] = [];
@@ -86,6 +86,37 @@ it('does not treat the single-thread note as an initialization error', async () 
   worker.onmessage!({ data: { type: 'error', message: 'warmup failed' } });
   await expect(pending).rejects.toThrow(/warmup failed/);
   await expect(pending).rejects.not.toThrow(/one thread/);
+  engine.dispose();
+});
+
+it('surfaces the worker error text instead of a generic load failure', async () => {
+  environment();
+  const engine = new BrowserEngine();
+  const pending = engine.initialize('models/manifest.json', { forceWasm: true, wasmThreads: 1 });
+  TestWorker.instances[0].onerror?.({
+    message: 'Failed to fetch ort-wasm-simd-threaded.asyncify.mjs',
+    filename: 'https://example.test/yagoo/assets/engine.worker.js',
+    lineno: 1,
+    colno: 1,
+  });
+  await expect(pending).rejects.toThrow(/ort-wasm-simd-threaded\.asyncify\.mjs/);
+  await expect(pending).rejects.toThrow(/engine\.worker\.js:1:1/);
+  engine.dispose();
+});
+
+it('explains an empty worker error when isolation blocked the script', async () => {
+  environment();
+  vi.stubGlobal('crossOriginIsolated', true);
+  vi.stubGlobal('fetch', vi.fn(async () => ({
+    ok: true,
+    status: 200,
+    headers: { get: (name: string) => name === 'cross-origin-opener-policy' ? 'same-origin' : null },
+  })));
+  const engine = new BrowserEngine();
+  const pending = engine.initialize('models/manifest.json', { forceWasm: true, wasmThreads: 1 });
+  TestWorker.instances[0].onerror?.({ message: '' });
+  await expect(pending).rejects.toThrow(/Cross-Origin-Embedder-Policy/);
+  await expect(pending).rejects.not.toThrow(/Engine worker failed to load\.$/);
   engine.dispose();
 });
 

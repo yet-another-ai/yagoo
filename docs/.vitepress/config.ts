@@ -1,5 +1,6 @@
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vitepress";
+import { stageOrtRuntime } from "../../scripts/stage-ort.mjs";
 
 const emptyShim = fileURLToPath(
   new URL("../../packages/ui/src/shims/empty.ts", import.meta.url),
@@ -133,6 +134,19 @@ export default defineConfig({
       ],
     },
     worker: { format: "es" },
+    plugins: [
+      {
+        name: "stage-ort-runtime",
+        buildStart() {
+          const names = stageOrtRuntime(
+            fileURLToPath(new URL("../public/ort", import.meta.url)),
+          );
+          if (names.length === 0) {
+            throw new Error("No ONNX Runtime wasm/mjs assets found to stage.");
+          }
+        },
+      },
+    ],
     ssr: {
       noExternal: ["@yagoo/ui", "@sabaki/sgf", "@sabaki/go-board", "@sabaki/immutable-gametree"],
     },

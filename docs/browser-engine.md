@@ -101,9 +101,11 @@ tolerances on retries; a failed fp16 warmup is never labeled as validated fp16.
 The package Vite build copies the installed ORT `.wasm` and `.mjs` worker assets
 into `ort/`, and bundles the Rust Wasm URL. Local dev and preview default to
 `/yagoo-engine/`. Override that with `YAGOO_BASE`, an absolute path with a
-trailing slash. `mise run pages:build` builds the docs site at `/yagoo/` and
-stages those ORT files under `docs/public/ort` so the demo can load them from
-`/yagoo/ort/`. It does not publish a second engine app. Relative paths, query
+trailing slash. `mise run pages:build` builds the docs site at `/yagoo/`. The VitePress build
+stages the installed ORT `.wasm` and `.mjs` files under `docs/public/ort`, and
+the engine worker sets `ort.env.wasm.wasmPaths` to the absolute
+`ort-wasm-simd-threaded.asyncify.wasm` and `.mjs` URLs in `/yagoo/ort/`. It does
+not publish a second engine app. Relative paths, query
 strings and URL hosts are rejected at build time so ORT and service-worker URLs
 cannot silently resolve elsewhere.
 Dev and preview serve COOP `same-origin` and COEP
@@ -193,12 +195,18 @@ GitHub Pages serves `.wasm` as `application/wasm` and `.mjs` as JavaScript. It
 cannot set custom response headers or per-file MIME types, so `public/_headers`
 is ignored and the first load is **not** cross-origin isolated. ORT then uses
 one Wasm thread. The hint next to **Enable threads** says so; it is not shown as
-a load error. **Enable threads** registers `coi-serviceworker.js` with scope
-`/yagoo/demo/` or `/yagoo/app/`, matching the page you are on, then reloads once.
-The worker adds COOP `same-origin` and COEP `require-corp` to same-origin
-responses under that scope. The rest of the docs site is left alone, because
-isolating `/yagoo/` would require CORP on every docs asset. If the reload still
-is not isolated, the hint stays and Wasm keeps one thread.
+a load error. **Enable threads** registers `/yagoo/coi-serviceworker.js` with
+scope `/yagoo/`, then reloads once. A registration left at `/yagoo/demo/` or
+`/yagoo/app/` by an older build is removed on the next visit to that page, then
+the page reloads so the root worker takes control. The script has to live at the site root:
+the engine worker and ORT files are under `/yagoo/assets/` and `/yagoo/ort/`,
+outside `/demo/` and `/app/`. A page-only scope leaves those responses without
+COEP, and Chrome then blocks the worker (`net::ERR_BLOCKED_BY_RESPONSE`) with an
+empty `error` event. The service worker adds COOP `same-origin` and COEP
+`require-corp` only to `/yagoo/demo/` and `/yagoo/app/`, and to requests made by
+those pages and by the engine or ORT workers they start. Other docs pages are
+not isolated. If the reload still is not isolated, the hint stays and Wasm keeps
+one thread.
 
 ## Root activations
 

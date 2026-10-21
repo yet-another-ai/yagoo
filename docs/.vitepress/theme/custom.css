@@ -18,3 +18,16 @@
 .yagoo-reviewer-page .vp-doc > div {
   margin: 0;
 }
+
+/* /demo/ is layout:false: the reviewer fills the viewport, with no doc chrome. */
+body:has(.yagoo-demo-shell) {
+  margin: 0;
+  overflow: hidden;
+}
+
+body:has(.yagoo-demo-shell) #app,
+body:has(.yagoo-demo-shell) .vp-doc {
+  margin: 0;
+  padding: 0;
+  max-width: none;
+}

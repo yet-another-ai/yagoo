@@ -8,6 +8,26 @@ let manifest: Manifest;
 let busy = false;
 let stats = { evaluations: 0, batches: 0, maxBatch: 0 };
 const emit = (data: unknown) => postMessage(data);
+function errorText(error: unknown): string {
+  if (error instanceof Error) return error.stack || error.message;
+  return String(error);
+}
+function reportWorkerError(error: unknown): void {
+  try { postMessage({ type: 'error', message: errorText(error) }); } catch { /* Worker is closing. */ }
+}
+const workerEvents = self as unknown as { addEventListener?: typeof addEventListener };
+if (typeof workerEvents.addEventListener === 'function') {
+  workerEvents.addEventListener('error', (event) => {
+    event.preventDefault?.();
+    const failure = event as ErrorEvent;
+    reportWorkerError(failure.error || failure.message || `Worker error at ${failure.filename}:${failure.lineno}:${failure.colno}`);
+  });
+  workerEvents.addEventListener('unhandledrejection', (event) => {
+    const failure = event as PromiseRejectionEvent;
+    failure.preventDefault?.();
+    reportWorkerError(failure.reason);
+  });
+}
 const heads = ['policy', 'value', 'miscvalue', 'moremiscvalue', 'ownership', 'scoring', 'futurepos', 'seki', 'scorebelief_logprobs'];
 const shapes: Record<string, number[]> = { policy: [6, 362], value: [3], miscvalue: [10], moremiscvalue: [8],
   ownership: [1, 19, 19], scoring: [1, 19, 19], futurepos: [2, 19, 19], seki: [4, 19, 19], scorebelief_logprobs: [842] };
@@ -146,7 +166,16 @@ self.onmessage = async ({ data }: MessageEvent) => {
       }
       ort.env.wasm.numThreads = data.ortThreads;
       ort.env.wasm.proxy = false; // We already own an engine worker; proxy cannot carry GPU tensors.
-      ort.env.wasm.wasmPaths = data.assetBase;
+      // Absolute file URLs, not a prefix. A prefix makes ORT dynamic-import the
+      // pthread module; an object also pins the .wasm locateFile result. Both
+      // files are staged at this directory with their original names.
+      if (typeof data.assetBase !== 'string' || !data.assetBase) throw new Error('ORT runtime asset base is missing.');
+      const assetBase = new URL(data.assetBase);
+      if (!assetBase.pathname.endsWith('/')) throw new Error(`ORT asset base must be a directory URL, got ${data.assetBase}.`);
+      ort.env.wasm.wasmPaths = {
+        wasm: new URL('ort-wasm-simd-threaded.asyncify.wasm', assetBase).href,
+        mjs: new URL('ort-wasm-simd-threaded.asyncify.mjs', assetBase).href,
+      };
       const model = await loadArtifact(data.manifestUrl, manifest.variants[precision]!, (loaded, total) => emit({ type: 'download', loaded, total }));
       modelSha256 = manifest.variants[precision]!.sha256;
       const reference = JSON.parse(new TextDecoder().decode(await loadArtifact(data.manifestUrl, manifest.warmup, () => {})));
@@ -201,6 +230,6 @@ self.onmessage = async ({ data }: MessageEvent) => {
       emit({ type: 'stats', ...stats, ...searchOptions });
       emit({ type: 'done' });
     }
-  } catch (error) { clearActivations('Released after analysis or initialization failure.'); emit({ type: 'error', message: String(error) }); }
+  } catch (error) { clearActivations('Released after analysis or initialization failure.'); emit({ type: 'error', message: errorText(error) }); }
   finally { busy = false; }
 };

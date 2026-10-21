@@ -24,7 +24,8 @@ const reference = Object.fromEntries(Object.entries(shapes).map(([name, dims]) =
 const manifest = { batch: 1, outputs: [...Object.keys(shapes), 'trunkfinal'],
   variants: { fp32: { sha256: 'test-model' } }, warmup: { file: 'warmup' }, postprocess: { lead_multiplier: 20 } };
 const initialize = { type: 'initialize', manifestUrl: 'https://example.test/manifest.json',
-  backend: 'webgpu', ortThreads: 1, precision: 'fp32', retainRootActivations: true };
+  backend: 'webgpu', ortThreads: 1, precision: 'fp32', retainRootActivations: true,
+  assetBase: 'https://example.test/yagoo/ort/' };
 let messages: Record<string, any>[];
 let worker: { onmessage: (event: { data: Record<string, unknown> }) => Promise<void> };
 const dispatch = (data: Record<string, unknown>) => worker.onmessage({ data });

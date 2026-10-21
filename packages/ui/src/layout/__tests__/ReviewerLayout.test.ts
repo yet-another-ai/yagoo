@@ -6,6 +6,50 @@ import ReviewerLayout from "../ReviewerLayout.vue";
 const SGF = "(;FF[4]GM[1]SZ[9];B[dd];W[ff])";
 
 describe("ReviewerLayout", () => {
+  it("keeps the last valid mainline move when leaving a longer sibling", async () => {
+    const wrapper = mount(ReviewerLayout, {
+      props: { sgf: "(;SZ[9];B[dd](;W[cc])(;W[ff];B[ee]))", vertexSize: 16 },
+    });
+    try {
+      await flushPromises();
+      wrapper.vm.goToPly(1);
+      wrapper.vm.goForward(1);
+      wrapper.vm.goForward();
+      expect(wrapper.vm.moveNumber).toBe(3);
+      wrapper.vm.leaveVariation();
+      await flushPromises();
+      expect(wrapper.vm.moveNumber).toBe(2);
+      expect(wrapper.find('[data-testid="try-banner"]').exists()).toBe(false);
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
+  it.each([
+    ["(;SZ[9];B[dd](;W[dd])(;W[ff]))", 0],
+    ["(;SZ[9]B[dd](;W[dd])(;W[ff]))", 1],
+  ])("leaves a legal sibling when the corresponding mainline move is illegal: %s", async (sgf, rootPly) => {
+    const wrapper = mount(ReviewerLayout, { props: { sgf, vertexSize: 16 } });
+    try {
+      await flushPromises();
+      wrapper.vm.goToPly(1);
+      wrapper.vm.goForward(1);
+      await flushPromises();
+      expect(wrapper.vm.moveNumber).toBe(2);
+      expect(wrapper.find('[data-testid="try-banner"]').exists()).toBe(true);
+      wrapper.vm.leaveVariation();
+      await flushPromises();
+      expect(wrapper.vm.moveNumber).toBe(rootPly);
+      expect(wrapper.find('[data-testid="try-banner"]').exists()).toBe(false);
+      expect(wrapper.emitted("variation-change")?.at(-1)).toEqual([false]);
+      expect(wrapper.get('[role="alert"]').text()).toContain("Illegal SGF move 2");
+      expect(wrapper.get('.shudan-vertex[data-x="5"][data-y="5"]').classes()).toContain("shudan-sign_0");
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
   it("shows a recoverable error for illegal recorded moves without losing navigation", async () => {
     const wrapper = mount(ReviewerLayout, {
       props: { sgf: "(;SZ[9];B[dd];W[dd])", vertexSize: 16 },

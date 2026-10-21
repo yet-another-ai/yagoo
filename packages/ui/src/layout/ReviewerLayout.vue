@@ -609,7 +609,14 @@ function onForward() {
 function leaveVariation() {
   clearTry();
   tryMode.value = false;
-  if (!onMainLine.value) goToPly(moveNumber.value);
+  if (onMainLine.value) return;
+  goToPly(moveNumber.value);
+  if (!onMainLine.value) {
+    // The root was validated on load; keep the rejected move's error visible.
+    const mainlineError = gameError.value;
+    goToPly(0);
+    gameError.value = mainlineError;
+  }
 }
 
 function onSelectPly(ply: number) {

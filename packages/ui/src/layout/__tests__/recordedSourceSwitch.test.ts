@@ -26,6 +26,47 @@ const file = (name: string, visits: number, candidate: string) => ({
 afterEach(() => vi.unstubAllGlobals());
 
 describe("switching from live variations to recorded analysis", () => {
+  it("imports recording at the valid root when a sibling cannot return to the mainline ply", async () => {
+    const cancel = vi.fn();
+    const analyzePosition = vi.fn(() => new ReadableStream<string>({ cancel }));
+    const analyzeSgf = vi.fn(async function* () {});
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => frames.push(callback));
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    const wrapper = mount(AnalysisReviewer, {
+      props: {
+        initialSgf: "(;SZ[9];B[dd](;W[dd])(;W[ff]))", vertexSize: 16,
+        browserEngine: { analyzeSgf, analyzePosition },
+      },
+    });
+    try {
+      await flushPromises();
+      const layout = wrapper.getComponent(ReviewerLayout);
+      layout.vm.goToPly(1);
+      layout.vm.goForward(1);
+      await flushPromises();
+      expect(analyzePosition).toHaveBeenCalledOnce();
+      await wrapper.get('[data-testid="engine-source-button"]').trigger("click");
+      wrapper.getComponent(EngineSourcePanel).vm.$emit("ndjson-file", file("recovered.ndjson", 120, "D4"));
+      await flushPromises();
+      for (let frame = 0; frame < 2; frame++) {
+        frames.splice(0).forEach(callback => callback(0));
+        await flushPromises();
+      }
+      expect(layout.vm.moveNumber).toBe(0);
+      expect(wrapper.find('[data-testid="try-banner"]').exists()).toBe(false);
+      expect(wrapper.get('[role="alert"]').text()).toContain("Illegal SGF move 2");
+      expect(cancel).toHaveBeenCalledOnce();
+      expect(analyzePosition).toHaveBeenCalledOnce();
+      expect(analyzeSgf).not.toHaveBeenCalled();
+      expect(layout.props("rootAnalysis")?.visits).toBe(120);
+      expect(wrapper.get('[data-testid="candidates-panel"]').text()).toContain("D4");
+      expect(wrapper.text()).toContain("Loaded recovered.ndjson");
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
   it("finishes recordings without restarting browser Try and ignores canceled sources", async () => {
     let resolveNative!: (response: Response) => void;
     const pendingNative = new Promise<Response>((resolve) => { resolveNative = resolve; });

@@ -58,6 +58,36 @@ fn pass_ledger(snapshot: &PositionSnapshot) -> GainLossLedger {
     compute_ledger(snapshot, &snapshot.candidates[0], LedgerBaseline::Pass).unwrap()
 }
 
+#[test]
+fn constructed_played_status_change_prioritizes_a_group_without_ownership_swing() {
+    let mut snapshot = constructed_snapshot();
+    snapshot.candidates[0].ownership = snapshot.pass_probe.as_ref().unwrap().ownership.clone();
+    let tempo = PlayedGroupTempo {
+        group_id: "A3".into(),
+        color: ColorToken::B,
+        stones: vec!["A3".into()],
+        before_status: GroupStatus::Weak,
+        after_status: GroupStatus::Settled,
+        before_g_plus: 0.5,
+        before_g_minus: 0.1,
+        after_g_plus: 0.9,
+        after_g_minus: 0.8,
+    };
+    let ledger = compute_played_ledger_with_tempo(
+        &snapshot,
+        &snapshot.candidates[0],
+        std::slice::from_ref(&tempo),
+    )
+    .unwrap();
+    let group = &ledger.ledger[0];
+    assert_eq!(group.id.as_deref(), Some("A3"));
+    assert_eq!(group.tempo, Some(LedgerTempo::RootBranchPassProbes));
+    assert_eq!(group.played_tempo_changes, vec![tempo]);
+    assert_eq!(group.tempo_changes, []);
+    assert_eq!(group.book_value, 0.0);
+    assert_eq!(group.points, None, "zero ownership book remains unpriced");
+}
+
 fn close(actual: f64, expected: f64) {
     assert!((actual - expected).abs() < 1e-10, "{actual} != {expected}");
 }

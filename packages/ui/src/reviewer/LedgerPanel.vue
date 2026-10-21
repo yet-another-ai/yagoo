@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import type { GainLossLedger, GainLossLine } from "../analysis/modules";
 
-defineProps<{ ledger: GainLossLedger; tempoEvidenceAvailable?: boolean }>();
+withDefaults(defineProps<{
+  ledger: GainLossLedger;
+  tempoEvidenceAvailable?: boolean;
+  tempoComparison?: "branches" | "played";
+}>(), { tempoComparison: "branches" });
 const emit = defineEmits<{
   (e: "preview", line: GainLossLine): void;
   (e: "clear-preview"): void;
@@ -58,11 +62,22 @@ function label(line: GainLossLine): string {
           {{ change.color }} branch status: {{ change.preferredStatus }} → {{ change.actualStatus }}
           (explicit branch/pass probes).
         </p>
+        <p v-for="change in line.playedTempoChanges ?? []" :key="`played-tempo-${change.color}`"
+          class="yagoo-ledger-panel__note" data-testid="ledger-played-tempo">
+          {{ change.color === "B" ? "Black" : "White" }} status:
+          before {{ change.beforeStatus }} → after {{ change.afterStatus }}
+          (separate pass probes before and after the move).
+        </p>
       </li>
     </ul>
     <p v-if="!tempoEvidenceAvailable" class="yagoo-ledger-panel__note" data-testid="ledger-tempo-limitation">
-      Tempo transitions are unassessed: candidate branch pass probes are unavailable.
+      Tempo transitions are unassessed:
+      {{ tempoComparison === "played" ? "before/after pass probes are unavailable." : "candidate branch pass probes are unavailable." }}
       Strength changes do not establish sente, gote, or a change in life status.
+    </p>
+    <p v-else-if="tempoComparison === 'played'" class="yagoo-ledger-panel__note">
+      Status evidence follows the same root stones before and after the played move,
+      using separate pass probes. It does not establish sente or gote.
     </p>
     <p v-else class="yagoo-ledger-panel__note">
       Status evidence uses fixed root stone membership in both branch/pass pairs.

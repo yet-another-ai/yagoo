@@ -23,7 +23,7 @@ mod schema;
 pub use comparison::{
     candidate_has_comparison_evidence, compute_move_comparison, ComparisonBranch,
     ComparisonCandidateSource, ComparisonContext, ComparisonEvidence, ComparisonGroupTempo,
-    MoveComparison, SavingCandidateProbe,
+    MoveComparison, PlayedGroupTempo, SavingCandidateProbe,
 };
 pub use convert::{
     board_from_game, candidate_from_move_info, candidates_from_response, chains_from_game,
@@ -33,9 +33,9 @@ pub use events::{AnalysisPhase, AnalysisStage, DeepPlySelection, PipelineEvent};
 pub use groups::{compute_groups, compute_groups_with_params, GroupParams};
 pub use ledger::{
     best_candidate, compute_ledger, compute_ledger_against, compute_ledger_against_with_tempo,
-    compute_tempo_changes, GainLossLedger, GainLossLine, GroupTempoChange, LedgerBaseline,
-    LedgerInconsistency, LedgerLineKind, LedgerScaling, LedgerStrengthChange, LedgerTempo,
-    LEDGER_CONSISTENCY_TOLERANCE, LEDGER_STRENGTH_THRESHOLD,
+    compute_played_ledger_with_tempo, compute_tempo_changes, GainLossLedger, GainLossLine,
+    GroupTempoChange, LedgerBaseline, LedgerInconsistency, LedgerLineKind, LedgerScaling,
+    LedgerStrengthChange, LedgerTempo, LEDGER_CONSISTENCY_TOLERANCE, LEDGER_STRENGTH_THRESHOLD,
 };
 pub use openings::{match_opening, opening_max_ply};
 pub use pv_lineage::{trace_candidate_pv, CandidatePvLineage, RootStoneCapture};

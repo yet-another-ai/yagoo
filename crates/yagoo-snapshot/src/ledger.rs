@@ -10,7 +10,7 @@ use yagoo_core::Point;
 
 use crate::{
     CandidateSnapshot, ColorToken, ComparisonGroupTempo, GroupSnapshot, GroupStatus,
-    PositionSnapshot,
+    PlayedGroupTempo, PositionSnapshot,
 };
 
 /// Initial, uncalibrated tolerance in ownership-book versus search points.
@@ -54,6 +54,7 @@ pub enum LedgerInconsistency {
 pub enum LedgerTempo {
     Unassessed,
     BranchPassProbes,
+    RootBranchPassProbes,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -98,6 +99,8 @@ pub struct GainLossLine {
     pub tempo: Option<LedgerTempo>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tempo_changes: Vec<ComparisonGroupTempo>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub played_tempo_changes: Vec<PlayedGroupTempo>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -150,6 +153,7 @@ pub fn compute_ledger(
                 reference.ownership.as_deref()?,
                 reference.score_lead?,
                 &[],
+                &[],
             )
         }
         LedgerBaseline::Best => {
@@ -174,6 +178,7 @@ pub fn compute_ledger_against(
         reference.ownership.as_deref()?,
         reference.score_lead?,
         &[],
+        &[],
     )
 }
 
@@ -193,6 +198,29 @@ pub fn compute_ledger_against_with_tempo(
         &reference.move_,
         reference.ownership.as_deref()?,
         reference.score_lead?,
+        tempo,
+        &[],
+    )
+}
+
+/// Value of the played candidate against passing at the same historical root.
+/// Before/after statuses use separate explicit root/pass pairs; their maps are
+/// never subtracted to price the move.
+#[must_use]
+pub fn compute_played_ledger_with_tempo(
+    snapshot: &PositionSnapshot,
+    candidate: &CandidateSnapshot,
+    tempo: &[PlayedGroupTempo],
+) -> Option<GainLossLedger> {
+    let pass = snapshot.pass_probe.as_ref()?;
+    build_ledger(
+        snapshot,
+        candidate,
+        LedgerBaseline::Pass,
+        "pass",
+        pass.ownership.as_deref()?,
+        pass.score_lead?,
+        &[],
         tempo,
     )
 }
@@ -238,6 +266,7 @@ fn build_ledger(
     reference: &[f64],
     reference_score: f64,
     tempo: &[ComparisonGroupTempo],
+    played_tempo: &[PlayedGroupTempo],
 ) -> Option<GainLossLedger> {
     let size = snapshot.board.size;
     let count = usize::from(size).pow(2);
@@ -290,6 +319,25 @@ fn build_ledger(
         let status_changed = statuses
             .iter()
             .any(|entry| entry.actual_status != entry.preferred_status);
+        let played_statuses: Vec<_> = played_tempo
+            .iter()
+            .filter(|entry| {
+                entry.group_id == group.group_id
+                    && same_stones(
+                        &entry.stones,
+                        if entry.color == ColorToken::B {
+                            &group.members.black_stones
+                        } else {
+                            &group.members.white_stones
+                        },
+                    )
+            })
+            .cloned()
+            .collect();
+        let status_changed = status_changed
+            || played_statuses
+                .iter()
+                .any(|entry| entry.before_status != entry.after_status);
         if !changes
             .iter()
             .any(|change| change.delta.abs() >= LEDGER_STRENGTH_THRESHOLD)
@@ -325,12 +373,15 @@ fn build_ledger(
             .into(),
         );
         line.strength_changes = changes;
-        line.tempo = Some(if statuses.is_empty() {
+        line.tempo = Some(if !played_statuses.is_empty() {
+            LedgerTempo::RootBranchPassProbes
+        } else if statuses.is_empty() {
             LedgerTempo::Unassessed
         } else {
             LedgerTempo::BranchPassProbes
         });
         line.tempo_changes = statuses;
+        line.played_tempo_changes = played_statuses;
         lines.push(line);
     }
     for kind in [
@@ -468,6 +519,7 @@ fn make_line(kind: LedgerLineKind, indices: &[usize], delta: &[f64], size: u8) -
         strength_changes: Vec::new(),
         tempo: None,
         tempo_changes: Vec::new(),
+        played_tempo_changes: Vec::new(),
     }
 }
 

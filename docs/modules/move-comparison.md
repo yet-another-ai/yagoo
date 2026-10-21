@@ -75,6 +75,14 @@ ledgers remain `unassessed`. The evidence supports neither sente/gote nor a
 claim that a stone was sacrificed intentionally. Missing/invalid pass evidence
 leaves transitions unassessed. A previous pass suppresses a second-pass probe.
 
+The same existing evidence also supports `playedLedger` (actual move versus the
+explicit root pass) and `playedTempo` (root-to-actual-branch statuses). These are
+displayed separately from actual-versus-preferred loss and branch differences.
+Only candidate/pass maps from the original root price the played move; later
+branch root/pass pairs establish statuses. See the
+[played-move ledger](gain-loss-ledger.md#value-of-the-played-move) for coverage,
+wire fields and missing-evidence behavior.
+
 ## Configuration and limits
 
 Comparisons run for deeply analyzed played moves; setup ply 0 and scan-only

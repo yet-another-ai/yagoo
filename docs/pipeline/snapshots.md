@@ -96,8 +96,9 @@ the pass probe is the explicitly documented counterfactual.
 | `ledger[].bookValue`, `proportion` | Raw signed ownership and share of total absolute contribution |
 | `ledger[].intersections` | Disjoint GTP coordinates assigned to the row, covering the board |
 | `ledger[].strengthChanges` | Optional per-color `{color, reference, candidate, delta}` on fixed root stone membership |
-| `ledger[].tempo` | `unassessed` for candidate-only rows; comparison rows may use `branch_pass_probes` |
+| `ledger[].tempo` | `unassessed` for candidate-only rows; comparison rows may use `branch_pass_probes` or `root_branch_pass_probes` |
 | `ledger[].tempoChanges` | Per-color status evidence on fixed root stone membership when explicit branch/pass pairs exist |
+| `ledger[].playedTempoChanges` | Optional before/after played-move status evidence on fixed root stones; separate from actual/AI branch comparisons |
 
 The reducer copies this server fact and clears stale values when an authoritative
 snapshot omits it. It does not calculate attribution in TypeScript. Evidence
@@ -120,6 +121,14 @@ Paths such as `comparison.scoreLoss`, `comparison.ledgerDiff.ledger[i]`,
 `comparison.groupTempo[i]`, `comparison.context.preferred.pv` and
 `comparison.evidence` provide grounded facts for later explanation modules.
 Omitted/null is unavailable, not zero loss.
+
+`comparison.playedLedger` optionally carries actual-versus-pass value at root
+*p - 1*. `comparison.playedTempo` optionally carries `{groupId, color, stones,
+beforeStatus, afterStatus, beforeGPlus, beforeGMinus, afterGPlus, afterGMinus}`.
+Both use existing comparison context: root/pass for the counterfactual value,
+and root/pass plus actual-branch/pass for before/after statuses. They do not
+replace `ledgerDiff`, `groupTempo` or the next-mover `snapshot.ledger`. Old
+recordings omit them; scan-only snapshots do not acquire invented group facts.
 
 ## Optional sacrifice assessment
 

@@ -22,7 +22,7 @@ export type LedgerLineKind =
   | "other";
 
 /** Branch pass probes are required before a tempo transition can be assessed. */
-export type TempoChange = "unassessed" | "branch_pass_probes";
+export type TempoChange = "unassessed" | "branch_pass_probes" | "root_branch_pass_probes";
 
 export interface LedgerStrengthChange {
   color: "B" | "W";
@@ -49,6 +49,7 @@ export interface GainLossLine {
   strengthChanges?: LedgerStrengthChange[];
   tempo?: TempoChange | null;
   tempoChanges?: ComparisonGroupTempo[];
+  playedTempoChanges?: PlayedGroupTempo[];
 }
 
 /**
@@ -96,6 +97,10 @@ export interface MoveComparison {
   ownershipDelta: number[];
   /** Per-group ledger of actual versus AI. Depends on #23. */
   ledgerDiff: GainLossLedger | null;
+  /** Played move versus pass at root p-1; distinct from actual-versus-AI loss. */
+  playedLedger?: GainLossLedger | null;
+  /** Before/after statuses on fixed original root stones, using explicit pass probes. */
+  playedTempo?: PlayedGroupTempo[];
   context: ComparisonContext;
   evidence: ComparisonEvidence;
   groupTempo: ComparisonGroupTempo[];
@@ -169,6 +174,18 @@ export interface ComparisonGroupTempo {
   actualGMinus: number;
   preferredGPlus: number;
   preferredGMinus: number;
+}
+
+export interface PlayedGroupTempo {
+  groupId: string;
+  color: ColorToken;
+  stones: string[];
+  beforeStatus: GroupStatus;
+  afterStatus: GroupStatus;
+  beforeGPlus: number;
+  beforeGMinus: number;
+  afterGPlus: number;
+  afterGMinus: number;
 }
 
 /** A supported sacrifice candidate; not proof of intention or calibrated value. */

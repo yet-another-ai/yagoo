@@ -1,7 +1,9 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 import recorded from "../../analysis/__fixtures__/ledger-position.json";
+import comparisons from "../../analysis/__fixtures__/comparison-positions.json";
 import type { GainLossLedger } from "../../analysis/modules";
+import type { PositionSnapshot } from "../../analysis/types";
 import { parseGtpVertex } from "../../analysis/coords";
 import Goban from "../../goban/Goban.vue";
 import ReviewerLayout from "../../layout/ReviewerLayout.vue";
@@ -10,6 +12,22 @@ import LedgerPanel from "../LedgerPanel.vue";
 const ledger = recorded.ledger as GainLossLedger;
 
 describe("recorded ledger UI", () => {
+  it("labels played-move status changes as before/after evidence on the ledger line", () => {
+    const comparison = (comparisons as PositionSnapshot[]).find((item) => item.ply === 44)!.comparison!;
+    const wrapper = mount(LedgerPanel, {
+      props: { ledger: comparison.playedLedger!, tempoEvidenceAvailable: true, tempoComparison: "played" },
+    });
+    const changes = wrapper.findAll('[data-testid="ledger-played-tempo"]').map((entry) => entry.text());
+    expect(changes).toEqual([
+      "Black status: before settled → after weak (separate pass probes before and after the move).",
+      "White status: before weak → after settled (separate pass probes before and after the move).",
+    ]);
+    expect(wrapper.text()).toContain("same root stones before and after the played move");
+    expect(wrapper.text()).not.toContain("branch status");
+    expect(wrapper.find('[data-testid="ledger-tempo-limitation"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it("labels the baseline and refuses line point claims for inconsistent books", () => {
     const inconsistent: GainLossLedger = {
       ...ledger,

@@ -2,12 +2,12 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import snapshotsJson from "../../analysis/__fixtures__/comparison-positions.json";
 import sampleSgf from "../../analysis/__fixtures__/sample.sgf?raw";
-import type { PositionSnapshot, PipelineEvent } from "../../analysis/types";
+import { createInitialAnalysisState, type PositionSnapshot, type PipelineEvent } from "../../analysis/types";
 import AnalysisReviewer from "../../layout/AnalysisReviewer.vue";
 import ReviewerLayout from "../../layout/ReviewerLayout.vue";
 import ReviewReport from "../../reviewer/ReviewReport.vue";
 import EngineSourcePanel from "../../reviewer/EngineSourcePanel.vue";
-import { reviewPipelineEvents } from "../build";
+import { buildReviewReport, reviewPipelineEvents } from "../build";
 
 const snapshot = (snapshotsJson as unknown as PositionSnapshot[]).find((s) => s.ply === 60)!;
 const events: PipelineEvent[] = [
@@ -18,6 +18,66 @@ const events: PipelineEvent[] = [
 const report = reviewPipelineEvents(events);
 
 describe("report UI orchestration", () => {
+  it.each(["idle", "error", "completed"] as const)("shows no analyzed positions instead of partial coverage when %s has no positions", status => {
+    const emptyReport = buildReviewReport({
+      ...createInitialAnalysisState(), status,
+      lastError: status === "error" ? "Engine failed before its first result." : null,
+    });
+    const wrapper = mount(ReviewReport, { props: { report: emptyReport } });
+    expect(wrapper.text()).toContain("No completed position analyses are available.");
+    expect(wrapper.text()).toContain("select Review to analyze this game");
+    expect(wrapper.text()).not.toContain("Partial coverage.");
+    expect(wrapper.text()).not.toContain("Analysis is running.");
+    if (status === "error") expect(wrapper.text()).toContain("Engine failed before its first result.");
+    wrapper.unmount();
+  });
+
+  it("keeps streaming progress distinct from empty and partial results", async () => {
+    const wrapper = mount(ReviewReport, { props: { report: reviewPipelineEvents([events[0]!]) } });
+    expect(wrapper.text()).toContain("Analysis is running.");
+    expect(wrapper.text()).not.toContain("No completed position analyses are available.");
+    expect(wrapper.text()).not.toContain("Partial coverage.");
+    expect(wrapper.find('[data-testid="cancel-review"]').exists()).toBe(true);
+    await wrapper.setProps({ report });
+    expect(wrapper.text()).toContain("Partial coverage.");
+    expect(wrapper.text()).not.toContain("No completed position analyses are available.");
+    expect(wrapper.text()).not.toContain("Analysis is running.");
+    wrapper.unmount();
+  });
+
+  it("shows an empty report before analysis and after replacing a completely reviewed game", async () => {
+    // Controlled complete zero-move game: one root position, no comparisons required.
+    const completeEvents: PipelineEvent[] = [
+      { type: "gameStarted", v: 1, size: 9, komi: 7.5, moveCount: 0, positionCount: 1, strategy: "deep_only" },
+      { type: "positionCompleted", v: 1, phase: "deep", snapshot: {
+        schemaVersion: 1, ply: 0, toPlay: "B", ownershipConvention: "black_positive",
+        board: { size: 9, black: [], white: [] }, chains: [], root: { visits: 100 },
+      } },
+      { type: "gameCompleted", v: 1 },
+    ];
+    const analyzeSgf = vi.fn(async function* () {
+      for (const event of completeEvents) yield JSON.stringify(event);
+    });
+    const wrapper = mount(AnalysisReviewer, {
+      props: { initialSgf: "(;SZ[9])", browserEngine: { analyzeSgf }, vertexSize: 12 },
+    });
+    await wrapper.get('[data-testid="report-toggle"]').trigger("click");
+    expect(wrapper.get('[data-testid="review-report"]').text()).toContain("No completed position analyses are available.");
+    expect(analyzeSgf).not.toHaveBeenCalled();
+    await wrapper.get('[data-testid="review-game"]').trigger("click");
+    await flushPromises();
+    const view = wrapper.get('[data-testid="review-report"]');
+    expect(view.get('[role="status"]').text()).toBe("complete");
+    expect(view.text()).not.toContain("No completed position analyses are available.");
+    expect(view.text()).not.toContain("Partial coverage.");
+    await wrapper.setProps({ initialSgf: "(;SZ[9];B[aa])" });
+    expect(view.get('[role="status"]').text()).toBe("empty");
+    expect(view.text()).toContain("No completed position analyses are available.");
+    expect(view.text()).not.toContain("Partial coverage.");
+    expect(analyzeSgf).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
+
   it("jumps to played move60 rather than comparison root59", async () => {
     const wrapper = mount(ReviewerLayout, { props: { sgf: sampleSgf, reportDocument: report, vertexSize: 12 } });
     wrapper.vm.openReport();

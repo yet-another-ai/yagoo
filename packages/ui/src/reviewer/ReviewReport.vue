@@ -77,7 +77,8 @@ const showPlies = (values: number[]) => values.join(", ") || "none";
           Black {{ reportNumber(report.overview.blackPositiveScoreLoss) }},
           White {{ reportNumber(report.overview.whitePositiveScoreLoss) }} points. This is not a full-game rating.</p>
         <p v-if="report.streamStatus === 'streaming'">Analysis is running. The report updates as completed comparisons arrive.</p>
-        <p v-else-if="report.status !== 'complete'">Partial coverage. Missing comparisons cannot establish whether a move was good or bad.</p>
+        <p v-else-if="report.status === 'empty'" class="yagoo-report__empty">No completed position analyses are available. Load recorded results or choose an engine and select Review to analyze this game.</p>
+        <p v-else-if="report.status === 'partial'">Partial coverage. Missing comparisons cannot establish whether a move was good or bad.</p>
         <details><summary>Missing coverage</summary>
           <p>Positions: {{ showPlies(report.coverage.missingPositionPlies) }}</p>
           <p>Played-move comparisons: {{ showPlies(report.coverage.missingComparisonPlies) }}</p>

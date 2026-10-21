@@ -457,10 +457,10 @@ function reviewGame() {
     return;
   }
   if (chosenSource.value === "native" && liveAvailable) {
-    reviewer.value?.openReport();
+    reviewer.value?.prepareReview();
     tryLiveNative();
   } else if (props.browserEngine && chosenSource.value !== "native") {
-    reviewer.value?.openReport();
+    reviewer.value?.prepareReview();
     tryBrowserEngine();
   } else {
     sourceOpen.value = true;

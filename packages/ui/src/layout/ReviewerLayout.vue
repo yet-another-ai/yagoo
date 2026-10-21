@@ -573,10 +573,17 @@ function clearTry() {
   tryCursor.value = null;
 }
 
-function openReport() {
+function prepareReview() {
   // Stop the old position request before the parent starts a full-game run on
   // the same adapter. Queued variation watchers will then see a main-line key.
   leaveVariation();
+  view.value = "report";
+}
+
+function openReport() {
+  // Reusing existing results only cancels the position request owned here.
+  // Preserve the local branch/tree and leave any parent's full-game run alone.
+  variation.stop();
   view.value = "report";
 }
 
@@ -584,9 +591,7 @@ function toggleReport() {
   if (view.value === "report") {
     view.value = "board";
   } else {
-    // Viewing existing results must preserve the user's local branch and tree.
-    variation.stop();
-    view.value = "report";
+    openReport();
   }
 }
 
@@ -834,6 +839,7 @@ function onSplitterKey(event: KeyboardEvent) {
 
 defineExpose({
   openReport,
+  prepareReview,
   boardSize,
   moveNumber,
   goToPly,

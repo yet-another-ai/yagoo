@@ -241,7 +241,7 @@ function refreshOverlays() {
 }
 
 watch(
-  [() => state.value, currentPly, selectedCandidate, activePreview],
+  [() => state.value, currentPly, selectedCandidate, activePreview, locale],
   refreshOverlays,
   { deep: true },
 );

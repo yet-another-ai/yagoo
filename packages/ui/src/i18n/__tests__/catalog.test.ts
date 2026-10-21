@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 import { defineComponent, nextTick } from "vue";
 import { createI18n } from "vue-i18n";
@@ -138,6 +138,47 @@ describe("reviewer locales", () => {
     await reviewer.get('[data-testid="locale-toggle"]').trigger("click");
     expect(reviewer.text()).toContain("复盘");
     expect(localStorage.getItem(YAGOO_LOCALE_STORAGE_KEY)).toBe("zh-CN");
+    reviewer.unmount();
+  });
+
+  it("retranslates analysis comments and variation labels when the locale changes", async () => {
+    const ndjson = JSON.stringify({
+      type: "positionCompleted",
+      v: 1,
+      phase: "scan",
+      snapshot: {
+        schemaVersion: 1,
+        ply: 0,
+        toPlay: "B",
+        ownershipConvention: "black_positive",
+        board: { size: 19, black: [], white: [] },
+        chains: [],
+        root: { scoreLead: 1, visits: 100, winrate: 0.6 },
+        candidates: [{ move: "D4", visits: 80, order: 0 }],
+      },
+    });
+    const reviewer = mount(AnalysisReviewer, {
+      props: {
+        initialSgf: "(;FF[4]GM[1]SZ[19];B[])",
+        initialNdjson: ndjson,
+        locale: "en",
+        vertexSize: 16,
+      },
+    });
+    for (let i = 0; i < 8; i++) {
+      await new Promise<void>((done) => requestAnimationFrame(() => done()));
+      await flushPromises();
+    }
+    expect(reviewer.text()).toContain("Black WR");
+    expect(reviewer.text()).toContain("B pass");
+    reviewer.get("[title='D4 · order 0']");
+    await reviewer.get('[data-testid="locale-toggle"]').trigger("click");
+    await nextTick();
+    expect(reviewer.text()).toContain("黑胜率");
+    expect(reviewer.text()).toContain("B 停着");
+    expect(reviewer.text()).not.toContain("Black WR");
+    expect(reviewer.text()).not.toContain("B pass");
+    reviewer.get("[title='D4 · 顺序 0']");
     reviewer.unmount();
   });
 });

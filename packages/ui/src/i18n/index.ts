@@ -104,7 +104,7 @@ export function useYagooI18n(options?: { explicit?: string | null; host?: string
   const locale = explicit ?? resolveYagooLocale(options);
   installYagooI18n(instance.appContext.app, locale, explicit != null);
   const composer = useI18n({ useScope: "global", inheritLocale: true });
-  bindTranslator((key, params) => composer.t(key, params ?? {}));
+  bindTranslator((key, params) => composer.t(key, params ?? {}), composer.locale);
   return composer;
 }
 

@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { groupStatusLabel } from "../analysis/groups";
 import type { GainLossLine, MoveComparison } from "../analysis/modules";
+import { useYagooI18n } from "../i18n";
 import LedgerPanel from "./LedgerPanel.vue";
+
+const { t } = useYagooI18n();
 
 const props = withDefaults(defineProps<{
   comparison: MoveComparison;
@@ -24,81 +28,70 @@ const points = (value: number) => `${value > 0 ? "+" : ""}${value.toFixed(2)}`;
 <template>
   <section class="yagoo-comparison" data-testid="comparison-body">
     <p>
-      Move {{ comparison.ply }} · {{ comparison.mover === "B" ? "Black" : "White" }}
-      · before-move board (ply {{ comparison.rootPly }}).
-      A = actual, AI = preferred.
+      {{ t("comparison.context", { ply: comparison.ply, mover: comparison.mover === "B" ? t("color.black") : t("color.white"), root: comparison.rootPly }) }}
     </p>
-    <h3>Actual move versus AI</h3>
+    <h3>{{ t("comparison.title") }}</h3>
     <p v-if="comparison.actualMove === comparison.aiMove" data-testid="comparison-equal">
-      The played move matches the preferred move. Both columns use the same branch.
+      {{ t("comparison.equal") }}
     </p>
     <table>
-      <thead><tr><th></th><th>Actual {{ comparison.actualMove }}</th><th>AI {{ comparison.aiMove }}</th></tr></thead>
+      <thead><tr><th></th><th>{{ t("comparison.actual", { move: comparison.actualMove }) }}</th><th>{{ t("comparison.ai", { move: comparison.aiMove }) }}</th></tr></thead>
       <tbody>
-        <tr><th>Mover winrate</th><td>{{ percent(comparison.actualWinrate) }}</td><td>{{ percent(comparison.aiWinrate) }}</td></tr>
-        <tr><th>Black score lead</th><td>{{ points(comparison.actualScoreLead) }}</td><td>{{ points(comparison.aiScoreLead) }}</td></tr>
-        <tr><th>Candidate visits</th><td>{{ comparison.evidence.actualVisits ?? "—" }}</td><td>{{ comparison.evidence.aiVisits ?? "—" }}</td></tr>
+        <tr><th>{{ t("comparison.moverWinrate") }}</th><td>{{ percent(comparison.actualWinrate) }}</td><td>{{ percent(comparison.aiWinrate) }}</td></tr>
+        <tr><th>{{ t("comparison.scoreLead") }}</th><td>{{ points(comparison.actualScoreLead) }}</td><td>{{ points(comparison.aiScoreLead) }}</td></tr>
+        <tr><th>{{ t("comparison.visits") }}</th><td>{{ comparison.evidence.actualVisits ?? "—" }}</td><td>{{ comparison.evidence.aiVisits ?? "—" }}</td></tr>
       </tbody>
     </table>
     <p data-testid="comparison-loss">
-      Estimated loss for {{ comparison.mover === "B" ? "Black" : "White" }}:
-      {{ points(comparison.scoreLoss) }} points,
-      {{ points(comparison.winrateLoss * 100) }} percentage points.
+      {{ t("comparison.loss", { mover: comparison.mover === "B" ? t("color.black") : t("color.white"), score: points(comparison.scoreLoss), winrate: points(comparison.winrateLoss * 100) }) }}
     </p>
     <p class="yagoo-comparison__note">
-      Actual evidence: {{ comparison.evidence.actualSource === "forced" ? "restricted same-root search" : "root candidate" }}.
-      Root visits {{ comparison.evidence.rootVisits ?? "—" }};
-      requested {{ comparison.evidence.requestedVisits }}.
+      {{ t("comparison.evidence", { source: comparison.evidence.actualSource === "forced" ? t("comparison.sourceForced") : t("comparison.sourceRoot"), root: comparison.evidence.rootVisits ?? "—", requested: comparison.evidence.requestedVisits }) }}
     </p>
     <label>
       <input type="checkbox" data-testid="comparison-difference" :checked="showDifference"
         @change="emit('toggle-difference', ($event.target as HTMLInputElement).checked)" />
-      Show ownership difference
+      {{ t("comparison.difference") }}
     </label>
     <p class="yagoo-comparison__note">
-      Actual minus AI ownership: dark favors Black, light favors White.
-      Opacity uses half the difference (range −2 to +2). Both maps use this same root.
+      {{ t("comparison.differenceNote") }}
     </p>
     <LedgerPanel v-if="comparison.ledgerDiff" :ledger="comparison.ledgerDiff"
       :tempo-evidence-available="comparison.groupTempo.length > 0"
       @preview="emit('preview', $event)" @clear-preview="emit('clear-preview')" />
-    <p v-else>The root ledger is unavailable.</p>
+    <p v-else>{{ t("comparison.noLedger") }}</p>
     <details data-testid="comparison-tempo">
-      <summary>Branch status evidence ({{ comparison.groupTempo.length }} group/color pairs)</summary>
+      <summary>{{ t("comparison.tempoSummary", { count: comparison.groupTempo.length }) }}</summary>
       <p class="yagoo-comparison__note">
-        Fixed root stone coordinates, evaluated with each branch's own root and pass probe.
-        These status changes do not establish sente or gote.
+        {{ t("comparison.tempoNote") }}
       </p>
-      <p v-if="comparison.groupTempo.length === 0">Status transitions are unassessed: branch/pass evidence is missing.</p>
-      <p v-else-if="transitions.length === 0">These probes show no status changes between the two branches.</p>
+      <p v-if="comparison.groupTempo.length === 0">{{ t("comparison.tempoMissing") }}</p>
+      <p v-else-if="transitions.length === 0">{{ t("comparison.tempoNone") }}</p>
       <ul v-else>
         <li v-for="entry in transitions" :key="`${entry.groupId}-${entry.color}`">
           <button type="button" @mouseenter="emit('preview-stones', entry.stones)"
             @focus="emit('preview-stones', entry.stones)" @mouseleave="emit('clear-preview')"
             @blur="emit('clear-preview')">
-            {{ entry.groupId }} {{ entry.color }}:
-            AI {{ entry.preferredStatus }} → actual {{ entry.actualStatus }}
+            {{ t("comparison.tempoRow", { group: entry.groupId, color: entry.color, preferred: groupStatusLabel(entry.preferredStatus), actual: groupStatusLabel(entry.actualStatus) }) }}
           </button>
         </li>
       </ul>
     </details>
     <section class="yagoo-comparison__played" data-testid="comparison-played">
-      <h3>Played move versus pass</h3>
+      <h3>{{ t("comparison.playedTitle") }}</h3>
       <LedgerPanel v-if="comparison.playedLedger" :ledger="comparison.playedLedger"
         :tempo-evidence-available="playedTempo.length > 0" tempo-comparison="played"
         @preview="emit('preview', $event)" @clear-preview="emit('clear-preview')" />
       <p v-else data-testid="comparison-played-unavailable">
-        The played-move ledger is unavailable: no played-versus-pass evidence was recorded.
+        {{ t("comparison.playedUnavailable") }}
       </p>
       <details data-testid="comparison-played-tempo">
-        <summary>Before and after the played move ({{ playedTempo.length }} group/color pairs)</summary>
+        <summary>{{ t("comparison.playedTempoSummary", { count: playedTempo.length }) }}</summary>
         <p class="yagoo-comparison__note">
-          The same root stones are assessed before and after {{ comparison.actualMove }},
-          using separate pass probes. Highlights remain on the before-move board.
-          These status changes do not establish sente or gote.
+          {{ t("comparison.playedTempoNote", { move: comparison.actualMove }) }}
         </p>
         <p v-if="playedTempo.length === 0" data-testid="comparison-played-tempo-unavailable">
-          Before/after status transitions are unassessed: pass-probe evidence is unavailable.
+          {{ t("comparison.playedTempoMissing") }}
         </p>
         <ul v-else>
           <li v-for="entry in playedTempo" :key="`${entry.groupId}-${entry.color}`">
@@ -106,15 +99,14 @@ const points = (value: number) => `${value > 0 ? "+" : ""}${value.toFixed(2)}`;
               @mouseenter="emit('preview-stones', entry.stones)"
               @focus="emit('preview-stones', entry.stones)" @mouseleave="emit('clear-preview')"
               @blur="emit('clear-preview')">
-              {{ entry.groupId }} {{ entry.color === "B" ? "Black" : "White" }}:
-              before {{ entry.beforeStatus }} → after {{ entry.afterStatus }}
+              {{ t("comparison.playedTempoRow", { group: entry.groupId, color: entry.color === "B" ? t("color.black") : t("color.white"), before: groupStatusLabel(entry.beforeStatus), after: groupStatusLabel(entry.afterStatus) }) }}
             </button>
           </li>
         </ul>
       </details>
     </section>
     <details>
-      <summary>Evidence and limits</summary>
+      <summary>{{ t("comparison.limits") }}</summary>
       <p>{{ comparison.evidence.rootQueryId }} / {{ comparison.evidence.actualQueryId }}</p>
       <ul><li v-for="limit in comparison.evidence.limitations" :key="limit">{{ limit }}</li></ul>
     </details>

@@ -1,10 +1,20 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
-import { AnalysisReviewer } from "@yagoo/ui";
-import { SINGLE_THREAD_NOTE } from "@yagoo/browser-engine/capabilities";
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
+import { messageRef, presentError, serializeError, useYagooI18n, AnalysisReviewer } from "@yagoo/ui";
 import { configuredManifestUrl } from "@yagoo/browser-engine/manifest-url";
+import { useData } from "vitepress";
 import "@yagoo/ui/styles.css";
 import type { ReviewerBrowserEngine } from "@yagoo/browser-engine/reviewer-adapter";
+
+const { site, lang } = useData();
+const hostLocale = computed(() => {
+  const locales = site.value.locales ?? {};
+  return Object.keys(locales).length > 0 ? lang.value : null;
+});
+const explicitLocale = typeof window !== "undefined"
+  ? new URLSearchParams(window.location.search).get("lang")
+  : null;
+const { t } = useYagooI18n({ explicit: explicitLocale, host: hostLocale.value });
 
 const props = defineProps<{
   layout?: "page" | "embed" | "full";
@@ -33,7 +43,7 @@ onBeforeUnmount(() => {
 onMounted(async () => {
   const requested = new URLSearchParams(window.location.search).get("theme");
   if (requested === "dark" || requested === "light") theme.value = requested;
-  threadHint.value = crossOriginIsolated ? null : SINGLE_THREAD_NOTE;
+  threadHint.value = crossOriginIsolated ? null : "engine.singleThread";
   remoteManifestUrl.value = configuredManifestUrl();
   const { replaceStaleIsolation } = await import("@yagoo/browser-engine/isolation");
   void replaceStaleIsolation();
@@ -44,7 +54,7 @@ onMounted(async () => {
       fetch(`${base}app/sample-scan-deep.ndjson`, { signal: loading.signal }),
     ]);
     if (!sgfRes.ok || !ndjsonRes.ok) {
-      throw new Error("Failed to load bundled sample SGF / NDJSON");
+      throw new Error("docs.loadFailed");
     }
     sgf.value = await sgfRes.text();
     ndjson.value = await ndjsonRes.text();
@@ -71,13 +81,13 @@ async function onLocalFiles(files: File[]) {
     const model = await handle.stageLocal(files);
     if (disposed || generation !== modelGeneration) return;
     staged.value = handle.ready;
-    modelStatus.value = `${model} verified from local files. Recorded analysis stays until you choose Use browser engine.`;
+    modelStatus.value = messageRef("engine.verified", { model });
   } catch (err) {
     if (disposed || generation !== modelGeneration) return;
     engine.value?.dispose();
     engine.value = null;
     staged.value = false;
-    modelStatus.value = err instanceof Error ? err.message : String(err);
+    modelStatus.value = serializeError(err);
   }
 }
 
@@ -90,22 +100,20 @@ async function onRemote() {
     if (disposed || generation !== modelGeneration) return;
     handle.stageRemote(remoteManifestUrl.value);
     staged.value = handle.ready;
-    modelStatus.value = "Configured manifest selected. It is loaded when you choose Use browser engine.";
+    modelStatus.value = messageRef("engine.remoteSelected");
   } catch (err) {
     if (disposed || generation !== modelGeneration) return;
     engine.value?.dispose();
     engine.value = null;
     staged.value = false;
-    modelStatus.value = err instanceof Error ? err.message : String(err);
+    modelStatus.value = serializeError(err);
   }
 }
 
 async function onThreads() {
   const { enableIsolation, pageIsolationScope } = await import("@yagoo/browser-engine/isolation");
   const scope = pageIsolationScope();
-  modelStatus.value = scope
-    ? await enableIsolation(scope)
-    : "Enable threads from the demo or reviewer page.";
+  modelStatus.value = scope ? await enableIsolation(scope) : "engine.threadsScope";
 }
 </script>
 
@@ -117,13 +125,15 @@ async function onThreads() {
       'yagoo-docs-app--full': props.layout === 'full',
     }"
   >
-    <p v-if="error" class="yagoo-docs-app__error">{{ error }}</p>
-    <p v-else-if="!ready" class="yagoo-docs-app__loading">Loading sample…</p>
+    <p v-if="error" class="yagoo-docs-app__error">{{ presentError(error) }}</p>
+    <p v-else-if="!ready" class="yagoo-docs-app__loading">{{ t("docs.loading") }}</p>
     <AnalysisReviewer
       v-else
       :initial-sgf="sgf"
       :initial-ndjson="ndjson"
-      initial-analysis-notice="This sample contains legacy queries that omitted move history, so ko-forbidden candidates can appear outside the full-history comparison records. Use the labeled comparison records for historical move comparisons."
+      :initial-analysis-notice="t('docs.sampleNotice')"
+      :locale="explicitLocale"
+      :host-locale="hostLocale"
       :theme="theme"
       :browser-engine="staged ? engine : null"
       :thread-hint="threadHint"

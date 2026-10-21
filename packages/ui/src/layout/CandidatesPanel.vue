@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useYagooI18n } from "../i18n";
 import {
   candidateVisibleOnBoard,
   candidateVisitsReliable,
@@ -27,6 +28,8 @@ const props = withDefaults(
     embedded: false,
   },
 );
+
+const { t } = useYagooI18n();
 
 const emit = defineEmits<{
   (e: "preview", index: number): void;
@@ -73,7 +76,7 @@ const hiddenLow = computed(() => {
 });
 
 function formatWr(c: CandidateSnapshot): string {
-  if (!authoritative(c)) return "low";
+  if (!authoritative(c)) return t("candidates.low");
   return c.winrate != null ? `${(c.winrate * 100).toFixed(1)}%` : "—";
 }
 
@@ -125,12 +128,12 @@ function onRowKey(event: KeyboardEvent, position: number) {
     :class="{ 'yagoo-candidates--embedded': embedded }"
     data-testid="candidates-panel"
   >
-    <div class="yagoo-candidates__title">Candidates</div>
+    <div class="yagoo-candidates__title">{{ t("candidates.title") }}</div>
     <ul
       v-if="candidates.length"
       class="yagoo-candidates__list"
       role="listbox"
-      aria-label="Candidate moves"
+      :aria-label="t('candidates.aria')"
     >
       <li
         v-for="(row, position) in listed"
@@ -164,18 +167,16 @@ function onRowKey(event: KeyboardEvent, position: number) {
           :title="
             authoritative(row.candidate)
               ? undefined
-              : 'Too few visits to treat this winrate as a result'
+              : t('candidates.lowTitle')
           "
         >{{ formatWr(row.candidate) }}</span>
         <span class="yagoo-candidates__visits">{{ formatVisits(row.candidate) }}</span>
       </li>
     </ul>
     <p v-if="hiddenLow" class="yagoo-candidates__low" data-testid="low-visit-note">
-      {{ hiddenLow }} low-visit
-      {{ hiddenLow === 1 ? "move" : "moves" }} hidden. Winrate is withheld
-      under 5% of the top move's visits.
+      {{ t("candidates.hidden", { count: hiddenLow, noun: hiddenLow === 1 ? t("candidates.move") : t("candidates.moves") }) }}
     </p>
-    <p v-else-if="!candidates.length" class="yagoo-candidates__empty">No candidates at this ply.</p>
+    <p v-else-if="!candidates.length" class="yagoo-candidates__empty">{{ t("candidates.empty") }}</p>
   </div>
 </template>
 

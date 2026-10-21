@@ -1,3 +1,4 @@
+import { coded } from "../../i18n/coded";
 import { parsePipelineEventLine } from "../reduce";
 import type {
   AnalysisEventSource,
@@ -37,7 +38,8 @@ export function createBrowserEngineSource(
     label: options.label ?? "Browser engine (experimental)",
     start(handlers: AnalysisSourceHandlers): AnalysisSourceHandle {
       if (engine == null) {
-        const err = new Error(
+        const err = coded(
+          "engine.modelRequiredRecorded",
           "Load a local model bundle before starting the browser engine. " +
             "Recorded analysis stays on the board until you do.",
         );
@@ -50,7 +52,10 @@ export function createBrowserEngineSource(
       void (async () => {
         try {
           if (options.position && !engine.analyzePosition) {
-            throw new Error("This browser engine does not support single-position analysis.");
+            throw coded(
+              "engine.positionUnsupported",
+              "This browser engine does not support single-position analysis.",
+            );
           }
           const stream = options.position
             ? engine.analyzePosition!({ sgf: options.sgf ?? "", ...options.position })

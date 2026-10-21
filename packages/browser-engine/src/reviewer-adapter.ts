@@ -1,4 +1,5 @@
 import { BrowserEngine, type PositionAnalysisRequest } from './client';
+import { coded, isParams } from './errors';
 import { bundleFromLocalFiles } from './model';
 
 /**
@@ -29,7 +30,7 @@ export class ReviewerBrowserEngine {
 
   stageRemote(url: string): void {
     const trimmed = url.trim();
-    if (!trimmed) throw new Error('A manifest URL is required.');
+    if (!trimmed) throw coded('engine.manifestUrlRequired', 'A manifest URL is required.');
     this.stop();
     this.revoke?.();
     this.revoke = undefined;
@@ -67,7 +68,7 @@ export class ReviewerBrowserEngine {
   private async *stream(start: () => void): AsyncIterable<string> {
     if (this.cancelActive) this.stop();
     const manifestUrl = this.manifestUrl;
-    if (!manifestUrl) throw new Error('Load a local model bundle before starting the browser engine.');
+    if (!manifestUrl) throw coded('engine.modelRequired', 'Load a local model bundle before starting the browser engine.');
     const generation = ++this.generation;
     const queue: string[] = [];
     let notify: (() => void) | undefined;
@@ -85,7 +86,12 @@ export class ReviewerBrowserEngine {
       this.engine.onMessage = (message) => {
         if (cancelled || generation !== this.generation) return;
         if (message.type === 'event') queue.push(JSON.stringify(message.event));
-        else if (message.type === 'error') failure = new Error(String(message.message));
+        else if (message.type === 'error') {
+          const text = String(message.message ?? message.code ?? 'engine.worker');
+          const code = typeof message.code === 'string' ? message.code : 'engine.worker';
+          const params = isParams(message.params) ? message.params : { detail: text };
+          failure = coded(code, text, params);
+        }
         else if (message.type === 'done') done = true;
         wake();
       };

@@ -1,5 +1,9 @@
 <script setup lang="ts">
+import { groupStatusLabel } from "../analysis/groups";
 import type { GainLossLedger, GainLossLine } from "../analysis/modules";
+import { useYagooI18n } from "../i18n";
+
+const { t } = useYagooI18n();
 
 withDefaults(defineProps<{
   ledger: GainLossLedger;
@@ -15,27 +19,29 @@ function signed(value: number): string {
   return `${value > 0 ? "+" : ""}${value.toFixed(1)}`;
 }
 
+function colorName(color: string): string {
+  return color === "B" ? t("color.black") : t("color.white");
+}
+
 function label(line: GainLossLine): string {
-  return line.kind === "group"
-    ? `Group ${line.id}`
-    : line.kind.replace(/_/g, " ");
+  if (line.kind === "group") return t("ledger.group", { id: line.id });
+  const key = `ledger.kind.${line.kind}`;
+  const via = t(key);
+  return via === key ? line.kind.replace(/_/g, " ") : via;
 }
 </script>
 
 <template>
   <div class="yagoo-ledger-panel" data-testid="ledger-body">
     <p>
-      <strong>{{ ledger.move }} vs {{ ledger.vs === "pass" ? "pass" : `best (${ledger.referenceMove})` }}</strong>
-      · {{ signed(ledger.value) }} search points for {{ ledger.mover === "B" ? "Black" : "White" }}
+      <strong>{{ ledger.vs === "pass" ? t("ledger.versusPass", { move: ledger.move }) : t("ledger.versusBest", { move: ledger.move, reference: ledger.referenceMove }) }}</strong>
+      · {{ t("ledger.points", { value: signed(ledger.value), mover: colorName(ledger.mover) }) }}
     </p>
     <p class="yagoo-ledger-panel__note">
-      Candidate comparison at root ply {{ ledger.rootPly }}. Groups and highlighted
-      intersections belong to this position.
+      {{ t("ledger.note", { ply: ledger.rootPly }) }}
     </p>
     <p v-if="!ledger.consistent" role="status" data-testid="ledger-inconsistent">
-      Book and search inconsistent:
-      {{ ledger.inconsistency === "zero_book" ? "the ownership book is near zero" : "the difference exceeds 3 points" }}.
-      Showing signed shares of total absolute book contribution; line points are unavailable.
+      {{ t("ledger.inconsistent", { reason: ledger.inconsistency === "zero_book" ? t("ledger.zeroBook") : t("ledger.overPoints") }) }}
     </p>
     <ul>
       <li v-for="(line, index) in ledger.ledger" :key="`${line.kind}-${line.id ?? index}`">
@@ -43,45 +49,36 @@ function label(line: GainLossLine): string {
           type="button"
           :data-ledger-group="line.id"
           :data-ledger-kind="line.kind"
-          :aria-label="`Highlight ${label(line)}`"
+          :aria-label="t('ledger.highlight', { label: label(line) })"
           @mouseenter="emit('preview', line)"
           @mouseleave="emit('clear-preview')"
           @focus="emit('preview', line)"
           @blur="emit('clear-preview')"
         >
           <span>{{ label(line) }}</span>
-          <strong v-if="ledger.consistent && line.points != null">{{ signed(line.points) }} pt</strong>
+          <strong v-if="ledger.consistent && line.points != null">{{ t("ledger.pointsShort", { value: signed(line.points) }) }}</strong>
           <strong v-else>{{ signed(line.proportion * 100) }}%</strong>
         </button>
         <p v-for="change in line.strengthChanges ?? []" :key="change.color" class="yagoo-ledger-panel__note">
-          {{ change.color === "B" ? "Black" : "White" }} strength:
-          {{ change.reference.toFixed(2) }} → {{ change.candidate.toFixed(2) }}
-          ({{ signed(change.delta) }})
+          {{ t("ledger.strength", { color: colorName(change.color), from: change.reference.toFixed(2), to: change.candidate.toFixed(2), delta: signed(change.delta) }) }}
         </p>
         <p v-for="change in line.tempoChanges ?? []" :key="`tempo-${change.color}`" class="yagoo-ledger-panel__note">
-          {{ change.color }} branch status: {{ change.preferredStatus }} → {{ change.actualStatus }}
-          (explicit branch/pass probes).
+          {{ t("ledger.branchStatus", { color: change.color, preferred: groupStatusLabel(change.preferredStatus), actual: groupStatusLabel(change.actualStatus) }) }}
         </p>
         <p v-for="change in line.playedTempoChanges ?? []" :key="`played-tempo-${change.color}`"
           class="yagoo-ledger-panel__note" data-testid="ledger-played-tempo">
-          {{ change.color === "B" ? "Black" : "White" }} status:
-          before {{ change.beforeStatus }} → after {{ change.afterStatus }}
-          (separate pass probes before and after the move).
+          {{ t("ledger.playedStatus", { color: colorName(change.color), before: groupStatusLabel(change.beforeStatus), after: groupStatusLabel(change.afterStatus) }) }}
         </p>
       </li>
     </ul>
     <p v-if="!tempoEvidenceAvailable" class="yagoo-ledger-panel__note" data-testid="ledger-tempo-limitation">
-      Tempo transitions are unassessed:
-      {{ tempoComparison === "played" ? "before/after pass probes are unavailable." : "candidate branch pass probes are unavailable." }}
-      Strength changes do not establish sente, gote, or a change in life status.
+      {{ t("ledger.tempoMissing", { which: tempoComparison === "played" ? t("ledger.tempoPlayed") : t("ledger.tempoBranch") }) }}
     </p>
     <p v-else-if="tempoComparison === 'played'" class="yagoo-ledger-panel__note">
-      Status evidence follows the same root stones before and after the played move,
-      using separate pass probes. It does not establish sente or gote.
+      {{ t("ledger.playedNote") }}
     </p>
     <p v-else class="yagoo-ledger-panel__note">
-      Status evidence uses fixed root stone membership in both branch/pass pairs.
-      It does not establish sente or gote; see branch evidence below.
+      {{ t("ledger.branchNote") }}
     </p>
   </div>
 </template>

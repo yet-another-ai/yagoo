@@ -3,6 +3,7 @@ import { MODEL_CATALOG, defaultCatalogEntry, formatBytes, type CatalogEntry } fr
 import { clearModelCache, listCachedModels } from './cache';
 import { artifactsCached, bundleFromLocalFiles, manifestDownloadBytes, validateManifest } from './model';
 import { SINGLE_THREAD_NOTE } from './capabilities';
+import { CodedError } from './errors';
 import { enableIsolation } from './isolation';
 import { configuredManifestUrl } from './manifest-url';
 import './style.css';
@@ -169,7 +170,7 @@ async function loadModel(): Promise<void> {
     await refreshCacheStatus();
   } catch (error) {
     if (request === lifecycle) {
-      const message = String(error);
+      const message = shown(error);
       status.textContent = message;
       setModelUi(error instanceof DOMException && error.name === 'AbortError' ? 'idle' : 'error',
         error instanceof DOMException && error.name === 'AbortError' ? 'Download cancelled' : message);
@@ -206,7 +207,7 @@ clearBtn.addEventListener('click', async () => {
     cacheStatus.textContent = removed ? `Cache cleared (${removed} artifact(s) removed)` : 'Cache already empty';
     status.textContent = 'Model cache cleared. Load again to re-download weights.';
   } catch (error) {
-    status.textContent = String(error);
+    status.textContent = shown(error);
   }
 });
 
@@ -225,15 +226,28 @@ localFiles.addEventListener('change', async () => {
     status.textContent = 'Local model files verified. Click Load model to initialize the engine.';
     await refreshCacheStatus(bundle.manifest, selected.preferFp16 === true);
   } catch (error) {
-    status.textContent = String(error);
-    setModelUi('error', String(error));
+    status.textContent = shown(error);
+    setModelUi('error', shown(error));
   } finally {
     localFiles.value = '';
   }
 });
 
+const isolationText: Record<string, string> = {
+  'engine.isolationActive': 'Cross-origin isolation is already active.',
+  'engine.isolationUnsupported': 'This browser cannot install isolation support. Wasm will use one thread.',
+  'engine.isolationStale': 'A page-scoped isolation worker is still registered. Wasm stays on one thread until that worker is removed.',
+  'engine.isolationUpgrade': 'Reloading to replace the page-scoped isolation worker.',
+  'engine.isolationUnavailable': 'Isolation is still unavailable after reload. Check COOP/COEP headers; Wasm will use one thread.',
+  'engine.isolationReloading': 'Reloading once to enable shared Wasm memory.',
+};
+function shown(error: unknown): string {
+  if (typeof error === 'string') return isolationText[error] ?? error;
+  if (error instanceof CodedError) return error.message;
+  return String(error);
+}
 document.querySelector('#isolation')!.addEventListener('click', async () => {
-  try { status.textContent = await enableIsolation(); } catch (error) { status.textContent = String(error); }
+  try { status.textContent = shown(await enableIsolation()); } catch (error) { status.textContent = shown(error); }
 });
 
 document.querySelector('#stop')!.addEventListener('click', () => {
@@ -262,7 +276,7 @@ for (const [button, count] of [[scan, 0], [deep, 12]] as const) button.addEventL
   if (analysisRunning) return;
   try {
     const visits = Number(input('visits').value);
-    if (!Number.isInteger(visits) || visits < 1 || visits > 10000) throw new Error('Visit budget must be an integer from 1 to 10000.');
+    if (!Number.isInteger(visits) || visits < 1 || visits > 10000) throw new CodedError('engine.visitBudget', 'Visit budget must be an integer from 1 to 10000.');
     engine.analyze(document.querySelector<HTMLTextAreaElement>('#sgf')!.value, {
       rootVisits: visits, pvEndVisits: Math.min(visits, 100),
       deepenAll: count > 0 && input('all').checked, deepSelect: { maxDeepPlies: count },
@@ -270,7 +284,7 @@ for (const [button, count] of [[scan, 0], [deep, 12]] as const) button.addEventL
     events = []; analysisFailed = false; batchSummary = ''; output.textContent = '';
     analysisRunning = true; updateAnalysisButtons();
     status.textContent = 'Analyzing…';
-  } catch (error) { status.textContent = String(error); }
+  } catch (error) { status.textContent = shown(error); }
 });
 
 document.querySelector('#download')!.addEventListener('click', () => {

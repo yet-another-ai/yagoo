@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
+import { presentError, useYagooI18n } from "../i18n";
 import {
   buildCommentaryFacts, type CommentaryInput, type CommentaryTarget, type CommentaryOrigin,
   type GroundedCommentary,
@@ -22,6 +23,7 @@ const emit = defineEmits<{
   (e: "cite", target: CommentaryTarget): void;
   (e: "clear-citation"): void;
 }>();
+const { t } = useYagooI18n();
 const state = shallowRef<CommentarySessionState>({
   enabled: false, busy: false, awaitingManual: false, result: null, requestText: "",
 });
@@ -97,14 +99,13 @@ function importSelection() {
   <section v-show="active !== false" class="yagoo-commentary" data-testid="commentary-panel">
     <label>
       <input data-testid="commentary-enable" type="checkbox" :checked="state.enabled" @change="enable" />
-      Show grounded notes
+      {{ t("commentary.show") }}
     </label>
     <p class="yagoo-commentary__hint">
-      Notes are off by default. Templates run locally. An optional provider can
-      select and order approved sentences; it cannot write new judgments.
+      {{ t("commentary.hint") }}
     </p>
     <template v-if="state.enabled">
-      <p v-if="!facts.length">No supported structured facts at this position yet.</p>
+      <p v-if="!facts.length">{{ t("commentary.noFacts") }}</p>
       <div v-if="state.result" data-testid="commentary-body">
         <div v-for="sentence in cited" :key="sentence.factId" class="yagoo-commentary__sentence">
           <p>{{ sentence.text }}</p>
@@ -115,9 +116,9 @@ function importSelection() {
             @click="emit('cite', sentence.fact.target)"
             @focus="emit('cite', sentence.fact.target)"
             @blur="emit('clear-citation')"
-          >Highlight cited group or zone</button>
+          >{{ t("commentary.highlight") }}</button>
           <details>
-            <summary>{{ sentence.factId }} — source values</summary>
+            <summary>{{ t("commentary.sources", { id: sentence.factId }) }}</summary>
             <dl>
               <template v-for="source in sentence.fact.evidence" :key="source.path">
                 <dt><code>{{ source.path }}</code></dt>
@@ -127,25 +128,24 @@ function importSelection() {
           </details>
         </div>
         <p class="yagoo-commentary__hint" data-testid="commentary-verification">
-          {{ state.result.verified ? "Approved clause selection" : "Deterministic templates" }}
+          {{ state.result.verified ? t("commentary.approved") : t("commentary.templates") }}
           · {{ state.result.provider }}
         </p>
-        <p v-if="state.result.fallbackReason" role="status">{{ state.result.fallbackReason }}</p>
+        <p v-if="state.result.fallbackReason" role="status">{{ presentError(state.result.fallbackReason) }}</p>
       </div>
       <div class="yagoo-commentary__actions">
-        <button type="button" :disabled="!facts.length" @click="exportSelection">Prepare prompt JSON</button>
+        <button type="button" :disabled="!facts.length" @click="exportSelection">{{ t("commentary.prepare") }}</button>
         <button v-if="effectiveProvider" data-testid="commentary-provider" type="button" :disabled="!facts.length" @click="runProvider">
-          Send selected facts to {{ effectiveProvider.id }}
+          {{ t("commentary.send", { id: effectiveProvider.id }) }}
         </button>
-        <button v-if="state.busy || state.awaitingManual" type="button" data-testid="commentary-cancel" @click="session.cancel()">Cancel</button>
+        <button v-if="state.busy || state.awaitingManual" type="button" data-testid="commentary-cancel" @click="session.cancel()">{{ t("commentary.cancel") }}</button>
       </div>
-      <p v-if="state.busy" role="status">Waiting for the configured provider…</p>
+      <p v-if="state.busy" role="status">{{ t("commentary.waiting") }}</p>
       <p v-if="configuredProvider && !provider" class="yagoo-commentary__hint" data-testid="commentary-destination">
-        Send destination: {{ configuredDestination }}
+        {{ t("commentary.destination", { url: configuredDestination }) }}
       </p>
       <p class="yagoo-commentary__hint">
-        Prompt JSON contains selected structured values
-        and approved sentences, without SGF text, player names, comments, or full ownership maps.
+        {{ t("commentary.promptHint") }}
       </p>
       <CommentaryProviderSettings
         v-if="!provider"
@@ -153,13 +153,13 @@ function importSelection() {
         @provider="configureProvider"
       />
       <template v-if="state.awaitingManual">
-        <label>Copy prompt JSON
+        <label>{{ t("commentary.copy") }}
           <textarea data-testid="commentary-prompt" readonly :value="state.requestText" rows="6" />
         </label>
-        <label>Paste selection JSON
+        <label>{{ t("commentary.paste") }}
           <textarea data-testid="commentary-response" v-model="response" rows="4" />
         </label>
-        <button data-testid="commentary-import" type="button" @click="importSelection">Apply selection JSON</button>
+        <button data-testid="commentary-import" type="button" @click="importSelection">{{ t("commentary.apply") }}</button>
       </template>
     </template>
   </section>

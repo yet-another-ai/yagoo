@@ -42,8 +42,8 @@ async function unregisterNarrowIsolation(root: URL): Promise<number> {
 export async function enableIsolation(scopePath?: string): Promise<string> {
   if (!isSecureContext || !('serviceWorker' in navigator)) {
     return crossOriginIsolated
-      ? 'Cross-origin isolation is already active.'
-      : 'This browser cannot install isolation support. Wasm will use one thread.';
+      ? 'engine.isolationActive'
+      : 'engine.isolationUnsupported';
   }
   const page = new URL(scopePath || import.meta.env.BASE_URL, location.origin);
   if (!page.pathname.endsWith('/')) page.pathname += '/';
@@ -59,17 +59,17 @@ export async function enableIsolation(scopePath?: string): Promise<string> {
   }
   if (removed > 0) {
     if (sessionStorage.getItem(upgradeKey)) {
-      return 'A page-scoped isolation worker is still registered. Wasm stays on one thread until that worker is removed.';
+      return 'engine.isolationStale';
     }
     sessionStorage.setItem(upgradeKey, '1');
     location.reload();
-    return 'Reloading to replace the page-scoped isolation worker.';
+    return 'engine.isolationUpgrade';
   }
-  if (crossOriginIsolated && hasRoot) return 'Cross-origin isolation is already active.';
-  if (sessionStorage.getItem(key)) return 'Isolation is still unavailable after reload. Check COOP/COEP headers; Wasm will use one thread.';
+  if (crossOriginIsolated && hasRoot) return 'engine.isolationActive';
+  if (sessionStorage.getItem(key)) return 'engine.isolationUnavailable';
   sessionStorage.setItem(key, '1');
   location.reload();
-  return 'Reloading once to enable shared Wasm memory.';
+  return 'engine.isolationReloading';
 }
 
 /** Replace an older `/demo/` or `/app/` registration the next time that page loads. */

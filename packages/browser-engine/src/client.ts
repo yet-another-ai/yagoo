@@ -1,4 +1,5 @@
 import { sharedMemoryAvailable, threadPlan } from './capabilities';
+import { CodedError, coded, isParams } from './errors';
 import engineWorkerHref from './engine.worker.ts?worker&url';
 
 export type EngineStatus = {
@@ -38,6 +39,13 @@ async function describeEmptyWorkerError(workerUrl: string): Promise<string> {
   }
 }
 
+function errorFromMessage(data: EngineMessage): CodedError {
+  const message = String(data.message ?? data.code ?? 'engine.worker');
+  const code = typeof data.code === 'string' ? data.code : 'engine.worker';
+  const params = isParams(data.params) ? data.params : { detail: message };
+  return coded(code, message, params);
+}
+
 /** Owns a dedicated engine worker and its ORT pthreads. terminate() cancels all. */
 export class BrowserEngine {
   private worker?: Worker;
@@ -70,12 +78,12 @@ export class BrowserEngine {
             const fail = (error: Error) => reject(error);
             worker.onerror = event => {
               const message = formatWorkerError(event);
-              if (message) fail(new Error(message));
-              else void describeEmptyWorkerError(workerUrl.href).then(text => fail(new Error(text)));
+              if (message) fail(coded('engine.worker', message, { detail: message }));
+              else void describeEmptyWorkerError(workerUrl.href).then(text => fail(coded('engine.worker', text, { detail: text })));
             };
             worker.onmessage = ({ data }: MessageEvent<EngineMessage>) => {
               if (data.type === 'ready') resolve(data.status as EngineStatus);
-              else if (data.type === 'error') reject(new Error(String(data.message)));
+              else if (data.type === 'error') reject(errorFromMessage(data));
               else this.onMessage(data);
             };
             worker.postMessage({ type: 'initialize', manifestUrl: new URL(manifestUrl, location.href).href,
@@ -93,8 +101,9 @@ export class BrowserEngine {
           worker.onerror = event => {
             this.running = false;
             const message = formatWorkerError(event);
-            if (message) this.onMessage({ type: 'error', message });
-            else void describeEmptyWorkerError(workerUrl.href).then(text => this.onMessage({ type: 'error', message: text }));
+            const publish = (text: string) => this.onMessage({ type: 'error', code: 'engine.worker', params: { detail: text }, message: text });
+            if (message) publish(message);
+            else void describeEmptyWorkerError(workerUrl.href).then(publish);
           };
           return result;
         } catch (error) {
@@ -103,8 +112,9 @@ export class BrowserEngine {
           this.cancelInitialization = undefined;
           this.worker = undefined;
           const message = String(error);
-          if (/Manifest download failed \(404\)/.test(message)) {
-            throw new Error(
+          if (/Manifest download failed \(404\)/.test(message) || (error instanceof CodedError && error.code === 'engine.manifestDownloadFailed' && Number(error.params.status) === 404)) {
+            throw coded(
+              'engine.noHostedBundle',
               'No model bundle is hosted here. Load a local model (manifest.json, the .onnx weights, and warmup.json), or set VITE_YAGOO_MANIFEST_URL for local development.',
             );
           }
@@ -113,12 +123,13 @@ export class BrowserEngine {
       }
     }
     this.dispose();
-    throw new Error(messages.join('\n'));
+    const detail = messages.join('\n');
+    throw coded('engine.initFailed', detail, { detail });
   }
 
   analyze(sgf: string, config?: Record<string, unknown>, searchOptions?: { rootSymmetries?: number; batchSize?: number }): void {
-    if (!this.worker || !this.ready) throw new Error('Initialize the engine first.');
-    if (this.running) throw new Error('An analysis is already running.');
+    if (!this.worker || !this.ready) throw coded('engine.notInitialized', 'Initialize the engine first.');
+    if (this.running) throw coded('engine.alreadyRunning', 'An analysis is already running.');
     this.running = true;
     this.worker.postMessage({ type: 'analyze', sgf, config, searchOptions });
   }
@@ -131,8 +142,8 @@ export class BrowserEngine {
   }
 
   analyzePosition(request: PositionAnalysisRequest): void {
-    if (!this.worker || !this.ready) throw new Error('Initialize the engine first.');
-    if (this.running) throw new Error('An analysis is already running.');
+    if (!this.worker || !this.ready) throw coded('engine.notInitialized', 'Initialize the engine first.');
+    if (this.running) throw coded('engine.alreadyRunning', 'An analysis is already running.');
     this.running = true;
     this.worker.postMessage({ type: 'analyzePosition', request });
   }

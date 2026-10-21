@@ -1,4 +1,5 @@
 import { computed, getCurrentScope, onScopeDispose, ref, shallowRef, type Ref } from "vue";
+import { serializeError } from "../i18n";
 import {
   buildBoardOverlays,
   buildReviewSeries,
@@ -89,7 +90,7 @@ export function useAnalysisStream(): UseAnalysisStreamResult {
         state.value = {
           ...state.value,
           status: "error",
-          lastError: err.message,
+          lastError: serializeError(err),
         };
       },
     });

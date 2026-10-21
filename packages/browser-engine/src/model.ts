@@ -1,4 +1,5 @@
 import { cacheDelete, cacheHas, cachePut, cacheRead } from './cache';
+import { coded } from './errors';
 
 export interface Artifact { url: string; bytes: number; sha256: string; integrity: string }
 export interface Manifest {
@@ -15,28 +16,28 @@ export function validateManifest(value: unknown): Manifest {
       m.modelVersion !== 14 || m.model !== 'kata1-b18c384nbt-s9996604416-d4316597426' ||
       m.checkpointSha256 !== 'ed3f2681be01604fd51b467925de77cea4f19cf125383493449d8c002fb91a24' ||
       !/^[0-9a-f]{40}$/.test(m.upstreamRevision ?? '')) {
-    throw new Error('Expected a validated b18 SWA V7 model bundle with fixed batch 1 or bounded dynamic batches.');
+    throw coded('engine.manifestInvalid', 'Expected a validated b18 SWA V7 model bundle with fixed batch 1 or bounded dynamic batches.');
   }
-  if (m.batch === 0 && (!Number.isInteger(m.maxBatch) || m.maxBatch! < 1 || m.maxBatch! > 4)) throw new Error('Dynamic model maxBatch must be 1..4.');
+  if (m.batch === 0 && (!Number.isInteger(m.maxBatch) || m.maxBatch! < 1 || m.maxBatch! > 4)) throw coded('engine.maxBatch', 'Dynamic model maxBatch must be 1..4.');
   for (const name of ['policy', 'value', 'miscvalue', 'moremiscvalue', 'ownership', 'scoring', 'scorebelief_logprobs', 'seki', 'futurepos']) {
-    if (!Array.isArray(m.outputs) || !m.outputs.includes(name)) throw new Error(`Model is missing ${name}.`);
+    if (!Array.isArray(m.outputs) || !m.outputs.includes(name)) throw coded('engine.outputMissing', `Model is missing ${name}.`, { name });
   }
   for (const key of ['scoremean_multiplier', 'scorestdev_multiplier', 'lead_multiplier']) {
-    if (!(m.postprocess?.[key] > 0) || !Number.isFinite(m.postprocess[key])) throw new Error(`Invalid model postprocess ${key}.`);
+    if (!(m.postprocess?.[key] > 0) || !Number.isFinite(m.postprocess[key])) throw coded('engine.postprocessInvalid', `Invalid model postprocess ${key}.`, { key });
   }
-  if (!m.license || !m.source) throw new Error('Model provenance and license are required.');
+  if (!m.license || !m.source) throw coded('engine.provenance', 'Model provenance and license are required.');
   for (const a of [m.variants?.fp32, m.variants?.fp16, m.warmup].filter(Boolean) as Artifact[]) {
-    if (!a.url || !Number.isSafeInteger(a.bytes) || a.bytes <= 0 || !/^[0-9a-f]{64}$/.test(a.sha256)) throw new Error('Invalid model artifact metadata.');
+    if (!a.url || !Number.isSafeInteger(a.bytes) || a.bytes <= 0 || !/^[0-9a-f]{64}$/.test(a.sha256)) throw coded('engine.artifactMetadata', 'Invalid model artifact metadata.');
   }
-  if (!m.variants?.fp32 || !m.warmup) throw new Error('The fp32 fallback and warmup reference are required.');
+  if (!m.variants?.fp32 || !m.warmup) throw coded('engine.fp32Required', 'The fp32 fallback and warmup reference are required.');
   return m;
 }
 
 export async function verify(data: Uint8Array, a: Artifact): Promise<void> {
-  if (data.byteLength !== a.bytes) throw new Error(`Wrong size for ${a.url}.`);
+  if (data.byteLength !== a.bytes) throw coded('engine.wrongSize', `Wrong size for ${a.url}.`, { url: a.url });
   const hash = await crypto.subtle.digest('SHA-256', data as Uint8Array<ArrayBuffer>);
   const hex = Array.from(new Uint8Array(hash), x => x.toString(16).padStart(2, '0')).join('');
-  if (hex !== a.sha256) throw new Error(`SHA-256 mismatch for ${a.url}.`);
+  if (hex !== a.sha256) throw coded('engine.shaMismatch', `SHA-256 mismatch for ${a.url}.`, { url: a.url });
 }
 
 export type LoadArtifactOptions = {
@@ -84,7 +85,7 @@ export async function loadArtifact(
     credentials: 'same-origin',
     signal,
   });
-  if (!response.ok || !response.body) throw new Error(`Model download failed (${response.status}): ${a.url}`);
+  if (!response.ok || !response.body) throw coded('engine.downloadFailed', `Model download failed (${response.status}): ${a.url}`, { status: response.status, url: a.url });
   const reader = response.body.getReader();
   const bytes = new Uint8Array(a.bytes);
   let offset = 0;
@@ -93,13 +94,13 @@ export async function loadArtifact(
       throwIfAborted(signal);
       const { value, done } = await reader.read();
       if (done) break;
-      if (offset + value.byteLength > bytes.byteLength) throw new Error('Model download exceeds manifest size.');
+      if (offset + value.byteLength > bytes.byteLength) throw coded('engine.downloadTooLarge', 'Model download exceeds manifest size.');
       bytes.set(value, offset); offset += value.byteLength; progress(offset, a.bytes);
     }
   } finally {
     try { await reader.cancel(); } catch { /* ignore */ }
   }
-  if (offset !== a.bytes) throw new Error(`Incomplete download for ${a.url}: got ${offset}, expected ${a.bytes}.`);
+  if (offset !== a.bytes) throw coded('engine.downloadIncomplete', `Incomplete download for ${a.url}: got ${offset}, expected ${a.bytes}.`, { url: a.url, got: offset, expected: a.bytes });
   await verify(bytes, a);
   try { await cachePut(a.sha256, bytes); } catch { /* quota / private mode */ }
   return bytes;
@@ -126,7 +127,7 @@ export async function bundleFromLocalFiles(files: Iterable<File>): Promise<Local
   const byName = new Map<string, File>();
   for (const file of files) byName.set(file.name, file);
   const manifestFile = byName.get('manifest.json');
-  if (!manifestFile) throw new Error('Select files including manifest.json (plus the .onnx and warmup.json it names).');
+  if (!manifestFile) throw coded('engine.manifestFiles', 'Select files including manifest.json (plus the .onnx and warmup.json it names).');
   const manifest = validateManifest(JSON.parse(await manifestFile.text()));
   const objectUrls: string[] = [];
   const revokeAll = () => { for (const url of objectUrls) URL.revokeObjectURL(url); objectUrls.length = 0; };
@@ -134,7 +135,7 @@ export async function bundleFromLocalFiles(files: Iterable<File>): Promise<Local
     const rewrite = async (artifact: Artifact): Promise<Artifact> => {
       const name = artifact.url.split('/').pop()!;
       const file = byName.get(name);
-      if (!file) throw new Error(`Missing local file for ${name} (listed in the manifest as ${artifact.url}).`);
+      if (!file) throw coded('engine.localFileMissing', `Missing local file for ${name} (listed in the manifest as ${artifact.url}).`, { name, url: artifact.url });
       const bytes = new Uint8Array(await file.arrayBuffer());
       await verify(bytes, artifact);
       try { await cachePut(artifact.sha256, bytes); } catch { /* optional */ }

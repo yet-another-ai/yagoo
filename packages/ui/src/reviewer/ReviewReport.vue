@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from "vue";
+import { presentError, presentSource, useYagooI18n } from "../i18n";
 import type { ReviewReportDocument } from "../report";
 import { downloadReviewFile, ReviewExportSession, type ReviewExportFormat } from "../report";
 import { reportNumber } from "../report/export";
@@ -16,6 +17,7 @@ const emit = defineEmits<{
   (e: "close"): void;
   (e: "cancel"): void;
 }>();
+const { t } = useYagooI18n();
 const exporting = ref(false);
 const exportError = ref("");
 let exportGeneration = 0;
@@ -38,65 +40,61 @@ async function exportReport(format: ReviewExportFormat) {
   try {
     await session.export(props.report, format);
   } catch {
-    if (generation === exportGeneration) exportError.value = "Export failed. Please try again.";
+    if (generation === exportGeneration) exportError.value = "report.exportFailed";
   } finally {
     if (generation === exportGeneration) exporting.value = false;
   }
 }
-const showPlies = (values: number[]) => values.join(", ") || "none";
+const showPlies = (values: number[]) => values.join(", ") || t("report.none");
 </script>
 
 <template>
-  <section class="yagoo-report" data-testid="review-report" aria-label="Automatic review">
+  <section class="yagoo-report" data-testid="review-report" :aria-label="t('report.aria')">
     <header class="yagoo-report__header">
       <div>
-        <h2>Automatic review</h2>
-        <p class="yagoo-report__badge" role="status">{{ report?.status.replace("_", " ") ?? "No analysis loaded" }}</p>
+        <h2>{{ t("report.title") }}</h2>
+        <p class="yagoo-report__badge" role="status">{{ report ? t(`report.status.${report.status}`) : t("report.noAnalysis") }}</p>
       </div>
       <div class="yagoo-report__actions">
-        <button data-testid="export-markdown" type="button" :disabled="!report" @click="exportReport('markdown')">Markdown</button>
-        <button data-testid="export-html" type="button" :disabled="!report" @click="exportReport('html')">HTML</button>
-        <button v-if="exporting" type="button" @click="cancelExport">Cancel export</button>
-        <button v-if="report?.streamStatus === 'streaming'" data-testid="cancel-review" type="button" @click="emit('cancel')">Stop analysis</button>
-        <button type="button" @click="emit('close')">Back to board</button>
+        <button data-testid="export-markdown" type="button" :disabled="!report" @click="exportReport('markdown')">{{ t("report.markdown") }}</button>
+        <button data-testid="export-html" type="button" :disabled="!report" @click="exportReport('html')">{{ t("report.html") }}</button>
+        <button v-if="exporting" type="button" @click="cancelExport">{{ t("report.cancelExport") }}</button>
+        <button v-if="report?.streamStatus === 'streaming'" data-testid="cancel-review" type="button" @click="emit('cancel')">{{ t("report.stop") }}</button>
+        <button type="button" @click="emit('close')">{{ t("report.back") }}</button>
       </div>
     </header>
-    <p v-if="exportError" role="alert">{{ exportError }}</p>
-    <p v-if="!report" class="yagoo-report__empty">Load recorded results or choose an engine and select Review to analyze this game.</p>
+    <p v-if="exportError" role="alert">{{ t(exportError) }}</p>
+    <p v-if="!report" class="yagoo-report__empty">{{ t("report.empty") }}</p>
     <template v-else>
-      <p>Source: {{ report.source }}</p>
+      <p>{{ t("report.source", { source: presentSource(report.source) }) }}</p>
       <dl class="yagoo-report__metadata">
         <template v-for="entry in report.metadata" :key="entry.label"><dt>{{ entry.label }}</dt><dd>{{ entry.value }}</dd></template>
       </dl>
-      <section aria-label="Coverage" data-testid="report-coverage">
-        <h3>Coverage and overview</h3>
-        <p>Completed positions {{ report.coverage.completedPositionPlies.length }}/{{ report.coverage.moveCount + 1 }}.
-          Compared played moves {{ report.overview.comparedMoves }}/{{ report.coverage.moveCount }}.
-          {{ report.overview.matchesPreferred }} match the preferred move.</p>
-        <p>Sum of positive score differences on compared moves only:
-          Black {{ reportNumber(report.overview.blackPositiveScoreLoss) }},
-          White {{ reportNumber(report.overview.whitePositiveScoreLoss) }} points. This is not a full-game rating.</p>
-        <p v-if="report.streamStatus === 'streaming'">Analysis is running. The report updates as completed comparisons arrive.</p>
-        <p v-else-if="report.status === 'empty'" class="yagoo-report__empty">No completed position analyses are available. Load recorded results or choose an engine and select Review to analyze this game.</p>
-        <p v-else-if="report.status === 'partial'">Partial coverage. Missing comparisons cannot establish whether a move was good or bad.</p>
-        <details><summary>Missing coverage</summary>
-          <p>Positions: {{ showPlies(report.coverage.missingPositionPlies) }}</p>
-          <p>Played-move comparisons: {{ showPlies(report.coverage.missingComparisonPlies) }}</p>
+      <section :aria-label="t('report.coverageAria')" data-testid="report-coverage">
+        <h3>{{ t("report.coverageTitle") }}</h3>
+        <p>{{ t("report.coverage", { done: report.coverage.completedPositionPlies.length, total: report.coverage.moveCount + 1, compared: report.overview.comparedMoves, moves: report.coverage.moveCount, matches: report.overview.matchesPreferred }) }}</p>
+        <p>{{ t("report.scoreSum", { black: reportNumber(report.overview.blackPositiveScoreLoss), white: reportNumber(report.overview.whitePositiveScoreLoss) }) }}</p>
+        <p v-if="report.streamStatus === 'streaming'">{{ t("report.running") }}</p>
+        <p v-else-if="report.status === 'empty'" class="yagoo-report__empty">{{ t("report.noPositions") }}</p>
+        <p v-else-if="report.status === 'partial'">{{ t("report.partial") }}</p>
+        <details><summary>{{ t("report.missing") }}</summary>
+          <p>{{ t("report.missingPositions", { plies: showPlies(report.coverage.missingPositionPlies) }) }}</p>
+          <p>{{ t("report.missingComparisons", { plies: showPlies(report.coverage.missingComparisonPlies) }) }}</p>
         </details>
       </section>
-      <p v-if="report.opening">Catalogue opening: {{ report.opening.name }} ({{ report.opening.source }}).</p>
-      <h3>Ranked compared moves</h3>
-      <p>Signed score loss, then winrate loss, from the mover's perspective. Equality and negative search estimates remain visible.</p>
-      <p v-if="!report.moves.length">No validated played-move comparisons are available.</p>
+      <p v-if="report.opening">{{ t("report.opening", { name: report.opening.name, source: report.opening.source }) }}</p>
+      <h3>{{ t("report.ranked") }}</h3>
+      <p>{{ t("report.rankedNote") }}</p>
+      <p v-if="!report.moves.length">{{ t("report.noMoves") }}</p>
       <ol class="yagoo-report__list">
         <li v-for="row in report.moves" :key="row.ply" class="yagoo-report__move">
           <button type="button" class="yagoo-report__row"
             :class="{ 'yagoo-report__row--current': currentPly === row.ply }"
             :data-report-ply="row.ply" @click="emit('select', row.ply)">
-            <strong>{{ row.rank }}. Move {{ row.ply }}: {{ row.mover }} {{ row.actualMove }}</strong>
-            <span>Preferred {{ row.aiMove }} at root {{ row.rootPly }}</span>
-            <span>Score loss {{ reportNumber(row.scoreLoss) }} points</span>
-            <span>Winrate loss {{ reportNumber(row.winrateLoss * 100) }} pp</span>
+            <strong>{{ t("report.move", { rank: row.rank, ply: row.ply, mover: row.mover, actual: row.actualMove }) }}</strong>
+            <span>{{ t("report.preferred", { move: row.aiMove, root: row.rootPly }) }}</span>
+            <span>{{ t("report.scoreLoss", { value: reportNumber(row.scoreLoss) }) }}</span>
+            <span>{{ t("report.winrateLoss", { value: reportNumber(row.winrateLoss * 100) }) }}</span>
           </button>
           <p>{{ row.explanation.text }}</p>
           <section v-for="section in row.evidenceSections" :key="section.id"
@@ -107,20 +105,19 @@ const showPlies = (values: number[]) => values.join(", ") || "none";
               <li v-for="fact in section.facts" :key="fact.id" :data-report-fact="fact.id">
                 <p>{{ fact.variants[0] }}</p>
                 <details>
-                  <summary>Evidence</summary>
+                  <summary>{{ t("report.evidence") }}</summary>
                   <code v-for="evidence in fact.evidence" :key="evidence.path">{{ evidence.path }} = {{ JSON.stringify(evidence.value) }}</code>
                 </details>
               </li>
             </ul>
             <p v-if="section.omittedFacts > 0" class="yagoo-report__omitted">
-              {{ section.omittedFacts }} additional {{ section.omittedFacts === 1 ? "fact is" : "facts are" }}
-              available in Source facts and comparison limits below.
+              {{ t("report.omitted", { count: section.omittedFacts, noun: section.omittedFacts === 1 ? t("report.fact") : t("report.facts") }) }}
             </p>
           </section>
           <p class="yagoo-report__categories">{{ row.categories.map((c) => c.replaceAll("_", " ")).join(" · ") }}</p>
           <ul><li v-for="recommendation in row.recommendations" :key="recommendation.text">{{ recommendation.text }}</li></ul>
           <ul><li v-for="missing in row.missingEvidence" :key="missing">{{ missing }}</li></ul>
-          <details><summary>Source facts and comparison limits</summary>
+          <details><summary>{{ t("report.limits") }}</summary>
             <ul><li v-for="fact in row.facts" :key="fact.id">
               <strong>{{ fact.id }}</strong>: {{ fact.variants[0] }}
               <code v-for="evidence in fact.evidence" :key="evidence.path">{{ evidence.path }} = {{ JSON.stringify(evidence.value) }}</code>
@@ -129,11 +126,11 @@ const showPlies = (values: number[]) => values.join(", ") || "none";
         </li>
       </ol>
       <section v-if="report.unassessedPlies.length">
-        <h3>Unassessed scan leads</h3>
-        <p>These plies were selected for analysis. Their unsigned swings do not establish played-move loss.</p>
-        <button v-for="ply in report.unassessedPlies" :key="ply" type="button" :data-report-ply="ply" @click="emit('select', ply)">Move {{ ply }}</button>
+        <h3>{{ t("report.unassessed") }}</h3>
+        <p>{{ t("report.unassessedNote") }}</p>
+        <button v-for="ply in report.unassessedPlies" :key="ply" type="button" :data-report-ply="ply" @click="emit('select', ply)">{{ t("report.unassessedMove", { ply }) }}</button>
       </section>
-      <section><h3>Limits and provenance</h3><ul><li v-for="warning in report.warnings" :key="warning">{{ warning }}</li></ul></section>
+      <section><h3>{{ t("report.provenance") }}</h3><ul><li v-for="warning in report.warnings" :key="warning">{{ presentError(warning) }}</li></ul></section>
     </template>
   </section>
 </template>

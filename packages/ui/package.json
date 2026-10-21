@@ -25,7 +25,8 @@
   "dependencies": {
     "@sabaki/go-board": "^1.4.3",
     "@sabaki/immutable-gametree": "^1.9.4",
-    "@sabaki/sgf": "^3.4.7"
+    "@sabaki/sgf": "^3.4.7",
+    "vue-i18n": "11.4.16"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.1",

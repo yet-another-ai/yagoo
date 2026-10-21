@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
+import { useYagooI18n } from "../i18n";
 import type {
   GainLossLedger,
   GainLossLine,
@@ -82,13 +83,14 @@ const emit = defineEmits<{
   (e: "clear-commentary-citation"): void;
 }>();
 
-const tabs: { id: InspectorPerspective; label: string }[] = [
-  { id: "ai", label: "AI" },
-  { id: "why", label: "Why not" },
-  { id: "ledger", label: "Ledger" },
-  { id: "sacrifice", label: "Sacrifice" },
-  { id: "notes", label: "Notes" },
-];
+const { t } = useYagooI18n();
+const tabs = computed(() => [
+  { id: "ai" as const, label: t("inspector.tab.ai") },
+  { id: "why" as const, label: t("inspector.tab.why") },
+  { id: "ledger" as const, label: t("inspector.tab.ledger") },
+  { id: "sacrifice" as const, label: t("inspector.tab.sacrifice") },
+  { id: "notes" as const, label: t("inspector.tab.notes") },
+]);
 
 const perspective = ref<InspectorPerspective>(props.initialPerspective);
 watch(perspective, (next) => {
@@ -108,8 +110,9 @@ function onTabKey(event: KeyboardEvent, index: number) {
   event.preventDefault();
   event.stopPropagation();
   const dir = event.key === "ArrowRight" ? 1 : -1;
-  const next = (index + dir + tabs.length) % tabs.length;
-  const tab = tabs[next];
+  const list = tabs.value;
+  const next = (index + dir + list.length) % list.length;
+  const tab = list[next];
   if (tab == null) return;
   perspective.value = tab.id;
   const button = (event.currentTarget as HTMLElement).parentElement
@@ -133,15 +136,15 @@ defineExpose({ perspective });
 </script>
 
 <template>
-  <section class="yagoo-inspector" data-testid="move-inspector" :aria-label="`Move ${ply} inspector`">
+  <section class="yagoo-inspector" data-testid="move-inspector" :aria-label="t('inspector.aria', { ply })">
     <header class="yagoo-inspector__bar">
       <div class="yagoo-inspector__title">
-        Move {{ ply }}
+        {{ t("inspector.move", { ply }) }}
         <span v-if="keyCount > 0" class="yagoo-inspector__key">
           <template v-if="keyIndex >= 0">
-            Key {{ keyIndex + 1 }} / {{ keyCount }}
+            {{ t("inspector.key", { index: keyIndex + 1, count: keyCount }) }}
           </template>
-          <template v-else>Not a key move</template>
+          <template v-else>{{ t("inspector.notKey") }}</template>
         </span>
       </div>
       <div class="yagoo-inspector__keys">
@@ -149,24 +152,24 @@ defineExpose({ perspective });
           type="button"
           data-testid="prev-key-move"
           :disabled="keyCount === 0"
-          aria-label="Previous key move"
+          :aria-label="t('inspector.prevAria')"
           @click="emit('prev-key')"
         >
-          Prev key
+          {{ t("inspector.prev") }}
         </button>
         <button
           type="button"
           data-testid="next-key-move"
           :disabled="keyCount === 0"
-          aria-label="Next key move"
+          :aria-label="t('inspector.nextAria')"
           @click="emit('next-key')"
         >
-          Next key
+          {{ t("inspector.next") }}
         </button>
       </div>
     </header>
 
-    <div class="yagoo-inspector__tabs" role="tablist" aria-label="Move perspectives">
+    <div class="yagoo-inspector__tabs" role="tablist" :aria-label="t('inspector.perspectives')">
       <button
         v-for="(tab, index) in tabs"
         :id="`yagoo-tab-${tab.id}`"
@@ -193,19 +196,19 @@ defineExpose({ perspective });
     >
       <dl v-if="root" class="yagoo-inspector__root">
         <div>
-          <dt>Winrate</dt>
+          <dt>{{ t("inspector.winrate") }}</dt>
           <dd>{{ percent(root.winrate) }}</dd>
         </div>
         <div>
-          <dt>Score</dt>
+          <dt>{{ t("inspector.score") }}</dt>
           <dd>{{ points(root.scoreLead) }}</dd>
         </div>
         <div>
-          <dt>Visits</dt>
+          <dt>{{ t("inspector.visits") }}</dt>
           <dd>{{ root.visits ?? "—" }}</dd>
         </div>
       </dl>
-      <p v-else class="yagoo-inspector__wait">No root analysis at this ply yet.</p>
+      <p v-else class="yagoo-inspector__wait">{{ t("inspector.noRoot") }}</p>
       <CandidatesPanel
         embedded
         :candidates="candidates"
@@ -235,8 +238,8 @@ defineExpose({ perspective });
       <StubPane
         v-else
         :issue="24"
-        title="Why not this move"
-        summary="No comparison is available for this move. Deep analysis needs actual and preferred candidates from the historical board before this move. Scan-only positions, older recordings, or unsupported restricted queries may omit it."
+        :title="t('inspector.whyTitle')"
+        :summary="t('inspector.whySummary')"
       />
     </div>
 
@@ -256,8 +259,8 @@ defineExpose({ perspective });
       <StubPane
         v-else
         :issue="23"
-        title="Gain / loss by group"
-        summary="No ledger is available at this position. Deep analysis needs matching candidate ownership, score, and a pass probe; scan-only or older recordings may omit them. Tempo transitions require additional branch probes."
+        :title="t('inspector.ledgerTitle')"
+        :summary="t('inspector.ledgerSummary')"
       />
     </div>
 

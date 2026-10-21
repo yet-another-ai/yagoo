@@ -58,6 +58,7 @@ export default defineConfig({
         items: [
           { text: "Snapshots", link: "/pipeline/snapshots" },
           { text: "Streaming events", link: "/pipeline/streaming" },
+          { text: "Live variations", link: "/pipeline/live-variations" },
           { text: "Browser engine (EXPERIMENTAL)", link: "/browser-engine" },
         ],
       },

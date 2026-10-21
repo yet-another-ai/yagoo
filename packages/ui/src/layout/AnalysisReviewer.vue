@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   type BrowserEngineAdapter,
+  type PositionSourceFactory,
   buildGroupOutlines,
   buildGroupVertexIndex,
   createBrowserEngineSource,
@@ -15,6 +16,7 @@ import {
   resolveSgfRules,
   useAnalysisStream,
 } from "../analysis";
+import { getSgfRootError } from "../composables/useGame";
 import EngineSourcePanel from "../reviewer/EngineSourcePanel.vue";
 import { keyMovesFromState } from "../reviewer/keyMoves";
 import type { InspectorPerspective } from "../reviewer/MoveInspector.vue";
@@ -63,16 +65,24 @@ function parseBoardSize(sgf: string): number {
   return Number.isFinite(n) && n >= 2 ? n : 19;
 }
 
-const sgfText = ref(props.initialSgf ?? "");
+const sgfLoadError = ref(getSgfRootError(props.initialSgf?.trim() ? props.initialSgf : "(;)"));
+const hasAcceptedSgf = ref(sgfLoadError.value == null);
+const sgfText = ref(hasAcceptedSgf.value ? props.initialSgf ?? "" : "");
 const rulesLabel = computed(() => resolveSgfRules(sgfText.value));
 const boardSizeFromSgf = computed(() => parseBoardSize(sgfText.value));
 const dragOver = ref(false);
 const sourceOpen = ref(false);
 const nativeUrl = ref("http://127.0.0.1:8710/analyze");
 const activeNative = ref(false);
+const variationActive = ref(false);
+const sourceGeneration = ref(0);
+let gameReadGeneration = 0;
+let sourceReadGeneration = 0;
+onBeforeUnmount(() => { gameReadGeneration++; sourceReadGeneration++; });
 const statusMessage = ref("");
 const stoppedByUser = ref(false);
 const selectedCandidate = ref(0);
+const reviewer = ref<InstanceType<typeof ReviewerLayout> | null>(null);
 const currentPly = ref(0);
 /** Hover / panel preview index (cleared on leave unless touch-pinned). */
 const previewCandidate = ref<number | null>(null);
@@ -99,6 +109,15 @@ function reset() {
   stoppedByUser.value = false;
   statusMessage.value = "";
   resetStream();
+}
+
+function replaceSgf(text: string): boolean {
+  sgfLoadError.value = getSgfRootError(text.trim() ? text : "(;)");
+  if (sgfLoadError.value) return false;
+  reset();
+  sgfText.value = text;
+  hasAcceptedSgf.value = true;
+  return true;
 }
 
 function stopAnalysis() {
@@ -234,9 +253,21 @@ const liveAvailable = isLiveNativeAvailable();
 const browserAvailable = computed(() =>
   isBrowserEngineAvailable(props.browserEngine),
 );
+const positionSource = computed<PositionSourceFactory | null>(() => {
+  if (!hasAcceptedSgf.value) return null;
+  // Explicit reconnects must restart the selected position even for the same engine.
+  void sourceGeneration.value;
+  if (activeNative.value) {
+    const url = nativeUrl.value;
+    return ({ sgf, ...position }) => createLiveNativeSource({ url, sgf, position });
+  }
+  const engine = props.browserEngine;
+  if (!engine?.analyzePosition) return null;
+  return ({ sgf, ...position }) => createBrowserEngineSource({ engine, sgf, position });
+});
 
 onMounted(() => {
-  if (props.initialNdjson) {
+  if (props.initialNdjson && hasAcceptedSgf.value) {
     loadNdjsonText(props.initialNdjson, "bundled sample analysis");
   } else {
     refreshOverlays();
@@ -246,14 +277,22 @@ onMounted(() => {
 watch(
   () => props.initialSgf,
   (v) => {
+    gameReadGeneration++;
+    sourceReadGeneration++;
     if (v !== undefined && v !== sgfText.value) {
-      reset();
-      sgfText.value = v;
+      replaceSgf(v);
+    } else if (v !== undefined) {
+      sgfLoadError.value = null;
+      hasAcceptedSgf.value = true;
     }
   },
 );
 
 function loadNdjsonText(text: string, label: string) {
+  sourceReadGeneration++;
+  // Cancel the position request before changing adapters or attaching the file.
+  // Otherwise a queued source watcher can restart Try and stop the new stream.
+  reviewer.value?.leaveVariation();
   activeNative.value = false;
   reset();
   statusMessage.value = `Loading ${label}…`;
@@ -267,15 +306,19 @@ function loadNdjsonText(text: string, label: string) {
   statusMessage.value = `Streaming from ${label}`;
 }
 
-async function onSgfFile(file: File) {
+async function onSgfFile(file: File): Promise<boolean> {
+  const generation = ++gameReadGeneration;
+  sourceReadGeneration++;
   const text = await file.text();
-  reset();
-  sgfText.value = text;
+  if (generation !== gameReadGeneration || !replaceSgf(text)) return false;
   statusMessage.value = `Loaded SGF ${file.name} (rules: ${resolveSgfRules(text)})`;
+  return true;
 }
 
 async function onNdjsonFile(file: File) {
+  const generation = ++sourceReadGeneration;
   const text = await file.text();
+  if (generation !== sourceReadGeneration) return;
   loadNdjsonText(text, file.name);
 }
 
@@ -288,40 +331,52 @@ function onFileInput(kind: "sgf" | "ndjson", ev: Event) {
   input.value = "";
 }
 
-function onDrop(ev: DragEvent) {
+async function onDrop(ev: DragEvent) {
   ev.preventDefault();
   dragOver.value = false;
   const files = ev.dataTransfer?.files;
   if (!files?.length) return;
-  for (const file of Array.from(files)) {
-    const name = file.name.toLowerCase();
-    if (name.endsWith(".sgf") || name.endsWith(".sgf.txt")) {
-      void onSgfFile(file);
-    } else if (
-      name.endsWith(".ndjson") ||
-      name.endsWith(".jsonl") ||
-      name.endsWith(".json")
-    ) {
-      void onNdjsonFile(file);
-    }
+  const picked = Array.from(files);
+  const game = picked.find((file) => /\.sgf(?:\.txt)?$/i.test(file.name));
+  const analysis = picked.find((file) => /\.(ndjson|jsonl|json)$/i.test(file.name));
+  // Load paired files in order so the SGF reset cannot erase its analysis.
+  if (game) {
+    const generation = gameReadGeneration + 1;
+    const accepted = await onSgfFile(game);
+    if (!accepted || generation !== gameReadGeneration) return;
   }
+  if (analysis) await onNdjsonFile(analysis);
 }
 
 function tryLiveNative(url: string) {
-  reset();
+  if (!hasAcceptedSgf.value) return;
+  sourceReadGeneration++;
+  sourceGeneration.value++;
   nativeUrl.value = url;
   activeNative.value = true;
+  if (variationActive.value) {
+    statusMessage.value = "Analyzing the selected variation with the native engine…";
+    return;
+  }
+  reset();
   statusMessage.value = "Connecting to local native engine…";
   attachSource(createLiveNativeSource({ url, sgf: sgfText.value }));
 }
 
 function tryBrowserEngine() {
+  if (!hasAcceptedSgf.value) return;
   if (!props.browserEngine) {
     statusMessage.value =
       "Load a local model bundle first. Recorded analysis stays on the board.";
     return;
   }
+  sourceReadGeneration++;
+  sourceGeneration.value++;
   activeNative.value = false;
+  if (variationActive.value && props.browserEngine.analyzePosition) {
+    statusMessage.value = "Analyzing the selected variation with the browser engine…";
+    return;
+  }
   reset();
   statusMessage.value = "Starting experimental browser engine…";
   attachSource(
@@ -495,6 +550,10 @@ const phaseBadge = computed(() => {
       @load-remote-manifest="emit('load-remote-manifest')"
     />
 
+    <p v-if="sgfLoadError" class="yagoo-analysis-app__status" role="alert">
+      Unable to load SGF: {{ sgfLoadError }}.
+      {{ hasAcceptedSgf ? 'The current game is unchanged.' : 'Load a valid SGF before starting analysis.' }}
+    </p>
     <p v-if="statusMessage" class="yagoo-analysis-app__status">
       {{ statusMessage }}
     </p>
@@ -512,7 +571,11 @@ const phaseBadge = computed(() => {
 
     <div class="yagoo-analysis-app__board">
       <ReviewerLayout
+        ref="reviewer"
         :sgf="sgfText"
+        :position-source="positionSource"
+        @variation-analysis="stop"
+        @variation-change="variationActive = $event"
         :winrate-data="series"
         :heat-map="heatMap.length ? heatMap : emptyHeat"
         :paint-map="paintMap"

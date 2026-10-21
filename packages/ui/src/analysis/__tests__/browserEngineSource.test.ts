@@ -17,6 +17,39 @@ function adapter(lines: string[], seen: { sgf?: string; stopped?: boolean }): Br
 }
 
 describe("createBrowserEngineSource", () => {
+  it("sends a full position request without falling back to a game scan", async () => {
+    const analyzeSgf = vi.fn();
+    const analyzePosition = vi.fn(async function* () {
+      yield '{"type":"positionCompleted","v":1,"phase":"deep","snapshot":{"ply":3}}';
+    });
+    const onDone = vi.fn();
+    createBrowserEngineSource({
+      engine: { analyzeSgf, analyzePosition },
+      sgf: "(;SZ[9];B[cc])",
+      position: { ply: 1, moves: ["D4", "pass"], visits: 100 },
+    }).start({ onEvent: () => {}, onDone });
+    await vi.waitFor(() => expect(onDone).toHaveBeenCalledOnce());
+    expect(analyzeSgf).not.toHaveBeenCalled();
+    expect(analyzePosition).toHaveBeenCalledWith({
+      sgf: "(;SZ[9];B[cc])", ply: 1, moves: ["D4", "pass"], visits: 100,
+    });
+  });
+
+  it("cancels a pending readable stream without reporting completion", async () => {
+    const cancel = vi.fn();
+    const stop = vi.fn();
+    const stream = new ReadableStream<string>({ cancel });
+    const onDone = vi.fn();
+    const handle = createBrowserEngineSource({
+      engine: { analyzeSgf: () => stream, stop },
+      sgf: "(;SZ[9])",
+    }).start({ onEvent: () => {}, onDone });
+    handle.stop();
+    await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+    expect(stop).toHaveBeenCalledOnce();
+    expect(onDone).not.toHaveBeenCalled();
+  });
+
   it("parses NDJSON from the adapter and forwards the SGF", async () => {
     const seen: { sgf?: string; stopped?: boolean } = {};
     const events: string[] = [];

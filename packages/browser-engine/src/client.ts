@@ -7,6 +7,7 @@ export type EngineStatus = {
   rootActivationLayers?: number; rootActivationReason?: string;
 };
 export type EngineMessage = { type: string; [key: string]: unknown };
+export type PositionAnalysisRequest = { sgf: string; ply: number; moves?: string[]; visits?: number };
 
 /** Owns a dedicated engine worker and its ORT pthreads. terminate() cancels all. */
 export class BrowserEngine {
@@ -87,6 +88,13 @@ export class BrowserEngine {
     this.cancelInitialization?.(); this.cancelInitialization = undefined;
     this.worker?.terminate(); this.worker = undefined; this.running = false; this.ready = false;
     this.retainRootActivations = false;
+  }
+
+  analyzePosition(request: PositionAnalysisRequest): void {
+    if (!this.worker || !this.ready) throw new Error('Initialize the engine first.');
+    if (this.running) throw new Error('An analysis is already running.');
+    this.running = true;
+    this.worker.postMessage({ type: 'analyzePosition', request });
   }
 
   /** Releases only ephemeral activation buffers; does not cancel active analysis. */

@@ -4,6 +4,7 @@ import sgf from "@sabaki/sgf";
 import { computed, ref, shallowRef, type Ref } from "vue";
 import { formatGtpVertex } from "../analysis/coords";
 import type { BoardMap, Sign, Vertex } from "../types";
+import { boardKey, playPosition, type GamePosition } from "./gamePosition";
 
 export interface GamePlayerInfo {
   name: string;
@@ -21,6 +22,9 @@ export interface UseGameResult {
   tree: Ref<GameTree | null>;
   currentId: Ref<number | string | null>;
   signMap: Ref<BoardMap<Sign>>;
+  position: Ref<GamePosition | null>;
+  /** Current ancestry serialized as a single SGF line, with setup/history intact. */
+  positionSgf: Ref<string>;
   boardSize: Ref<number>;
   currentPlayer: Ref<Sign>;
   players: Ref<[GamePlayerInfo, GamePlayerInfo]>;
@@ -30,7 +34,9 @@ export interface UseGameResult {
   onMainLine: Ref<boolean>;
   /** Variations available at the current node. */
   children: Ref<GameChildInfo[]>;
-  loadSgf: (contents: string) => void;
+  /** Last failed load/navigation; the previous valid position is retained. */
+  error: Ref<string | null>;
+  loadSgf: (contents: string) => boolean;
   goForward: (childIndex?: number) => boolean;
   goBack: () => boolean;
   goToPly: (ply: number) => boolean;
@@ -43,6 +49,29 @@ export interface UseGameResult {
 function createIdFactory(): () => number {
   let id = 0;
   return () => id++;
+}
+
+function parseGameTree(contents: string): GameTree {
+  const idFactory = createIdFactory();
+  const root = sgf.parse(contents, { getId: idFactory })[0];
+  if (root == null) throw new Error("SGF contained no game trees");
+  return new GameTree({
+    getId: idFactory,
+    // Parsed SGF roots match GameTree node objects.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    root: root as any,
+  });
+}
+
+/** Same root acceptance as loadSgf; later illegal moves remain navigable errors. */
+export function getSgfRootError(contents: string): string | null {
+  try {
+    const tree = parseGameTree(contents);
+    boardFromPath(tree, tree.root.id);
+    return null;
+  } catch (cause) {
+    return cause instanceof Error ? cause.message : String(cause);
+  }
 }
 
 function parseSize(sz: string | undefined): number {
@@ -58,17 +87,18 @@ function childMoveLabel(
   const black = data.B?.[0];
   const white = data.W?.[0];
   if (black != null) {
-    const v = parsePoint(black);
+    const v = parsePoint(black, size);
     return v ? `B ${formatGtpVertex(v, size)}` : "B pass";
   }
   if (white != null) {
-    const v = parsePoint(white);
+    const v = parsePoint(white, size);
     return v ? `W ${formatGtpVertex(v, size)}` : "W pass";
   }
   return "node";
 }
 
-function parsePoint(raw: string): Vertex | null {
+function parsePoint(raw: string, size = 19): Vertex | null {
+  if (raw.toLowerCase() === "tt" && size <= 19) return null;
   const v = sgf.parseVertex(raw) as Vertex;
   if (v == null || v[0] < 0 || v[1] < 0) return null;
   return v;
@@ -100,13 +130,17 @@ function applySetup(
 function boardFromPath(
   tree: GameTree,
   nodeId: number | string,
-): { board: Board; moveNumber: number; currentPlayer: Sign } {
+): { position: GamePosition; moveNumber: number } {
   const size = parseSize(tree.root.data.SZ?.[0]);
   let board = Board.fromDimensions(size);
-  board = applySetup(board, tree.root.data as Record<string, string[]>);
-
   let moveNumber = 0;
-  let currentPlayer: Sign = tree.root.data.PL?.[0] === "W" ? -1 : 1;
+  const handicap = Number(tree.root.data.HA?.[0] ?? 0);
+  let currentPlayer: Sign = handicap >= 2 && !tree.root.data.AW?.length ? -1 : 1;
+  const ru = tree.root.data.RU?.[0]?.toLowerCase();
+  let position: GamePosition = {
+    board, toPlay: currentPlayer, history: [boardKey(board)],
+    previousBoard: null, positionalSuperko: ru !== "japanese" && ru !== "jp",
+  };
 
   const path: Array<Record<string, string[]>> = [];
   let cur = tree.get(nodeId);
@@ -117,26 +151,27 @@ function boardFromPath(
   }
   path.reverse();
 
-  for (let i = 1; i < path.length; i++) {
+  for (let i = 0; i < path.length; i++) {
     const data = path[i]!;
-    board = applySetup(board, data);
+    if (data.AB || data.AW || data.AE || data.PL) {
+      board = applySetup(position.board, data);
+      currentPlayer = data.PL?.[0] === "W" ? -1 : data.PL?.[0] === "B" ? 1 : currentPlayer;
+      position = { ...position, board, toPlay: currentPlayer, history: [boardKey(board)], previousBoard: null };
+    }
 
-    if (data.B != null) {
-      const raw = data.B[0] ?? "";
-      const v = parsePoint(raw);
-      board = board.makeMove(1, v ?? ([-1, -1] as Vertex));
+    if (data.B != null || data.W != null) {
+      const toPlay: Sign = data.B != null ? 1 : -1;
+      const raw = (data.B ?? data.W)?.[0] ?? "";
+      const v = parsePoint(raw, size);
+      const next = playPosition({ ...position, toPlay }, v ?? [-1, -1]);
+      if (next == null) throw new Error(`Illegal SGF move ${moveNumber + 1}`);
+      position = next;
       moveNumber += 1;
-      currentPlayer = -1;
-    } else if (data.W != null) {
-      const raw = data.W[0] ?? "";
-      const v = parsePoint(raw);
-      board = board.makeMove(-1, v ?? ([-1, -1] as Vertex));
-      moveNumber += 1;
-      currentPlayer = 1;
+      currentPlayer = position.toPlay;
     }
   }
 
-  return { board, moveNumber, currentPlayer };
+  return { position, moveNumber };
 }
 
 /**
@@ -147,22 +182,34 @@ export function useGame(): UseGameResult {
   const tree = shallowRef<GameTree | null>(null);
   const currentId = ref<number | string | null>(null);
   const signMap = shallowRef<BoardMap<Sign>>([]);
+  const position = shallowRef<GamePosition | null>(null);
   const boardSize = ref(19);
   const currentPlayer = ref<Sign>(1);
   const moveNumber = ref(0);
   const comment = ref("");
+  const error = ref<string | null>(null);
   const players = ref<[GamePlayerInfo, GamePlayerInfo]>([
     { name: "Black", rank: "", captures: 0 },
     { name: "White", rank: "", captures: 0 },
   ]);
 
-  function syncFromNode(id: number | string) {
-    const t = tree.value;
-    if (t == null) return;
+  function syncFromNode(id: number | string, t = tree.value): boolean {
+    if (t == null) return false;
     const node = t.get(id);
-    if (node == null) return;
+    if (node == null) return false;
 
-    const { board, moveNumber: mn, currentPlayer: cp } = boardFromPath(t, id);
+    let replay: ReturnType<typeof boardFromPath>;
+    try {
+      replay = boardFromPath(t, id);
+    } catch (cause) {
+      error.value = cause instanceof Error ? cause.message : String(cause);
+      return false;
+    }
+    // Commit the tree and position together only after the complete path is valid.
+    const { position: nextPosition, moveNumber: mn } = replay;
+    tree.value = t;
+    position.value = nextPosition;
+    const { board, toPlay: cp } = nextPosition;
     signMap.value = board.signMap as BoardMap<Sign>;
     boardSize.value = board.width;
     currentPlayer.value = cp;
@@ -181,23 +228,18 @@ export function useGame(): UseGameResult {
       },
     ];
     currentId.value = id;
+    error.value = null;
+    return true;
   }
 
-  function loadSgf(contents: string) {
-    const idFactory = createIdFactory();
-    const roots = sgf.parse(contents, { getId: idFactory });
-    const root = roots[0];
-    if (root == null) {
-      throw new Error("SGF contained no game trees");
+  function loadSgf(contents: string): boolean {
+    try {
+      const gt = parseGameTree(contents);
+      return syncFromNode(gt.root.id, gt);
+    } catch (cause) {
+      error.value = cause instanceof Error ? cause.message : String(cause);
+      return false;
     }
-    const gt = new GameTree({
-      getId: idFactory,
-      // Parsed SGF roots match GameTree node objects.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      root: root as any,
-    });
-    tree.value = gt;
-    syncFromNode(gt.root.id);
   }
 
   function goForward(childIndex = 0): boolean {
@@ -207,8 +249,7 @@ export function useGame(): UseGameResult {
     const node = t.get(id);
     const child = node?.children[childIndex];
     if (child == null) return false;
-    syncFromNode(child.id);
-    return true;
+    return syncFromNode(child.id);
   }
 
   function goBack(): boolean {
@@ -217,8 +258,7 @@ export function useGame(): UseGameResult {
     if (t == null || id == null) return false;
     const node = t.get(id);
     if (node?.parentId == null) return false;
-    syncFromNode(node.parentId);
-    return true;
+    return syncFromNode(node.parentId);
   }
 
   function goToVariation(childIndex: number): boolean {
@@ -231,16 +271,15 @@ export function useGame(): UseGameResult {
     if (t == null) return false;
     const target = Math.max(0, Math.floor(ply));
     let id: number | string = t.root.id;
-    let depth = 0;
+    let depth = t.root.data.B != null || t.root.data.W != null ? 1 : 0;
     while (depth < target) {
       const node = t.get(id);
       const child = node?.children[0];
       if (child == null) break;
       id = child.id;
-      depth += 1;
+      if (t.get(id)?.data.B != null || t.get(id)?.data.W != null) depth += 1;
     }
-    syncFromNode(id);
-    return depth === target;
+    return syncFromNode(id) && depth === target;
   }
 
   const canGoBack = computed(() => {
@@ -295,10 +334,30 @@ export function useGame(): UseGameResult {
     });
   });
 
+  const positionSgf = computed(() => {
+    const t = tree.value;
+    if (!t || currentId.value == null) return "";
+    const path: Record<string, string[]>[] = [];
+    let node = t.get(currentId.value);
+    while (node) {
+      path.unshift(node.data);
+      node = node.parentId == null ? null : t.get(node.parentId);
+    }
+    // Explicit ancestry avoids choosing a sibling with the same ply number.
+    return `(${path.map((data) => ";" + Object.entries(data).map(([key, values]) => {
+      const expanded = ["AB", "AW", "AE"].includes(key)
+        ? values.flatMap((value) => sgf.parseCompressedVertices(value).map(sgf.stringifyVertex))
+        : values;
+      return key + expanded.map((value) => `[${sgf.escapeString(value)}]`).join("");
+    }).join("")).join("")})`;
+  });
+
   return {
     tree,
     currentId,
     signMap,
+    position,
+    positionSgf,
     boardSize,
     currentPlayer,
     players,
@@ -306,6 +365,7 @@ export function useGame(): UseGameResult {
     moveNumber,
     onMainLine,
     children,
+    error,
     loadSgf,
     goForward,
     goBack,

@@ -102,6 +102,8 @@ export type {
   AnalysisEventSource,
   AnalysisSourceHandle,
   AnalysisSourceHandlers,
+  PositionAnalysisRequest,
+  PositionSourceFactory,
 } from "./sources/types";
 
 export {

@@ -1,5 +1,5 @@
 import * as ort from 'onnxruntime-web/webgpu';
-import initRust, { analyze, default_config } from '../wasm/yagoo_web';
+import initRust, { analyze, analyze_position, default_config } from '../wasm/yagoo_web';
 import { loadArtifact, validateManifest, type Manifest } from './model';
 import { ROOT_LAYERS, RootActivationStore, type RootContext } from './activations';
 
@@ -176,7 +176,7 @@ self.onmessage = async ({ data }: MessageEvent) => {
       emit({ type: 'ready', status: { backend: data.backend, precision, ortThreads: data.ortThreads,
         searchThreads: 1, maxBatch, validated: true, rootActivationLayers: activationNames.length,
         rootActivationReason: activationNames.length ? undefined : activationReason, messages: [] } });
-    } else if (data.type === 'analyze') {
+    } else if (data.type === 'analyze' || data.type === 'analyzePosition') {
       if (!session) throw new Error('Initialize the engine first.');
       const defaults = JSON.parse(default_config());
       const config = { ...defaults, ...data.config, deepSelect: { ...defaults.deepSelect, ...data.config?.deepSelect } };
@@ -186,12 +186,18 @@ self.onmessage = async ({ data }: MessageEvent) => {
       const searchOptions = { rootSymmetries, batchSize: Math.min(requestedBatch, manifest.batch === 0 ? manifest.maxBatch! : 1) };
       stats = { evaluations: 0, batches: 0, maxBatch: 0 };
       activations.clear(); rootContext = undefined;
-      await analyze(data.sgf, JSON.stringify(config), JSON.stringify(manifest.postprocess), JSON.stringify(searchOptions), evaluate,
-        (json: string) => {
-          const event = JSON.parse(json);
-          if (event.type === 'error') clearActivations('Root activations released after a pipeline error.');
-          emit({ type: 'event', event });
-        }, beginRoot);
+      const event = (json: string) => {
+        const value = JSON.parse(json);
+        if (value.type === 'error') clearActivations('Root activations released after a pipeline error.');
+        emit({ type: 'event', event: value });
+      };
+      if (data.type === 'analyzePosition') {
+        await analyze_position(JSON.stringify(data.request), JSON.stringify(manifest.postprocess),
+          JSON.stringify(searchOptions), evaluate, event, beginRoot);
+      } else {
+        await analyze(data.sgf, JSON.stringify(config), JSON.stringify(manifest.postprocess),
+          JSON.stringify(searchOptions), evaluate, event, beginRoot);
+      }
       emit({ type: 'stats', ...stats, ...searchOptions });
       emit({ type: 'done' });
     }

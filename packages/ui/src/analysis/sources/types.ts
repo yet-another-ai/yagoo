@@ -1,5 +1,15 @@
 import type { PipelineEvent } from "../types";
 
+/** The original SGF ancestry and all moves after its anchor, including passes. */
+export interface PositionAnalysisRequest {
+  sgf: string;
+  ply: number;
+  moves?: string[];
+  visits?: number;
+}
+
+export type PositionSourceFactory = (request: PositionAnalysisRequest) => AnalysisEventSource;
+
 /**
  * One interface for every analysis event producer.
  * All sources emit the same NDJSON `PipelineEvent` stream that

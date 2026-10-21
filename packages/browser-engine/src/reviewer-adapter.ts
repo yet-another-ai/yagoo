@@ -1,4 +1,4 @@
-import { BrowserEngine } from './client';
+import { BrowserEngine, type PositionAnalysisRequest } from './client';
 import { bundleFromLocalFiles } from './model';
 
 /**
@@ -8,11 +8,20 @@ import { bundleFromLocalFiles } from './model';
 export class ReviewerBrowserEngine {
   private readonly engine = new BrowserEngine();
   private manifestUrl: string | null = null;
+  private initializedFor: string | null = null;
   private revoke: (() => void) | undefined;
+  private cancelActive: (() => void) | undefined;
+  private generation = 0;
 
   async stageLocal(files: Iterable<File>): Promise<string> {
-    this.revoke?.();
+    this.stop();
+    const generation = this.generation;
     const bundle = await bundleFromLocalFiles(files);
+    if (generation !== this.generation) {
+      bundle.revoke();
+      throw new DOMException('Model staging was cancelled.', 'AbortError');
+    }
+    this.revoke?.();
     this.revoke = bundle.revoke;
     this.manifestUrl = bundle.manifestUrl;
     return bundle.manifest.model;
@@ -21,6 +30,7 @@ export class ReviewerBrowserEngine {
   stageRemote(url: string): void {
     const trimmed = url.trim();
     if (!trimmed) throw new Error('A manifest URL is required.');
+    this.stop();
     this.revoke?.();
     this.revoke = undefined;
     this.manifestUrl = trimmed;
@@ -31,36 +41,70 @@ export class ReviewerBrowserEngine {
   }
 
   stop(): void {
+    this.generation++;
+    // Wake the generator before terminating its worker.
+    this.cancelActive?.();
+    this.cancelActive = undefined;
+    this.initializedFor = null;
     this.engine.dispose();
   }
 
+  dispose(): void {
+    this.stop();
+    this.revoke?.();
+    this.revoke = undefined;
+    this.manifestUrl = null;
+  }
+
   analyzeSgf(sgf: string): AsyncIterable<string> {
+    return this.stream(() => this.engine.analyze(sgf));
+  }
+
+  analyzePosition(request: PositionAnalysisRequest): AsyncIterable<string> {
+    return this.stream(() => this.engine.analyzePosition(request));
+  }
+
+  private async *stream(start: () => void): AsyncIterable<string> {
+    if (this.cancelActive) this.stop();
     const manifestUrl = this.manifestUrl;
-    const engine = this.engine;
-    return (async function* () {
-      if (!manifestUrl) throw new Error('Load a local model bundle before starting the browser engine.');
-      await engine.initialize(manifestUrl);
-      const queue: string[] = [];
-      let notify: (() => void) | undefined;
-      let done = false;
-      let failure: Error | undefined;
-      const wake = () => {
-        notify?.();
-        notify = undefined;
-      };
-      engine.onMessage = (message) => {
+    if (!manifestUrl) throw new Error('Load a local model bundle before starting the browser engine.');
+    const generation = ++this.generation;
+    const queue: string[] = [];
+    let notify: (() => void) | undefined;
+    let cancelled = false;
+    let done = false;
+    let failure: Error | undefined;
+    const wake = () => { notify?.(); notify = undefined; };
+    this.cancelActive = () => { cancelled = true; queue.length = 0; wake(); };
+    try {
+      if (this.initializedFor !== manifestUrl) {
+        await this.engine.initialize(manifestUrl);
+        if (cancelled || generation !== this.generation) return;
+        this.initializedFor = manifestUrl;
+      }
+      this.engine.onMessage = (message) => {
+        if (cancelled || generation !== this.generation) return;
         if (message.type === 'event') queue.push(JSON.stringify(message.event));
         else if (message.type === 'error') failure = new Error(String(message.message));
         else if (message.type === 'done') done = true;
         wake();
       };
-      engine.analyze(sgf);
-      while (!done && !failure) {
-        if (queue.length === 0) await new Promise<void>((resolve) => { notify = resolve; });
-        while (queue.length) yield queue.shift()!;
+      start();
+      for (;;) {
+        if (cancelled) return;
+        while (queue.length && !cancelled) yield queue.shift()!;
+        if (failure) throw failure;
+        if (done || cancelled) return;
+        await new Promise<void>((resolve) => { notify = resolve; });
       }
-      while (queue.length) yield queue.shift()!;
-      if (failure) throw failure;
-    })();
+    } catch (error) {
+      if (!cancelled) throw error;
+    } finally {
+      if (generation === this.generation) {
+        this.cancelActive = undefined;
+        this.engine.onMessage = () => {};
+        if (!done) { this.initializedFor = null; this.engine.dispose(); }
+      }
+    }
   }
 }

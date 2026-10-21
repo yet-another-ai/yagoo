@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const mock = vi.hoisted(() => ({
-  run: vi.fn(), analyze: vi.fn(), capture: vi.fn(), clear: vi.fn(), create: vi.fn(), load: vi.fn(),
+  run: vi.fn(), analyze: vi.fn(), analyzePosition: vi.fn(), capture: vi.fn(), clear: vi.fn(), create: vi.fn(), load: vi.fn(),
   device: { pushErrorScope: vi.fn(), popErrorScope: vi.fn(async () => null),
     queue: { onSubmittedWorkDone: vi.fn(async () => {}) }, lost: new Promise(() => {}) },
 }));
@@ -10,7 +10,7 @@ vi.mock('onnxruntime-web/webgpu', () => ({
   Tensor: class { dispose() {} },
   InferenceSession: { create: mock.create },
 }));
-vi.mock('../wasm/yagoo_web', () => ({ default: async () => {}, analyze: mock.analyze, default_config: () => '{"deepSelect":{}}' }));
+vi.mock('../wasm/yagoo_web', () => ({ default: async () => {}, analyze: mock.analyze, analyze_position: mock.analyzePosition, default_config: () => '{"deepSelect":{}}' }));
 vi.mock('../src/model', () => ({ validateManifest: (value: unknown) => value, loadArtifact: mock.load }));
 vi.mock('../src/activations', () => ({
   ROOT_LAYERS: ['trunkfinal'],
@@ -51,6 +51,20 @@ beforeEach(async () => {
   await import('../src/engine.worker');
 });
 afterEach(() => vi.unstubAllGlobals());
+
+it('routes tried positions through the single-position pipeline with the full request', async () => {
+  await dispatch(initialize);
+  const request = { sgf: '(;SZ[9];B[cc];W[])', ply: 2, moves: ['D4', 'pass'], visits: 200 };
+  mock.analyzePosition.mockImplementation(async (json, _post, _options, evaluate, emit, begin) => {
+    expect(JSON.parse(json)).toEqual(request);
+    await root(evaluate, begin);
+    emit('{"type":"positionCompleted","v":1,"phase":"deep","snapshot":{"ply":4}}');
+  });
+  await dispatch({ type: 'analyzePosition', request });
+  expect(mock.analyze).not.toHaveBeenCalled();
+  expect(messages).toContainEqual({ type: 'event', event: { type: 'positionCompleted', v: 1, phase: 'deep', snapshot: { ply: 4 } } });
+  expect(messages.at(-1)).toEqual({ type: 'done' });
+});
 
 it('invalidates retained tensors on an error event even when the pipeline resolves normally', async () => {
   await dispatch(initialize);

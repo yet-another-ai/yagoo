@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, shallowRef } from "vue";
+import { onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
 import { AnalysisReviewer } from "@yagoo/ui";
 import { SINGLE_THREAD_NOTE } from "@yagoo/browser-engine/capabilities";
 import { configuredManifestUrl } from "@yagoo/browser-engine/manifest-url";
@@ -20,6 +20,15 @@ const threadHint = ref<string | null>(null);
 const modelStatus = ref<string | null>(null);
 const engine = shallowRef<ReviewerBrowserEngine | null>(null);
 const staged = ref(false);
+let disposed = false;
+let modelGeneration = 0;
+const loading = new AbortController();
+onBeforeUnmount(() => {
+  disposed = true;
+  modelGeneration++;
+  loading.abort();
+  engine.value?.dispose();
+});
 
 onMounted(async () => {
   const requested = new URLSearchParams(window.location.search).get("theme");
@@ -29,8 +38,8 @@ onMounted(async () => {
   try {
     const base = import.meta.env.BASE_URL;
     const [sgfRes, ndjsonRes] = await Promise.all([
-      fetch(`${base}app/sample.sgf`),
-      fetch(`${base}app/sample-scan-deep.ndjson`),
+      fetch(`${base}app/sample.sgf`, { signal: loading.signal }),
+      fetch(`${base}app/sample-scan-deep.ndjson`, { signal: loading.signal }),
     ]);
     if (!sgfRes.ok || !ndjsonRes.ok) {
       throw new Error("Failed to load bundled sample SGF / NDJSON");
@@ -46,18 +55,24 @@ onMounted(async () => {
 async function engineHandle(): Promise<ReviewerBrowserEngine> {
   if (engine.value) return engine.value;
   const { ReviewerBrowserEngine } = await import("@yagoo/browser-engine/reviewer-adapter");
-  engine.value = new ReviewerBrowserEngine();
+  if (disposed) throw new DOMException("Reviewer was closed.", "AbortError");
+  engine.value ??= new ReviewerBrowserEngine();
   return engine.value;
 }
 
 async function onLocalFiles(files: File[]) {
+  const generation = ++modelGeneration;
   staged.value = false;
   try {
     const handle = await engineHandle();
+    if (disposed || generation !== modelGeneration) return;
     const model = await handle.stageLocal(files);
+    if (disposed || generation !== modelGeneration) return;
     staged.value = handle.ready;
     modelStatus.value = `${model} verified from local files. Recorded analysis stays until you choose Use browser engine.`;
   } catch (err) {
+    if (disposed || generation !== modelGeneration) return;
+    engine.value?.dispose();
     engine.value = null;
     staged.value = false;
     modelStatus.value = err instanceof Error ? err.message : String(err);
@@ -66,13 +81,17 @@ async function onLocalFiles(files: File[]) {
 
 async function onRemote() {
   if (!remoteManifestUrl.value) return;
+  const generation = ++modelGeneration;
   staged.value = false;
   try {
     const handle = await engineHandle();
+    if (disposed || generation !== modelGeneration) return;
     handle.stageRemote(remoteManifestUrl.value);
     staged.value = handle.ready;
     modelStatus.value = "Configured manifest selected. It is loaded when you choose Use browser engine.";
   } catch (err) {
+    if (disposed || generation !== modelGeneration) return;
+    engine.value?.dispose();
     engine.value = null;
     staged.value = false;
     modelStatus.value = err instanceof Error ? err.message : String(err);

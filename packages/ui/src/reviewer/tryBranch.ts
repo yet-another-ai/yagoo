@@ -1,5 +1,6 @@
 import Board from "@sabaki/go-board";
 import type { BoardMap, Sign, Vertex } from "../types";
+import { boardKey, playPosition, type GamePosition } from "../composables/gamePosition";
 
 export interface TryNode {
   id: string;
@@ -22,47 +23,56 @@ export interface TryPosition {
 }
 
 /**
- * Replay anchor stones plus a try-move path.
- * Returns null when a move overwrites, is suicide, or repeats a simple ko.
- * This does not invent analysis; it only updates the local board.
- * Capture counts are only those made by `moves` (`set` does not record them).
+ * Replay a try path from the game's full anchor position.
+ * Returns null for illegal moves, including simple ko and positional superko.
+ * Capture counts are deltas from the anchor; analysis comes from the engine.
  */
 export function applyTryMoves(
   size: number,
   anchor: BoardMap<Sign>,
   toPlay: Sign,
   moves: readonly Vertex[],
+  anchorPosition?: GamePosition | null,
 ): TryPosition | null {
-  let board = Board.fromDimensions(size);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const sign = anchor[y]?.[x] ?? 0;
-      if (sign !== 0) board.set([x, y], sign);
-    }
-  }
-
-  let player: Sign = toPlay === -1 ? -1 : 1;
+  // The optional fallback is for callers supplying a genuinely new setup board.
+  // Reviewer anchors always pass the replayed position, never a stone-only copy.
+  const board = anchorPosition?.board ?? new Board(anchor.map((row) => [...row]));
+  if (board.width !== size || board.height !== size) return null;
+  let position: GamePosition = anchorPosition ?? {
+    board, toPlay: toPlay === -1 ? -1 : 1,
+    history: [boardKey(board)], previousBoard: null, positionalSuperko: true,
+  };
+  const before = { black: board.getCaptures(1) ?? 0, white: board.getCaptures(-1) ?? 0 };
   for (const vertex of moves) {
-    try {
-      board = board.makeMove(player, vertex, {
-        preventSuicide: true,
-        preventOverwrite: true,
-        preventKo: true,
-      });
-    } catch {
-      return null;
-    }
-    player = player === 1 ? -1 : 1;
+    const next = playPosition(position, vertex);
+    if (!next) return null;
+    position = next;
   }
 
   return {
-    signMap: board.signMap as BoardMap<Sign>,
-    toPlay: player,
+    signMap: position.board.signMap as BoardMap<Sign>,
+    toPlay: position.toPlay,
     captures: {
-      black: board.getCaptures(1) ?? 0,
-      white: board.getCaptures(-1) ?? 0,
+      black: (position.board.getCaptures(1) ?? 0) - before.black,
+      white: (position.board.getCaptures(-1) ?? 0) - before.white,
     },
   };
+}
+
+/** Parent-first depth-first order keeps siblings under the correct ancestor. */
+export function orderedTryNodes(nodes: readonly TryNode[]): TryNode[] {
+  const result: TryNode[] = [];
+  const seen = new Set<string>();
+  function visit(parentId: string | null) {
+    for (const node of nodes) {
+      if (node.parentId !== parentId || seen.has(node.id)) continue;
+      seen.add(node.id);
+      result.push(node);
+      visit(node.id);
+    }
+  }
+  visit(null);
+  return result;
 }
 
 export function tryPath(

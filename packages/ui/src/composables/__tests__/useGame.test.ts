@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { useGame } from "../useGame";
+import { getSgfRootError, useGame } from "../useGame";
 
 const SAMPLE = `(;FF[4]GM[1]SZ[9]PB[Alice]PW[Bob]BR[1d]WR[2d]C[Root comment]
 ;B[dd]C[Black opens]
@@ -9,6 +9,69 @@ const SAMPLE = `(;FF[4]GM[1]SZ[9]PB[Alice]PW[Bob]BR[1d]WR[2d]C[Root comment]
 (;W[cf]C[Variation]))`;
 
 describe("useGame", () => {
+  it("validates the same root as loading without rejecting later illegal moves", () => {
+    for (const [text, accepted] of [
+      ["(;SZ[5]AB[aa]B[aa])", false],
+      ["(;SZ[5]B[zz])", false],
+      ["(;SZ[9];B[dd](;W[dd])(;W[ff]))", true],
+      ["(;)", true],
+    ] as const) {
+      expect(getSgfRootError(text) == null).toBe(accepted);
+      expect(useGame().loadSgf(text)).toBe(accepted);
+    }
+  });
+
+  it("keeps the valid position when a recorded move is illegal and allows another variation", () => {
+    const g = useGame();
+    g.loadSgf("(;SZ[9];B[dd](;W[dd])(;W[ff]))");
+    g.goForward();
+    const position = g.position.value;
+    const ancestry = g.positionSgf.value;
+    expect(g.goForward()).toBe(false);
+    expect(g.error.value).toBe("Illegal SGF move 2");
+    expect(g.position.value).toBe(position);
+    expect(g.positionSgf.value).toBe(ancestry);
+    expect(g.moveNumber.value).toBe(1);
+    expect(g.goToPly(2)).toBe(false);
+    expect(g.position.value).toBe(position);
+    expect(g.goToVariation(1)).toBe(true);
+    expect(g.error.value).toBeNull();
+    expect(g.signMap.value[5]![5]).toBe(-1);
+    expect(g.goBack()).toBe(true);
+  });
+
+  it("rejects an invalid replacement root without losing the loaded game", () => {
+    const g = useGame();
+    g.loadSgf(SAMPLE);
+    g.goToPly(2);
+    const tree = g.tree.value;
+    const position = g.position.value;
+    expect(g.loadSgf("(;SZ[5]AB[aa]B[aa])")).toBe(false);
+    expect(g.error.value).toBe("Illegal SGF move 1");
+    expect(g.tree.value).toBe(tree);
+    expect(g.position.value).toBe(position);
+    expect(g.boardSize.value).toBe(9);
+    expect(g.moveNumber.value).toBe(2);
+    expect(g.players.value[0].name).toBe("Alice");
+    expect(g.goForward()).toBe(true);
+    expect(g.error.value).toBeNull();
+    expect(g.loadSgf("(;SZ[5])")).toBe(true);
+    expect(g.boardSize.value).toBe(5);
+  });
+
+  it("reports illegal recorded Chinese superko without weakening the default rules", () => {
+    const g = useGame();
+    g.loadSgf("(;SZ[5]AB[ab][cb][ba]AW[bb][ac][cc][bd];B[bc];W[];B[];W[bb])");
+    expect(g.goToPly(3)).toBe(true);
+    const position = g.position.value;
+    expect(position?.positionalSuperko).toBe(true);
+    expect(g.goForward()).toBe(false);
+    expect(g.error.value).toBe("Illegal SGF move 4");
+    expect(g.position.value).toBe(position);
+    expect(g.goBack()).toBe(true);
+    expect(g.error.value).toBeNull();
+  });
+
   it("loads SGF metadata and root position", () => {
     const g = useGame();
     g.loadSgf(SAMPLE);

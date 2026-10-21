@@ -14,6 +14,74 @@ async function settle() {
 }
 
 describe("commentary reviewer integration", () => {
+  const unrelatedOpening = JSON.stringify({
+    type: "openingMatched", v: 1,
+    match: { name: "Unrelated game", joseki: null, deviationPly: 9, source: "synthetic test" },
+  });
+
+  it.each([
+    { sgf: "(;SZ[19];B[pd];W[dd];B[pp];W[dp];B[pj])", expected: "Sanrensei" },
+    { sgf: "(;SZ[19];B[jj])", expected: null },
+    { sgf: "", expected: "Unrelated game" },
+  ])("uses the same opening in Notes and the header for SGF '$sgf'", async ({ sgf, expected }) => {
+    const wrapper = mount(AnalysisReviewer, {
+      props: { initialSgf: sgf, initialNdjson: unrelatedOpening, vertexSize: 16, initialPerspective: "notes" },
+    });
+    try {
+      await settle();
+      await wrapper.get('[data-testid="commentary-enable"]').setValue(true);
+      const badge = wrapper.get('[data-testid="opening-badge"]');
+      const notes = wrapper.get('[data-testid="commentary-panel"]');
+      if (expected) {
+        expect(badge.text()).toContain(expected);
+        expect(wrapper.get('[data-testid="commentary-body"]').text()).toContain(expected);
+        await notes.findAll("button").find((button) => button.text() === "Prepare prompt JSON")!.trigger("click");
+        const packet = JSON.parse(wrapper.get<HTMLTextAreaElement>('[data-testid="commentary-prompt"]').element.value) as CommentaryRequest;
+        expect(packet.facts.find((fact) => fact.id.endsWith("/opening"))?.evidence)
+          .toContainEqual({ path: "/opening/name", value: expected });
+      } else {
+        expect(badge.text()).toContain("No unique match");
+        expect(notes.text()).toContain("No supported structured facts");
+      }
+      if (sgf) expect(notes.text()).not.toContain("Unrelated game");
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
+  it("refreshes Notes opening context when the SGF switches or is cleared", async () => {
+    const wrapper = mount(AnalysisReviewer, {
+      props: { initialSgf: "(;SZ[19];B[pd];W[dd];B[pp];W[dp];B[pj])", vertexSize: 16, initialPerspective: "notes" },
+    });
+    try {
+      await wrapper.get('[data-testid="engine-source-button"]').trigger("click");
+      const input = wrapper.get('[data-testid="source-ndjson-input"]');
+      for (const [sgf, expected] of [
+        ["(;SZ[19];B[dd];W[cc];B[dc];W[ce])", "4-4 point"],
+        ["(;SZ[19];B[jj])", null],
+        ["", "Unrelated game"],
+      ] as const) {
+        await wrapper.setProps({ initialSgf: sgf });
+        await settle();
+        expect(wrapper.get<HTMLInputElement>('[data-testid="commentary-enable"]').element.checked).toBe(false);
+        expect(wrapper.find('[data-testid="commentary-body"]').exists()).toBe(false);
+        Object.defineProperty(input.element, "files", {
+          configurable: true,
+          value: [new File([unrelatedOpening], "unrelated.ndjson", { type: "text/plain" })],
+        });
+        await input.trigger("change");
+        await settle();
+        await wrapper.get('[data-testid="commentary-enable"]').setValue(true);
+        const notes = wrapper.get('[data-testid="commentary-panel"]');
+        expect(wrapper.get('[data-testid="opening-badge"]').text()).toContain(expected ?? "No unique match");
+        expect(notes.text()).toContain(expected ?? "No supported structured facts");
+        if (sgf) expect(notes.text()).not.toContain("Unrelated game");
+      }
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
   it.each(["navigation", "Try", "SGF sibling", "report"])(
     "preserves a non-default selection through %s", async (transition) => {
     // Labelled synthetic positions exercise UI persistence; no engine is used.

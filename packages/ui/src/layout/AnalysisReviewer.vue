@@ -114,6 +114,10 @@ const {
   commentFor,
 } = useAnalysisStream();
 
+// A loaded SGF is authoritative, including no unique local match. Only an
+// analysis-only review may use the stream's opening label.
+const effectiveOpening = computed(() => sgfText.value ? sgfOpening.value : state.value.opening);
+
 function reset() {
   stoppedByUser.value = false;
   statusMessage.value = "";
@@ -265,7 +269,7 @@ const commentaryInput = computed<CommentaryInput>(() => ({
   ledger: currentPlyAnalysis.value?.ledger,
   comparison: currentPlyAnalysis.value?.comparison,
   sacrifices: currentPlyAnalysis.value?.sacrifices,
-  opening: state.value.opening,
+  opening: effectiveOpening.value,
 }));
 // Kept inside the reviewer; this context key is never in the provider packet.
 const commentaryContextKey = computed(() => `${gameGeneration.value}:${sgfText.value}`);
@@ -536,7 +540,7 @@ const phaseBadge = computed(() => {
   >
     <header class="yagoo-analysis-app__toolbar">
       <div class="yagoo-analysis-app__brand">Yagoo</div>
-      <OpeningBadge :match="sgfText ? sgfOpening : state.opening" />
+      <OpeningBadge :match="effectiveOpening" />
       <div class="yagoo-analysis-app__meta">
         <span>RU {{ rulesLabel }}</span>
         <span v-if="sourceLabel">· {{ sourceLabel }}</span>

@@ -15,6 +15,33 @@ async function drainProgressiveBatches(rounds = 350) {
 }
 
 describe("AnalysisReviewer", () => {
+  it("keeps the SGF file confirmation after the new game has rendered", async () => {
+    const wrapper = mount(AnalysisReviewer, {
+      props: { initialSgf: "(;SZ[9])", vertexSize: 16 },
+    });
+    try {
+      await wrapper.get('[data-testid="engine-source-button"]').trigger("click");
+      const input = wrapper.get('[data-testid="source-sgf-input"]');
+      for (const [name, text, rules] of [
+        ["first.sgf", "(;SZ[9];B[cc])", "chinese"],
+        ["second.sgf", "(;SZ[9]RU[Japanese];B[dd])", "Japanese"],
+      ]) {
+        Object.defineProperty(input.element, "files", {
+          configurable: true,
+          value: [new File([text!], name!, { type: "text/plain" })],
+        });
+        await input.trigger("change");
+        await flushPromises();
+        expect(wrapper.find(".yagoo-analysis-app__status").exists()).toBe(true);
+        expect(wrapper.get(".yagoo-analysis-app__status").text())
+          .toBe(`Loaded SGF ${name} (rules: ${rules})`);
+      }
+      expect(wrapper.text()).not.toContain("Loaded SGF first.sgf");
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
   it("does not replace recorded analysis when a model bundle is dropped on the engine panel", async () => {
     const wrapper = mount(AnalysisReviewer, {
       props: {

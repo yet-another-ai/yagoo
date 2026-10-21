@@ -130,10 +130,11 @@ function stopAnalysis() {
   statusMessage.value = "Analysis stopped.";
 }
 
+// Clear the old game before the importer publishes the new file confirmation.
 watch(sgfText, () => {
   reset();
   currentPly.value = 0;
-});
+}, { flush: "sync" });
 
 const emptyHeat = computed<BoardMap<HeatVertex | null>>(() => []);
 const heatMap = ref<BoardMap<HeatVertex | null>>([]);

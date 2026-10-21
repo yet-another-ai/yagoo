@@ -144,14 +144,14 @@ pub fn compute_ledger(
 ) -> Option<GainLossLedger> {
     match baseline {
         LedgerBaseline::Pass => {
-            let reference = snapshot.pass_probe.as_ref()?;
+            let (reference, reference_score) = pass_reference(snapshot, candidate)?;
             build_ledger(
                 snapshot,
                 candidate,
                 baseline,
                 "pass",
-                reference.ownership.as_deref()?,
-                reference.score_lead?,
+                reference,
+                reference_score,
                 &[],
                 &[],
             )
@@ -212,17 +212,38 @@ pub fn compute_played_ledger_with_tempo(
     candidate: &CandidateSnapshot,
     tempo: &[PlayedGroupTempo],
 ) -> Option<GainLossLedger> {
-    let pass = snapshot.pass_probe.as_ref()?;
+    let (reference, reference_score) = pass_reference(snapshot, candidate)?;
     build_ledger(
         snapshot,
         candidate,
         LedgerBaseline::Pass,
         "pass",
-        pass.ownership.as_deref()?,
-        pass.score_lead?,
+        reference,
+        reference_score,
         &[],
         tempo,
     )
+}
+
+fn pass_reference<'a>(
+    snapshot: &'a PositionSnapshot,
+    candidate: &'a CandidateSnapshot,
+) -> Option<(&'a [f64], f64)> {
+    let pass = snapshot.pass_probe.as_ref()?;
+    let pass_ownership = pass.ownership.as_deref()?;
+    let pass_score = pass.score_lead?;
+    if !crate::comparison::valid_map(pass_ownership, snapshot.board.size) || !pass_score.is_finite()
+    {
+        return None;
+    }
+    // Passing and the pass reference are the same action. Independent searches
+    // may disagree, but their sampling difference is not value from playing.
+    // Keep the explicit pass-evidence requirement, then alias the actual branch.
+    Some(if candidate.move_.eq_ignore_ascii_case("pass") {
+        (candidate.ownership.as_deref()?, candidate.score_lead?)
+    } else {
+        (pass_ownership, pass_score)
+    })
 }
 
 /// Compare already assessed tempo statuses only for exactly matching stone

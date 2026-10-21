@@ -128,6 +128,16 @@ answers "what did playing this move gain compared with passing?" It is separate
 from `comparison.ledgerDiff`, which measures actual versus preferred, and does
 not subtract the ownership estimates of consecutive positions.
 
+If a candidate or played move is itself `pass`, both sides are the same action. After
+validating the required explicit pass probe, the ledger uses the actual
+candidate's ownership and score as both candidate and reference. Played value,
+ownership-book contributions and signed shares are therefore zero even when
+independent pass searches disagree. The zero book remains unpriced (`points:
+null`); missing or malformed pass evidence still leaves the ledger unavailable.
+The ordinary best-versus-pass ledger shares this alias rule. The rule also
+applies when validating imported played ledgers and does
+not change actual-versus-AI loss or the recorded before/after pass sensitivity.
+
 `comparison.playedTempo` evaluates the original root group's stones before the
 move and after the actual branch. Each position supplies its own root/pass pair;
 side-to-play determines `gPlus`/`gMinus` independently. These are the existing

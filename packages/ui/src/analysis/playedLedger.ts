@@ -50,10 +50,16 @@ function validLedger(ledger: GainLossLedger, comparison: MoveComparison): boolea
   const { context } = comparison;
   const size = context.board.size;
   const actual = context.actual.ownership;
-  const pass = context.passProbe?.ownership;
-  const passScore = context.passProbe?.scoreLead;
+  const recordedPass = context.passProbe?.ownership;
+  const recordedPassScore = context.passProbe?.scoreLead;
+  // A played pass and its reference share action identity. Validate the recorded
+  // probe, but price the self-comparison from the actual candidate on both sides.
+  const sameAction = comparison.actualMove.toLowerCase() === "pass";
+  const pass = sameAction ? actual : recordedPass;
+  const passScore = sameAction ? context.actual.scoreLead : recordedPassScore;
   const sign = comparison.mover === "B" ? 1 : -1;
   if (!ledger || !id(context.passQueryId) || !map(actual, size) || !map(pass, size)
+    || !map(recordedPass, size) || !Number.isFinite(recordedPassScore)
     || !Number.isFinite(passScore) || !Number.isFinite(context.actual.scoreLead)
     || ledger.rootPly !== comparison.rootPly || ledger.mover !== comparison.mover
     || ledger.move !== comparison.actualMove || ledger.vs !== "pass" || ledger.referenceMove !== "pass"

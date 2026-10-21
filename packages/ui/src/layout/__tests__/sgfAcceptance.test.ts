@@ -21,6 +21,57 @@ const recording = [result(65), result(65, 1), { type: "gameCompleted", v: 1 }]
 afterEach(() => vi.unstubAllGlobals());
 
 describe("accepted SGF replacement", () => {
+  it.each(["sgf", "ndjson"] as const)("a rejected latest SGF supersedes an older pending %s import", async (kind) => {
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => frames.push(callback));
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    let finishOld!: (text: string) => void;
+    const oldFile = {
+      name: `older.${kind}`,
+      text: vi.fn(() => new Promise<string>(resolve => { finishOld = resolve; })),
+    } as unknown as File;
+    const wrapper = mount(AnalysisReviewer, {
+      props: { initialSgf: accepted, initialNdjson: recording, vertexSize: 16 },
+    });
+    try {
+      frames.splice(0).forEach(callback => callback(0));
+      await flushPromises();
+      const layout = wrapper.getComponent(ReviewerLayout);
+      layout.vm.goToPly(1);
+      await flushPromises();
+      expect(layout.props("rootAnalysis")?.visits).toBe(65);
+      await wrapper.get('[data-testid="engine-source-button"]').trigger("click");
+      const panel = wrapper.getComponent(EngineSourcePanel);
+      if (kind === "sgf") panel.vm.$emit("sgf-file", oldFile);
+      else panel.vm.$emit("ndjson-file", oldFile);
+      expect(oldFile.text).toHaveBeenCalledOnce();
+      panel.vm.$emit("sgf-file", sgfFile(rejected));
+      await flushPromises();
+      const rejection = wrapper.get('[role="alert"]').text();
+      expect(rejection).toContain("Illegal SGF move 1");
+      expect(layout.props("sgf")).toBe(accepted);
+      expect(layout.props("rootAnalysis")?.visits).toBe(65);
+
+      // The latest selection supersedes old import intent even when it fails.
+      // An already accepted game/analysis remains; an old read must not attach later.
+      finishOld(kind === "sgf" ? replacement : [result(999, 1), { type: "gameCompleted", v: 1 }]
+        .map(event => JSON.stringify(event)).join("\n"));
+      await flushPromises();
+      frames.splice(0).forEach(callback => callback(0));
+      await flushPromises();
+      expect(layout.props("sgf")).toBe(accepted);
+      expect(layout.vm.boardSize).toBe(9);
+      expect(layout.vm.moveNumber).toBe(1);
+      expect(layout.props("rootAnalysis")?.visits).toBe(65);
+      expect(wrapper.get('[role="alert"]').text()).toBe(rejection);
+      expect(wrapper.get(".yagoo-analysis-app__meta").text()).toContain("bundled sample analysis");
+      expect(wrapper.text()).toContain("Loaded bundled sample analysis");
+      expect(wrapper.text()).not.toContain(`older.${kind}`);
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
   it.each(["upload", "drop", "prop"] as const)("retains the accepted game, results and pending Try after a rejected %s", async (route) => {
     const frames: FrameRequestCallback[] = [];
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => frames.push(callback));

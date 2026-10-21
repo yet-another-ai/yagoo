@@ -9,6 +9,8 @@ use yagoo_katago::AnalysisClient;
 use yagoo_pipeline::{analyze_game, DeepSelectConfig, PipelineConfig, PipelineStrategy};
 use yagoo_snapshot::{GameSnapshot, PipelineEvent};
 
+mod serve;
+
 #[derive(Debug, Parser)]
 #[command(name = "yagoo", version, about = "Yagoo Go teaching analysis CLI")]
 struct Cli {
@@ -21,7 +23,17 @@ enum Commands {
     /// Analyze an SGF: stream NDJSON events; optionally write a final aggregate JSON.
     Analyze {
         /// Input SGF path.
-        sgf: PathBuf,
+        #[arg(required_unless_present = "serve")]
+        sgf: Option<PathBuf>,
+        /// Serve live SSE analysis on loopback instead of writing NDJSON.
+        #[arg(long, conflicts_with_all = ["output", "final_json", "record_fixture", "scripted_fixture"])]
+        serve: bool,
+        /// Local HTTP port for --serve.
+        #[arg(long, requires = "serve", default_value_t = 8710)]
+        port: u16,
+        /// Exact browser origin allowed by --serve (repeatable).
+        #[arg(long, requires = "serve")]
+        allow_origin: Vec<String>,
         /// NDJSON event stream output (default: stdout). Use `-` for stdout.
         #[arg(short, long, default_value = "-")]
         output: PathBuf,
@@ -107,11 +119,15 @@ impl From<StrategyArg> for PipelineStrategy {
 }
 
 #[tokio::main]
+#[allow(clippy::too_many_lines)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     match cli.command {
         Commands::Analyze {
             sgf,
+            serve,
+            port,
+            allow_origin,
             output,
             final_json,
             katago,
@@ -135,7 +151,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             scripted_fixture,
             record_fixture,
         } => {
-            let sgf_text = tokio::fs::read_to_string(&sgf).await?;
+            let sgf_text = match sgf {
+                Some(path) => Some(tokio::fs::read_to_string(path).await?),
+                None => None,
+            };
+            // Validate the network policy before starting the engine process.
+            let serve_options = serve::ServeOptions::new(port, allow_origin)?;
             let client = if let Some(fix) = scripted_fixture {
                 let lines = load_scripted_fixture(&fix)?;
                 AnalysisClient::scripted(lines)
@@ -175,6 +196,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ..PipelineConfig::default()
             };
 
+            if serve {
+                return serve::run(client, sgf_text, pipeline_cfg, serve_options).await;
+            }
+            let sgf_text = sgf_text.ok_or("missing SGF path")?;
             let mut out = open_output(&output).await?;
             let mut aggregate: Option<GameSnapshot> = None;
             let mut stream = analyze_game(&sgf_text, Arc::clone(&client), pipeline_cfg);
@@ -302,5 +327,28 @@ async fn open_output(
         Ok(Box::new(tokio::io::stdout()))
     } else {
         Ok(Box::new(tokio::fs::File::create(path).await?))
+    }
+}
+
+#[cfg(test)]
+mod cli_tests {
+    use super::*;
+
+    #[test]
+    fn serve_accepts_optional_sgf_and_rejects_file_output() {
+        assert!(Cli::try_parse_from(["yagoo", "analyze", "--serve"]).is_ok());
+        assert!(Cli::try_parse_from(["yagoo", "analyze", "game.sgf", "--serve"]).is_ok());
+        assert!(Cli::try_parse_from(["yagoo", "analyze"]).is_err());
+        assert!(
+            Cli::try_parse_from(["yagoo", "analyze", "--serve", "-o", "events.ndjson"]).is_err()
+        );
+        assert!(Cli::try_parse_from([
+            "yagoo",
+            "analyze",
+            "--serve",
+            "--scripted-fixture",
+            "responses.json"
+        ])
+        .is_err());
     }
 }

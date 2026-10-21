@@ -9,7 +9,7 @@ use crate::error::{KatagoError, KatagoResult};
 use crate::types::{AnalysisQuery, AnalysisResponse, AnalysisUpdate};
 use std::collections::{HashMap, VecDeque};
 use std::process::Stdio;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex as SyncMutex, Weak};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
@@ -61,6 +61,7 @@ struct Inner {
     orphans: SyncMutex<VecDeque<AnalysisResponse>>,
     scripted: bool,
     next_id: AtomicU64,
+    failed: AtomicBool,
     stdout: Mutex<StdoutTransport>,
 }
 
@@ -173,6 +174,7 @@ impl AnalysisClient {
             orphans: SyncMutex::new(VecDeque::new()),
             scripted,
             next_id: AtomicU64::new(1),
+            failed: AtomicBool::new(false),
             stdout: Mutex::new(stdout),
         });
         Self::start_writer(Arc::downgrade(&inner), stdin, commands);
@@ -204,9 +206,7 @@ impl AnalysisClient {
                     StdinTransport::Test(stdin) => write_line(stdin, &line).await,
                 };
                 if result.is_err() {
-                    for (_, route) in inner.routes.lock().expect("routes lock").drain() {
-                        let _ = route.tx.send(RouteMsg::Failed(KatagoError::ProcessExited));
-                    }
+                    fail_process(&inner);
                     break;
                 }
                 if let Some(written) = command.written {
@@ -240,10 +240,7 @@ impl AnalysisClient {
                             continue;
                         }
                         Err(_) => {
-                            let mut routes = inner.routes.lock().expect("routes lock");
-                            for (_, route) in routes.drain() {
-                                let _ = route.tx.send(RouteMsg::Failed(KatagoError::ProcessExited));
-                            }
+                            fail_process(&inner);
                             break;
                         }
                     }
@@ -261,6 +258,7 @@ impl AnalysisClient {
                     Ok(r) => r,
                     Err(e) => {
                         let mut routes = inner.routes.lock().expect("routes lock");
+                        inner.failed.store(true, Ordering::Relaxed);
                         for (_, route) in routes.drain() {
                             let _ = route.tx.send(RouteMsg::Failed(KatagoError::Io(
                                 std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()),
@@ -333,6 +331,9 @@ impl AnalysisClient {
         let (tx, mut rx) = mpsc::unbounded_channel();
         {
             let mut routes = self.inner.routes.lock().expect("routes lock");
+            if self.inner.failed.load(Ordering::Relaxed) {
+                return Err(KatagoError::ProcessExited);
+            }
             if routes.values().any(|route| route.logical_id == query.id) {
                 return Err(KatagoError::Io(std::io::Error::other(format!(
                     "duplicate in-flight query id `{}`",
@@ -403,7 +404,23 @@ impl AnalysisClient {
     }
 }
 
+fn fail_process(inner: &Inner) {
+    let mut routes = inner.routes.lock().expect("routes lock");
+    // The route lock orders failure against new registration.
+    inner.failed.store(true, Ordering::Relaxed);
+    for (_, route) in routes.drain() {
+        let _ = route.tx.send(RouteMsg::Failed(KatagoError::ProcessExited));
+    }
+}
+
 fn dispatch_response(inner: &Inner, mut resp: AnalysisResponse) {
+    // KataGo can emit an advisory before the analysis for the same ID (for
+    // example v1.16.4's includePvVisits warning). It must not consume the route.
+    // Recognize only a warning envelope; errors and malformed/result payloads
+    // still follow normal delivery and downstream validation.
+    if is_warning_envelope(&resp) {
+        return;
+    }
     let destination = {
         let mut routes = inner.routes.lock().expect("routes lock");
         let wire_id = if routes.contains_key(&resp.id) {
@@ -443,6 +460,24 @@ fn dispatch_response(inner: &Inner, mut resp: AnalysisResponse) {
     deliver_to_route(&tx, resp);
 }
 
+fn is_warning_envelope(resp: &AnalysisResponse) -> bool {
+    resp.warning.is_some()
+        && resp.error.is_none()
+        && resp.is_during_search.is_none()
+        && resp.root_info.is_none()
+        && resp.move_infos.is_none()
+        && resp.ownership.is_none()
+        && resp.ownership_stdev.is_none()
+        && resp.policy.is_none()
+        && resp.human_policy.is_none()
+        && resp.neural.is_none()
+        && resp.extra.keys().all(|key| key == "field")
+        && resp
+            .extra
+            .get("field")
+            .is_none_or(serde_json::Value::is_string)
+}
+
 async fn write_line<W: tokio::io::AsyncWrite + Unpin>(
     writer: &mut W,
     line: &str,
@@ -472,7 +507,7 @@ async fn read_line(stdout: &mut StdoutTransport) -> KatagoResult<Option<String>>
             let mut buf = String::new();
             let n = stdout.read_line(&mut buf).await?;
             if n == 0 {
-                return Ok(None);
+                return Err(KatagoError::ProcessExited);
             }
             if buf.ends_with('\n') {
                 buf.pop();
@@ -521,6 +556,118 @@ mod cancellation_tests {
 
     fn respond(client: &AnalysisClient, value: serde_json::Value) {
         dispatch_response(&client.inner, serde_json::from_value(value).unwrap());
+    }
+
+    #[tokio::test]
+    async fn recorded_warning_keeps_route_until_real_final_and_preserves_other_query() {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            let (client, mut peer) = controlled_client(4096);
+            let first_client = client.clone();
+            let first = tokio::spawn(async move {
+                first_client
+                    .analyze(&AnalysisQueryBuilder::new("first").build())
+                    .await
+            });
+            let first_wire = next_line(&mut peer).await;
+            let other_client = client.clone();
+            let other = tokio::spawn(async move {
+                other_client
+                    .analyze(&AnalysisQueryBuilder::new("other").build())
+                    .await
+            });
+            let other_wire = next_line(&mut peer).await;
+            let mut recorded =
+                include_str!("../tests/fixtures/katago1164-warning-then-final.ndjson").lines();
+            let warning: serde_json::Value =
+                serde_json::from_str(recorded.next().unwrap()).unwrap();
+            assert_eq!(warning["id"], first_wire["id"]);
+            respond(&client, warning);
+            assert_eq!(client.inner.routes.lock().unwrap().len(), 2);
+            assert!(!first.is_finished());
+            assert!(!other.is_finished());
+            respond(
+                &client,
+                serde_json::json!({"id": other_wire["id"], "rootInfo": {"visits": 17}}),
+            );
+            let other_result = other.await.unwrap().unwrap();
+            assert_eq!(other_result.id, "other");
+            assert_eq!(other_result.root_info.unwrap().visits, Some(17));
+            assert_eq!(client.inner.routes.lock().unwrap().len(), 1);
+            let final_value = serde_json::from_str(recorded.next().unwrap()).unwrap();
+            respond(&client, final_value);
+            let result = first.await.unwrap().unwrap();
+            assert_eq!(result.id, "first");
+            assert_eq!(result.root_info.unwrap().visits, Some(8));
+            assert_eq!(result.ownership.unwrap().len(), 361);
+            assert!(client.inner.routes.lock().unwrap().is_empty());
+            assert!(recorded.next().is_none());
+        })
+        .await
+        .expect("warning must not consume the final result or another query");
+    }
+
+    #[tokio::test]
+    async fn warnings_do_not_hide_errors_results_or_malformed_payloads() {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            for line in [
+                r#"{"id":"q","warning":"advisory","error":"fatal"}"#,
+                r#"{"id":"q","warning":"advisory","rootInfo":{"visits":1}}"#,
+                r#"{"id":"q","warning":"advisory","isDuringSearch":false}"#,
+                r#"{"id":"q","warning":"advisory","moveInfos":[]}"#,
+                r#"{"id":"q","warning":"advisory","ownership":[0.1]}"#,
+                r#"{"id":"q","warning":"advisory","field":42}"#,
+                r#"{"id":"q","warning":"advisory","unexpected":"payload"}"#,
+                r#"{"id":"q"}"#,
+            ] {
+                let (client, mut peer) = controlled_client(4096);
+                let running_client = client.clone();
+                let running = tokio::spawn(async move {
+                    running_client
+                        .analyze(&AnalysisQueryBuilder::new("q").build())
+                        .await
+                });
+                let wire = next_line(&mut peer).await;
+                let expected: AnalysisResponse = serde_json::from_str(line).unwrap();
+                let mut value: serde_json::Value = serde_json::from_str(line).unwrap();
+                value["id"] = wire["id"].clone();
+                respond(&client, value);
+                let received = running.await.unwrap();
+                if expected.error.is_some() {
+                    assert!(matches!(received, Err(KatagoError::Engine { id, error })
+                        if id == "q" && error == "fatal"));
+                } else {
+                    // Missing-root payloads still reach downstream validation;
+                    // they must not silently leave the caller waiting forever.
+                    assert_eq!(received.unwrap(), expected);
+                }
+                assert!(client.inner.routes.lock().unwrap().is_empty());
+            }
+        })
+        .await
+        .expect("only warning envelopes may be skipped");
+    }
+
+    #[tokio::test]
+    async fn process_failure_fails_active_and_future_queries() {
+        let (client, mut peer) = controlled_client(4096);
+        let running_client = client.clone();
+        let running = tokio::spawn(async move {
+            running_client
+                .analyze(&AnalysisQueryBuilder::new("active").build())
+                .await
+        });
+        next_line(&mut peer).await;
+        fail_process(&client.inner);
+        assert!(matches!(
+            running.await.unwrap(),
+            Err(KatagoError::ProcessExited)
+        ));
+        assert!(matches!(
+            client
+                .analyze(&AnalysisQueryBuilder::new("after-exit").build())
+                .await,
+            Err(KatagoError::ProcessExited)
+        ));
     }
 
     #[tokio::test]

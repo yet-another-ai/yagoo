@@ -1,5 +1,7 @@
 <script setup lang="ts">
-defineProps<{
+import { ref } from "vue";
+
+const props = defineProps<{
   nativeAvailable: boolean;
   browserAvailable: boolean;
   sourceLabel?: string | null;
@@ -8,13 +10,14 @@ defineProps<{
   /** Set only when a developer configured a remote manifest. Never fetched on load. */
   remoteManifestUrl?: string | null;
   modelStatus?: string | null;
+  nativeUrl?: string;
 }>();
 
 const emit = defineEmits<{
   (e: "close"): void;
   (e: "sgf-file", file: File): void;
   (e: "ndjson-file", file: File): void;
-  (e: "connect-native"): void;
+  (e: "connect-native", url: string): void;
   (e: "connect-browser"): void;
   (e: "local-model-files", files: File[]): void;
   (e: "enable-threads"): void;
@@ -39,6 +42,7 @@ function onModelDrop(ev: DragEvent) {
   if (!picked.length) return;
   emit("local-model-files", picked);
 }
+const nativeUrl = ref(props.nativeUrl ?? "http://127.0.0.1:8710/analyze");
 
 function onFile(kind: "sgf" | "ndjson", ev: Event) {
   const input = ev.target as HTMLInputElement;
@@ -100,17 +104,20 @@ function onFile(kind: "sgf" | "ndjson", ev: Event) {
     </section>
 
     <section class="yagoo-source__card" data-source="live-native">
-      <h3>Live native <span class="yagoo-source__issue">Coming in #19</span></h3>
+      <h3>Live native</h3>
       <p>
-        <code>yagoo analyze --serve</code> will stream the same events over
-        WebSocket or SSE. The reviewer already has a
-        <code>createLiveNativeSource</code> adapter; it is not connected.
+        Start <code>yagoo analyze --serve</code> locally, then connect to analyze
+        the loaded SGF. Scan and deepen results appear as they finish.
       </p>
+      <label>
+        Local engine URL
+        <input v-model="nativeUrl" type="url" data-testid="native-url" />
+      </label>
       <button
         type="button"
         class="yagoo-btn"
         :disabled="!nativeAvailable"
-        @click="emit('connect-native')"
+        @click="emit('connect-native', nativeUrl)"
       >
         Connect to local engine
       </button>

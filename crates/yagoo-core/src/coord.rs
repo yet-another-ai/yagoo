@@ -74,7 +74,7 @@ impl Point {
             .next()
             .ok_or_else(|| CoreError::InvalidCoordinate(t.to_owned()))?
             .to_ascii_uppercase();
-        if col == 'I' {
+        if !col.is_ascii_uppercase() || col == 'I' {
             return Err(CoreError::InvalidCoordinate(t.to_owned()));
         }
         let col_index = if col < 'I' {
@@ -210,5 +210,11 @@ mod tests {
     fn pass_gtp() {
         assert!(Point::parse_gtp("pass", 19).unwrap().is_none());
         assert!(Point::parse_gtp("PASS", 9).unwrap().is_none());
+    }
+    #[test]
+    fn rejects_nonletter_gtp_columns_without_panicking() {
+        for coordinate in ["11", "!1", "@1", "[1", "é1", "中1", "I1"] {
+            assert!(Point::parse_gtp(coordinate, 19).is_err(), "{coordinate}");
+        }
     }
 }

@@ -1,4 +1,4 @@
-import { computed, ref, shallowRef, type Ref } from "vue";
+import { computed, getCurrentScope, onScopeDispose, ref, shallowRef, type Ref } from "vue";
 import {
   buildBoardOverlays,
   buildReviewSeries,
@@ -41,6 +41,7 @@ export function useAnalysisStream(): UseAnalysisStreamResult {
   const state = shallowRef<AnalysisState>(createInitialAnalysisState());
   const sourceLabel = ref<string | null>(null);
   let handle: AnalysisSourceHandle | null = null;
+  let generation = 0;
 
   function reset() {
     stop();
@@ -53,24 +54,31 @@ export function useAnalysisStream(): UseAnalysisStreamResult {
   }
 
   function stop() {
+    generation += 1;
     handle?.stop();
     handle = null;
+    if (state.value.status === "streaming") {
+      state.value = { ...state.value, status: "idle" };
+    }
   }
+
+  if (getCurrentScope()) onScopeDispose(stop);
 
   function attachSource(source: AnalysisEventSource) {
     stop();
+    const current = generation;
     sourceLabel.value = source.label;
-    if (state.value.status === "idle") {
-      state.value = { ...state.value, status: "streaming" };
-    }
-    handle = source.start({
-      onEvent: applyEvent,
+    state.value = { ...state.value, status: "streaming", lastError: null };
+    const next = source.start({
+      onEvent: (event) => { if (current === generation) applyEvent(event); },
       onDone: () => {
+        if (current !== generation) return;
         if (state.value.status === "streaming") {
           state.value = { ...state.value, status: "completed" };
         }
       },
       onError: (err) => {
+        if (current !== generation) return;
         state.value = {
           ...state.value,
           status: "error",
@@ -78,6 +86,8 @@ export function useAnalysisStream(): UseAnalysisStreamResult {
         };
       },
     });
+    if (current === generation) handle = next;
+    else next.stop();
   }
 
   const series = computed(() => buildReviewSeries(state.value));

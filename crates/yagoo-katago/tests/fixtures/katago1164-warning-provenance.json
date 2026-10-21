@@ -1,0 +1,20 @@
+{
+  "kind": "genuine native KataGo stdout envelopes",
+  "capturedAt": "2026-10-20T17:48:18Z",
+  "engineVersion": "KataGo v1.16.4 Eigen AVX2 Windows",
+  "engineSha256": "bad55cf31ec42f58dec821a2e428c8d45d9e4697f9e2741b8aa644d03a37acfc",
+  "modelName": "kata1-b18c384nbt-s9996604416-d4316597426 (existing SWA export)",
+  "modelSha256": "46a623a366ef6ef423fa2055f1b094fd8f64c518c065e7d254a9e0829c192c5c",
+  "sourceSgf": "docs/public/app/sample.sgf",
+  "sourceSgfSha256": "6b0310aec23fd026120aed5bb29ec4a68350494c47403fad1dde09757308b269",
+  "position": "Exact SGF moves1..49 followed by legal White R7 (move50)",
+  "rules": "Chinese",
+  "komi": 0,
+  "visits": 8,
+  "rootNumSymmetriesToSample": 8,
+  "reportAnalysisWinratesAs": "BLACK",
+  "trigger": "includePvVisits:true is not recognized by v1.16.4; warning precedes the valid final response for the same wire ID",
+  "extraction": "Exact JSON bytes after Response: in the engine log; no value edits",
+  "recordedFileSha256": "e87a8eda0a266e09b502446e66e80fd0cac64e25b9d184b1134136d4461ef4f1",
+  "ci": "Replay only; no model access or engine execution"
+}

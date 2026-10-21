@@ -11,13 +11,17 @@ use yagoo_core::{Color, Point, Ruleset};
 
 /// Parse an SGF string into a [`GameRecord`] using the first game's main line.
 pub fn parse_sgf(input: &str) -> SgfResult<GameRecord> {
+    record_from_tree(&parse_sgf_tree(input)?)
+}
+
+/// Parse the first game tree, preserving node properties and variation ancestry.
+pub fn parse_sgf_tree(input: &str) -> SgfResult<GameTreeNode> {
     let mut lexer = Lexer::new(input);
     lexer.skip_ws();
     if lexer.eof() {
         return Err(SgfError::Empty);
     }
-    let root = parse_game_tree(&mut lexer)?;
-    record_from_tree(&root)
+    parse_game_tree(&mut lexer)
 }
 
 fn parse_game_tree(lexer: &mut Lexer<'_>) -> SgfResult<GameTreeNode> {
@@ -138,10 +142,12 @@ fn record_from_tree(root: &GameTreeNode) -> SgfResult<GameRecord> {
         }
     }
 
-    let initial_player = if handicap.unwrap_or(0) >= 2 && setup.white.is_empty() {
-        Color::White
-    } else {
-        Color::Black
+    let initial_player = match root.get_one("PL") {
+        Some("B") => Color::Black,
+        Some("W") => Color::White,
+        Some(value) => return Err(SgfError::InvalidValue(format!("invalid PL[{value}]"))),
+        None if handicap.unwrap_or(0) >= 2 && setup.white.is_empty() => Color::White,
+        None => Color::Black,
     };
 
     let mut moves = Vec::new();

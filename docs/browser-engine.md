@@ -30,8 +30,17 @@ original research report.
   on the board until **Use browser engine**. A remote manifest is used only when
   `VITE_YAGOO_MANIFEST_URL` is set, and only after **Load configured manifest**.
   The package still has a local dev page (`packages/browser-engine`) with catalog,
-  progress, cancel, and OPFS clear for `mise run browser:check`. HTTP Range
-  resume remains open ([#14](https://github.com/yet-another-ai/yagoo/issues/14)).
+  progress, cancel, and OPFS clear for `mise run browser:check`. Interrupted
+  weight downloads keep a `partial-<sha256>` OPFS entry and resume with an HTTP
+  `Range` request when the host answers `206` with a matching `Content-Range`.
+  A `200`, `416`, foreign or missing range, or compressed (`Content-Encoding`)
+  body restarts from zero. The complete artifact is SHA-256 verified before it
+  replaces the verified cache entry, and the partial is deleted only then, so a
+  stale prefix can never be loaded as a model. Self-hosted artifacts must support
+  byte ranges; a cross-origin host must allow `Range` and expose `Content-Range`
+  (for example `Access-Control-Expose-Headers: Content-Range, Content-Length`).
+  Without ranges the download still succeeds but restarts from the beginning.
+  Cancel terminates the worker after the last checkpoint ([#14](https://github.com/yet-another-ai/yagoo/issues/14)).
 - Experimental PUCT/FPU search has a bounded cache, partial events, candidates,
   PVs and tree ownership. Optional eight-way root symmetry averages probabilities
   and ownership after inverse transforms. Async batches of up to four reserve
@@ -380,7 +389,6 @@ limit is its own issue (related to #7 / #5):
 - [#11](https://github.com/yet-another-ai/yagoo/issues/11) Search parity with native (uncertainty weighting, LCB, passing heuristics, strength)
 - [#12](https://github.com/yet-another-ai/yagoo/issues/12) Native comparison release aligned with the pinned exporter
 - [#13](https://github.com/yet-another-ai/yagoo/issues/13) Concept-head consumers, activation visualization, persistent activation storage
-- [#14](https://github.com/yet-another-ai/yagoo/issues/14) Model download resume (cancel exists; Range resume does not)
 - [#15](https://github.com/yet-another-ai/yagoo/issues/15) Small-net / mobile support
 - [#17](https://github.com/yet-another-ai/yagoo/issues/17) Deployed public-host verification
 

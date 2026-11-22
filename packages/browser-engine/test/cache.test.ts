@@ -1,57 +1,85 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { cacheHas, cachePut, cacheRead, clearModelCache, listCachedModels } from '../src/cache';
+import {
+  cacheHas,
+  cachePartialDelete,
+  cachePartialRead,
+  cachePartialWriter,
+  cachePut,
+  cacheRead,
+  clearModelCache,
+  listCachedModels,
+} from '../src/cache';
+import { mockOpfs } from './opfs';
 
-afterEach(() => { vi.unstubAllGlobals(); vi.resetModules(); });
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
-function mockOpfs(files = new Map<string, Uint8Array>()) {
-  const directory = {
-    async getFileHandle(name: string, options?: { create?: boolean }) {
-      if (!files.has(name) && !options?.create) throw new DOMException('missing', 'NotFoundError');
-      if (!files.has(name)) files.set(name, new Uint8Array());
-      return {
-        kind: 'file' as const,
-        async getFile() {
-          const data = files.get(name)!;
-          return { size: data.byteLength, arrayBuffer: async () => data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) };
-        },
-        async createWritable() {
-          const chunks: Uint8Array[] = [];
-          return {
-            async write(bytes: Uint8Array) { chunks.push(bytes); },
-            async close() { files.set(name, chunks.length === 1 ? chunks[0]! : concat(chunks)); },
-            async abort() {},
-          };
-        },
-      };
-    },
-    async removeEntry(name: string) { files.delete(name); },
-    async *entries() {
-      for (const [name] of files) {
-        yield [name, await this.getFileHandle(name)] as unknown as [string, FileSystemHandle];
-      }
-    },
-  };
+function useOpfs(directory: unknown): void {
   vi.stubGlobal('navigator', { storage: { getDirectory: async () => directory } });
-  return files;
-}
-
-function concat(chunks: Uint8Array[]): Uint8Array {
-  const total = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) { out.set(chunk, offset); offset += chunk.byteLength; }
-  return out;
 }
 
 it('stores, lists, and clears content-addressed OPFS model blobs', async () => {
-  const files = mockOpfs();
+  const { files, directory } = mockOpfs();
+  useOpfs(directory);
   const sha = 'a'.repeat(64);
   const bytes = new Uint8Array([1, 2, 3, 4]);
-  await cachePut(sha, bytes);
+  expect(await cachePut(sha, bytes)).toBe(true);
   expect(await cacheHas(sha)).toBe(true);
   expect(Array.from(await cacheRead(sha) ?? [])).toEqual([1, 2, 3, 4]);
   expect(await listCachedModels()).toEqual([{ sha256: sha, bytes: 4 }]);
   expect(await clearModelCache()).toBe(1);
   expect(files.size).toBe(0);
   expect(await listCachedModels()).toEqual([]);
+});
+
+it('reads, appends to, and deletes a resumable partial', async () => {
+  const sha = 'b'.repeat(64);
+  const name = `partial-${sha}`;
+  const { files, directory } = mockOpfs({ [name]: new Uint8Array([1, 2]) });
+  useOpfs(directory);
+
+  const target = new Uint8Array(4);
+  expect(await cachePartialRead(sha, target)).toBe(2);
+  expect(Array.from(target)).toEqual([1, 2, 0, 0]);
+  expect(await cachePartialWriter(sha, 4, 0)).toBeUndefined();
+
+  const writer = await cachePartialWriter(sha, 4, 2);
+  expect(writer?.offset).toBe(2);
+  await writer!.write(new Uint8Array([3, 4]));
+  await writer!.close();
+
+  const again = new Uint8Array(4);
+  expect(await cachePartialRead(sha, again)).toBe(4);
+  expect(Array.from(again)).toEqual([1, 2, 3, 4]);
+  // Partials are not verified models.
+  expect(await cacheHas(sha)).toBe(false);
+  expect(await listCachedModels()).toEqual([]);
+
+  await cachePartialDelete(sha);
+  expect(files.has(name)).toBe(false);
+});
+
+it('drops an oversized or truncated partial instead of resuming from it', async () => {
+  const sha = 'c'.repeat(64);
+  const name = `partial-${sha}`;
+  const { files, directory } = mockOpfs({ [name]: new Uint8Array(5) });
+  useOpfs(directory);
+
+  expect(await cachePartialRead(sha, new Uint8Array(4))).toBe(0);
+  expect(files.has(name)).toBe(false);
+
+  files.set(name, new Uint8Array([7, 8]));
+  const target = new Uint8Array(4);
+  expect(await cachePartialRead(sha, target)).toBe(2);
+  expect(Array.from(target)).toEqual([7, 8, 0, 0]);
+});
+
+it('clears resumable partials together with verified entries', async () => {
+  const sha = 'd'.repeat(64);
+  const { files, directory } = mockOpfs({
+    [sha]: new Uint8Array([1]),
+    [`partial-${sha}`]: new Uint8Array([2]),
+  });
+  useOpfs(directory);
+  expect(await clearModelCache()).toBe(2);
+  expect(files.size).toBe(0);
 });

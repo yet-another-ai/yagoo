@@ -1,9 +1,16 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { bundleFromLocalFiles, loadArtifact, validateManifest } from '../src/model';
+import {
+  PARTIAL_CHECKPOINT_BYTES,
+  bundleFromLocalFiles,
+  loadArtifact,
+  validateManifest,
+  type Artifact,
+} from '../src/model';
+import { mockOpfs } from './opfs';
 
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
-function artifact(bytes: Uint8Array, url = 'model.onnx') {
+function artifact(bytes: Uint8Array, url = 'model.onnx'): Promise<Artifact> {
   const copy = new Uint8Array(bytes);
   return crypto.subtle.digest('SHA-256', copy).then(hash => ({
     url,
@@ -13,7 +20,7 @@ function artifact(bytes: Uint8Array, url = 'model.onnx') {
   }));
 }
 
-function manifestFor(fp32: Awaited<ReturnType<typeof artifact>>, warmup: Awaited<ReturnType<typeof artifact>>) {
+function manifestFor(fp32: Artifact, warmup: Artifact) {
   return {
     schemaVersion: 1 as const,
     model: 'kata1-b18c384nbt-s9996604416-d4316597426',
@@ -33,25 +40,37 @@ function manifestFor(fp32: Awaited<ReturnType<typeof artifact>>, warmup: Awaited
   };
 }
 
-it('downloads with progress, verifies, and honors AbortSignal without Range resume', async () => {
+function response(chunks: Uint8Array[], init: { status?: number; headers?: Record<string, string> } = {}) {
+  return new Response(new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const chunk of chunks) controller.enqueue(chunk);
+      controller.close();
+    },
+  }), { status: init.status ?? 200, headers: init.headers });
+}
+
+function partialName(sha256: string): string {
+  return `partial-${sha256}`;
+}
+
+function useOpfs(directory: unknown): void {
+  vi.stubGlobal('navigator', { storage: { getDirectory: async () => directory } });
+}
+
+function useNoOpfs(): void {
+  vi.stubGlobal('navigator', { storage: { getDirectory: async () => { throw new Error('no opfs'); } } });
+}
+
+function rangeOf(init?: RequestInit): string | undefined {
+  const headers = init?.headers as Record<string, string> | undefined;
+  return headers?.Range;
+}
+
+it('downloads with progress, verifies, and honors AbortSignal', async () => {
   const payload = new Uint8Array([9, 8, 7, 6, 5, 4]);
   const meta = await artifact(payload);
-  vi.stubGlobal('navigator', { storage: { getDirectory: async () => { throw new Error('no opfs'); } } });
-  const chunks = [payload.subarray(0, 3), payload.subarray(3)];
-  let index = 0;
-  vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => ({
-    ok: true,
-    body: {
-      getReader: () => ({
-        read: async () => {
-          if (init?.signal?.aborted) throw new DOMException('aborted', 'AbortError');
-          if (index >= chunks.length) return { done: true, value: undefined };
-          return { done: false, value: chunks[index++] };
-        },
-        cancel: async () => {},
-      }),
-    },
-  })));
+  useNoOpfs();
+  vi.stubGlobal('fetch', vi.fn(async () => response([payload.subarray(0, 3), payload.subarray(3)])));
   const progress: number[] = [];
   const bytes = await loadArtifact('https://example.test/', meta, {
     progress: (loaded, total) => progress.push(loaded, total),
@@ -59,11 +78,247 @@ it('downloads with progress, verifies, and honors AbortSignal without Range resu
   expect(Array.from(bytes)).toEqual([9, 8, 7, 6, 5, 4]);
   expect(progress).toEqual([3, 6, 6, 6]);
 
-  index = 0;
   const controller = new AbortController();
+  vi.stubGlobal('fetch', vi.fn(async () => ({
+    status: 200,
+    ok: true,
+    headers: new Headers(),
+    body: {
+      getReader: () => ({
+        read: async () => {
+          controller.abort();
+          throw new DOMException('aborted', 'AbortError');
+        },
+        cancel: async () => {},
+      }),
+    },
+  })));
   const pending = loadArtifact('https://example.test/', meta, { signal: controller.signal });
   controller.abort();
   await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+});
+
+it('resumes a partial artifact with a matching 206 range', async () => {
+  const payload = new Uint8Array([9, 8, 7, 6, 5, 4]);
+  const meta = await artifact(payload);
+  const { files, directory } = mockOpfs({ [partialName(meta.sha256)]: payload.subarray(0, 3) });
+  useOpfs(directory);
+  const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) => response([payload.subarray(3)], {
+    status: 206,
+    headers: { 'Content-Range': 'bytes 3-5/6' },
+  }));
+  vi.stubGlobal('fetch', fetchMock);
+
+  const progress: number[] = [];
+  const bytes = await loadArtifact('https://example.test/', meta, {
+    progress: (loaded, total) => progress.push(loaded, total),
+  });
+
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(rangeOf(fetchMock.mock.calls[0]![1])).toBe('bytes=3-');
+  expect(progress).toEqual([3, 6, 6, 6]);
+  expect(Array.from(bytes)).toEqual([9, 8, 7, 6, 5, 4]);
+  expect(Array.from(files.get(meta.sha256)!)).toEqual([9, 8, 7, 6, 5, 4]);
+  expect(files.has(partialName(meta.sha256))).toBe(false);
+});
+
+it('restarts from zero when the host ignores Range', async () => {
+  const payload = new Uint8Array([9, 8, 7, 6, 5, 4]);
+  const meta = await artifact(payload);
+  const { files, directory } = mockOpfs({ [partialName(meta.sha256)]: payload.subarray(0, 3) });
+  useOpfs(directory);
+  const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) => response([payload]));
+  vi.stubGlobal('fetch', fetchMock);
+
+  const bytes = await loadArtifact('https://example.test/', meta);
+
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(rangeOf(fetchMock.mock.calls[0]![1])).toBe('bytes=3-');
+  expect(Array.from(bytes)).toEqual([9, 8, 7, 6, 5, 4]);
+  expect(Array.from(files.get(meta.sha256)!)).toEqual([9, 8, 7, 6, 5, 4]);
+  expect(files.has(partialName(meta.sha256))).toBe(false);
+});
+
+it('rejects a foreign Content-Range and retries without Range', async () => {
+  const payload = new Uint8Array([9, 8, 7, 6, 5, 4]);
+  const meta = await artifact(payload);
+  const { directory } = mockOpfs({ [partialName(meta.sha256)]: payload.subarray(0, 3) });
+  useOpfs(directory);
+  let calls = 0;
+  const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) => {
+    if (calls++ === 0) {
+      return response([payload.subarray(1)], {
+        status: 206,
+        headers: { 'Content-Range': 'bytes 1-5/6' },
+      });
+    }
+    return response([payload]);
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  const bytes = await loadArtifact('https://example.test/', meta);
+
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(rangeOf(fetchMock.mock.calls[0]![1])).toBe('bytes=3-');
+  expect(rangeOf(fetchMock.mock.calls[1]![1])).toBeUndefined();
+  expect(Array.from(bytes)).toEqual([9, 8, 7, 6, 5, 4]);
+});
+
+it('drops an oversized partial and downloads from zero', async () => {
+  const payload = new Uint8Array([9, 8, 7, 6, 5, 4]);
+  const meta = await artifact(payload);
+  const { files, directory } = mockOpfs({ [partialName(meta.sha256)]: new Uint8Array(8) });
+  useOpfs(directory);
+  const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) => response([payload]));
+  vi.stubGlobal('fetch', fetchMock);
+
+  const bytes = await loadArtifact('https://example.test/', meta);
+
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(rangeOf(fetchMock.mock.calls[0]![1])).toBeUndefined();
+  expect(Array.from(bytes)).toEqual([9, 8, 7, 6, 5, 4]);
+  expect(files.has(partialName(meta.sha256))).toBe(false);
+});
+
+it('keeps a durable prefix when the connection drops, then resumes it', async () => {
+  const payload = new Uint8Array([9, 8, 7, 6, 5, 4]);
+  const meta = await artifact(payload);
+  const { files, directory } = mockOpfs();
+  useOpfs(directory);
+  let calls = 0;
+  const fetchMock = vi.fn(async (_url: string | URL, init?: RequestInit) => {
+    if (calls++ === 0) {
+      let pulled = 0;
+      return new Response(new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (pulled++ === 0) controller.enqueue(payload.subarray(0, 3));
+          else controller.error(new Error('connection lost'));
+        },
+      }), { status: 200 });
+    }
+    expect(rangeOf(init)).toBe('bytes=3-');
+    return response([payload.subarray(3)], {
+      status: 206,
+      headers: { 'Content-Range': 'bytes 3-5/6' },
+    });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  await expect(loadArtifact('https://example.test/', meta)).rejects.toThrow('connection lost');
+  expect(Array.from(files.get(partialName(meta.sha256))!)).toEqual([9, 8, 7]);
+
+  const bytes = await loadArtifact('https://example.test/', meta);
+  expect(Array.from(bytes)).toEqual([9, 8, 7, 6, 5, 4]);
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(files.has(partialName(meta.sha256))).toBe(false);
+});
+
+it('retries once from zero when a resumed artifact fails verification', async () => {
+  const payload = new Uint8Array([9, 8, 7, 6, 5, 4]);
+  const meta = await artifact(payload);
+  const { files, directory } = mockOpfs({ [partialName(meta.sha256)]: new Uint8Array([0, 0, 0]) });
+  useOpfs(directory);
+  let calls = 0;
+  const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) => {
+    if (calls++ === 0) {
+      return response([payload.subarray(3)], {
+        status: 206,
+        headers: { 'Content-Range': 'bytes 3-5/6' },
+      });
+    }
+    return response([payload]);
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  const bytes = await loadArtifact('https://example.test/', meta);
+
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(Array.from(bytes)).toEqual([9, 8, 7, 6, 5, 4]);
+  expect(Array.from(files.get(meta.sha256)!)).toEqual([9, 8, 7, 6, 5, 4]);
+});
+
+it('accepts a full-length partial without a network request', async () => {
+  const payload = new Uint8Array([9, 8, 7, 6, 5, 4]);
+  const meta = await artifact(payload);
+  const { files, directory } = mockOpfs({ [partialName(meta.sha256)]: payload });
+  useOpfs(directory);
+  const fetchMock = vi.fn();
+  vi.stubGlobal('fetch', fetchMock);
+
+  const bytes = await loadArtifact('https://example.test/', meta);
+
+  expect(fetchMock).not.toHaveBeenCalled();
+  expect(Array.from(bytes)).toEqual([9, 8, 7, 6, 5, 4]);
+  expect(Array.from(files.get(meta.sha256)!)).toEqual([9, 8, 7, 6, 5, 4]);
+  expect(files.has(partialName(meta.sha256))).toBe(false);
+});
+
+it('keeps a verified partial when the cache entry cannot be written', async () => {
+  const payload = new Uint8Array([9, 8, 7, 6, 5, 4]);
+  const meta = await artifact(payload);
+  let failCache = true;
+  const { files, directory } = mockOpfs(
+    { [partialName(meta.sha256)]: payload },
+    { failWrite: name => failCache && name === meta.sha256 },
+  );
+  useOpfs(directory);
+  const fetchMock = vi.fn();
+  vi.stubGlobal('fetch', fetchMock);
+
+  const first = await loadArtifact('https://example.test/', meta);
+  expect(Array.from(first)).toEqual([9, 8, 7, 6, 5, 4]);
+  expect(files.has(meta.sha256)).toBe(false);
+  expect(Array.from(files.get(partialName(meta.sha256))!)).toEqual([9, 8, 7, 6, 5, 4]);
+
+  failCache = false;
+  const second = await loadArtifact('https://example.test/', meta);
+  expect(Array.from(second)).toEqual([9, 8, 7, 6, 5, 4]);
+  expect(fetchMock).not.toHaveBeenCalled();
+  expect(files.has(meta.sha256)).toBe(true);
+  expect(files.has(partialName(meta.sha256))).toBe(false);
+});
+
+it('checkpoints cumulatively across host-capped ranges', async () => {
+  const cap = Math.floor(PARTIAL_CHECKPOINT_BYTES / 2);
+  const payload = new Uint8Array(2 * cap + 1024);
+  for (let i = 0; i < payload.length; i++) payload[i] = i & 0xff;
+  const meta = await artifact(payload);
+  const { files, directory } = mockOpfs({ [partialName(meta.sha256)]: payload.subarray(0, 1) });
+  useOpfs(directory);
+  let observed = -1;
+  const fetchMock = vi.fn(async (_url: string | URL, init?: RequestInit) => {
+    const start = Number(/^bytes=(\d+)-$/.exec(rangeOf(init) ?? '')?.[1]);
+    if (start > 2 * cap) observed = files.get(partialName(meta.sha256))?.byteLength ?? 0;
+    const end = Math.min(start + cap, payload.length);
+    return response([payload.subarray(start, end)], {
+      status: 206,
+      headers: { 'Content-Range': `bytes ${start}-${end - 1}/${payload.length}` },
+    });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  const bytes = await loadArtifact('https://example.test/', meta);
+
+  expect(fetchMock).toHaveBeenCalledTimes(3);
+  expect(bytes.byteLength).toBe(payload.length);
+  expect(observed).toBe(2 * cap + 1);
+  expect(files.has(partialName(meta.sha256))).toBe(false);
+  expect(files.get(meta.sha256)?.byteLength).toBe(payload.length);
+});
+
+it('drops a corrupt OPFS hit and refetches instead of failing forever', async () => {
+  const payload = new Uint8Array([1, 2, 3, 4, 5, 6]);
+  const meta = await artifact(payload);
+  const { files, directory } = mockOpfs({ [meta.sha256]: new Uint8Array([9, 9]) });
+  useOpfs(directory);
+  const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) => response([payload]));
+  vi.stubGlobal('fetch', fetchMock);
+
+  const bytes = await loadArtifact('https://example.test/', meta);
+
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(Array.from(bytes)).toEqual([1, 2, 3, 4, 5, 6]);
+  expect(Array.from(files.get(meta.sha256)!)).toEqual([1, 2, 3, 4, 5, 6]);
 });
 
 it('stages local files into a blob manifest without network fetch', async () => {
@@ -73,7 +328,7 @@ it('stages local files into a blob manifest without network fetch', async () => 
   const warm = await artifact(warmup, 'warmup.json');
   const manifest = manifestFor(fp32, warm);
   validateManifest(manifest);
-  vi.stubGlobal('navigator', { storage: { getDirectory: async () => { throw new Error('no opfs'); } } });
+  useNoOpfs();
   const urls: string[] = [];
   vi.stubGlobal('URL', {
     ...URL,
@@ -97,65 +352,6 @@ it('stages local files into a blob manifest without network fetch', async () => 
   expect(URL.revokeObjectURL).toHaveBeenCalled();
 });
 
-it('drops a corrupt OPFS hit and refetches instead of failing forever', async () => {
-  const payload = new Uint8Array([1, 2, 3, 4, 5, 6]);
-  const meta = await artifact(payload);
-  const files = new Map<string, Uint8Array>([[meta.sha256, new Uint8Array([9, 9])]]);
-  const directory = {
-    async getFileHandle(name: string, options?: { create?: boolean }) {
-      if (!files.has(name) && !options?.create) throw new DOMException('missing', 'NotFoundError');
-      if (!files.has(name)) files.set(name, new Uint8Array());
-      return {
-        async getFile() {
-          const data = files.get(name)!;
-          return {
-            size: data.byteLength,
-            arrayBuffer: async () => data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength),
-          };
-        },
-        async createWritable() {
-          const chunks: Uint8Array[] = [];
-          return {
-            async write(bytes: Uint8Array) { chunks.push(bytes); },
-            async close() {
-              const total = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
-              const out = new Uint8Array(total);
-              let offset = 0;
-              for (const chunk of chunks) { out.set(chunk, offset); offset += chunk.byteLength; }
-              files.set(name, out);
-            },
-            async abort() {},
-          };
-        },
-      };
-    },
-    async removeEntry(name: string) { files.delete(name); },
-  };
-  vi.stubGlobal('navigator', { storage: { getDirectory: async () => directory } });
-  let fetches = 0;
-  vi.stubGlobal('fetch', vi.fn(async () => {
-    fetches++;
-    let sent = false;
-    return {
-      ok: true,
-      body: {
-        getReader: () => ({
-          read: async () => {
-            if (sent) return { done: true, value: undefined };
-            sent = true;
-            return { done: false, value: payload };
-          },
-          cancel: async () => {},
-        }),
-      },
-    };
-  }));
-  const bytes = await loadArtifact('https://example.test/', meta);
-  expect(fetches).toBe(1);
-  expect(Array.from(bytes)).toEqual([1, 2, 3, 4, 5, 6]);
-  expect(Array.from(files.get(meta.sha256)!)).toEqual([1, 2, 3, 4, 5, 6]);
-});
-
 it('revokes partial object URLs when a later local file is missing', async () => {
   const onnx = new Uint8Array([1, 2, 3, 4]);
   const warmup = new Uint8Array([5, 6]);
@@ -168,7 +364,7 @@ it('revokes partial object URLs when a later local file is missing', async () =>
     variants: { fp32: fp32Meta, fp16: fp16Meta },
   };
   validateManifest(manifest);
-  vi.stubGlobal('navigator', { storage: { getDirectory: async () => { throw new Error('no opfs'); } } });
+  useNoOpfs();
   const created: string[] = [];
   const revoked: string[] = [];
   vi.stubGlobal('URL', {

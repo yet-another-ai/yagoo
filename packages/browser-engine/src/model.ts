@@ -1,4 +1,12 @@
-import { cacheDelete, cacheHas, cachePut, cacheRead } from './cache';
+import {
+  cacheDelete,
+  cacheHas,
+  cachePartialDelete,
+  cachePartialRead,
+  cachePartialWriter,
+  cachePut,
+  cacheRead,
+} from './cache';
 import { coded } from './errors';
 
 export interface Artifact { url: string; bytes: number; sha256: string; integrity: string }
@@ -49,11 +57,35 @@ function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) throw new DOMException('Model download was cancelled.', 'AbortError');
 }
 
+/** Cumulative received bytes between OPFS commits; bounds what a worker kill loses. */
+export const PARTIAL_CHECKPOINT_BYTES = 16 * 1024 * 1024;
+
+type ContentRange = { start: number; end: number; total: number };
+
+/** Parses `bytes <start>-<end>/<total>`; undefined for absent or malformed values. */
+function parseContentRange(value: string | null): ContentRange | undefined {
+  const match = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(value?.trim() ?? '');
+  if (!match) return undefined;
+  const [start, end, total] = match.slice(1).map(Number);
+  if (![start, end, total].every(Number.isSafeInteger) || end < start) return undefined;
+  return { start, end, total };
+}
+
 /**
- * Content-addressed OPFS cache + network fetch (jet/wllama-style).
- * Cancel via AbortSignal (UI Cancel / Stop terminates the worker). Partial
- * OPFS writes are never accepted as models.
- * TODO(#14): HTTP Range / resumable downloads — cancel is supported; resume is not.
+ * Content-addressed OPFS cache + resumable network fetch (jet/wllama-style).
+ *
+ * A `partial-<sha256>` OPFS entry holds the durable prefix of an interrupted
+ * download. It is written while the body arrives and checkpointed so a worker
+ * termination loses at most one interval. A retry asks for the missing range and
+ * only appends when the host answers `206` with a matching `Content-Range`; a
+ * `200`, `416`, a missing or foreign range, or a transformed body restarts from
+ * zero. The complete artifact is SHA-256 verified before it replaces the
+ * verified cache entry; the partial is deleted only then.
+ *
+ * Cross-origin hosts must allow `Range` and expose `Content-Range` (plus
+ * `Content-Length` for diagnostics). Without byte-range support the loader still
+ * works but restarts from the beginning. Cancel via AbortSignal (UI Cancel / Stop
+ * terminates the worker) keeps the last checkpoint for the next load.
  */
 export async function loadArtifact(
   base: string,
@@ -80,30 +112,166 @@ export async function loadArtifact(
   }
 
   throwIfAborted(signal);
-  const response = await fetch(new URL(a.url, base), {
-    mode: 'cors',
-    credentials: 'same-origin',
-    signal,
-  });
-  if (!response.ok || !response.body) throw coded('engine.downloadFailed', `Model download failed (${response.status}): ${a.url}`, { status: response.status, url: a.url });
-  const reader = response.body.getReader();
   const bytes = new Uint8Array(a.bytes);
-  let offset = 0;
+  let offset = await cachePartialRead(a.sha256, bytes);
+  if (offset === a.bytes) {
+    try {
+      await verify(bytes, a);
+      // Keep the verified prefix when OPFS cannot store the cache entry.
+      if (await cachePut(a.sha256, bytes)) await cachePartialDelete(a.sha256);
+      progress(a.bytes, a.bytes);
+      return bytes;
+    } catch {
+      // A killed process can leave a full-length but unverified prefix.
+      await cachePartialDelete(a.sha256);
+      offset = 0;
+    }
+  }
+  const fromPartial = offset > 0;
+  if (fromPartial) progress(offset, a.bytes);
+
+  let writer = await cachePartialWriter(a.sha256, a.bytes, offset);
+  if (writer && writer.offset !== offset) writer = undefined;
+  let durable = writer !== undefined;
+  // Cumulative, not per-response: hosts may cap each 206 below one interval.
+  let checkpointed = offset;
+
+  const closeWriter = async (): Promise<boolean> => {
+    const current = writer;
+    writer = undefined;
+    if (!current) return true;
+    try {
+      await current.close();
+      return true;
+    } catch {
+      durable = false; // Quota or another tab; keep downloading in memory.
+      return false;
+    }
+  };
+  const reopenWriter = async (): Promise<void> => {
+    if (!durable || writer) return;
+    const next = await cachePartialWriter(a.sha256, a.bytes, offset);
+    writer = next && next.offset === offset ? next : undefined;
+    if (!writer) durable = false;
+  };
+  const restart = async (): Promise<void> => {
+    await closeWriter();
+    await cachePartialDelete(a.sha256);
+    offset = 0;
+    checkpointed = 0;
+    await reopenWriter();
+  };
+  const discard = async (response: Response): Promise<void> => {
+    try { await response.body?.cancel(); } catch { /* ignore */ }
+  };
+
+  const url = new URL(a.url, base);
+  let restarted = false;
   try {
     for (;;) {
       throwIfAborted(signal);
-      const { value, done } = await reader.read();
-      if (done) break;
-      if (offset + value.byteLength > bytes.byteLength) throw coded('engine.downloadTooLarge', 'Model download exceeds manifest size.');
-      bytes.set(value, offset); offset += value.byteLength; progress(offset, a.bytes);
+      const resuming = offset > 0;
+      const response = await fetch(url, {
+        mode: 'cors',
+        credentials: 'same-origin',
+        signal,
+        ...(resuming ? { headers: { Range: `bytes=${offset}-` } } : {}),
+      });
+      let end = a.bytes;
+
+      if (resuming && response.status === 206) {
+        const range = parseContentRange(response.headers.get('Content-Range'));
+        const encoding = response.headers.get('Content-Encoding');
+        if (!range || range.start !== offset || range.total !== a.bytes || range.end >= a.bytes ||
+            (encoding !== null && encoding !== 'identity')) {
+          await discard(response);
+          if (restarted) throw coded('engine.downloadRange', `Model host did not honor the requested range: ${a.url}`, { url: a.url, status: response.status });
+          restarted = true;
+          await restart();
+          continue;
+        }
+        end = range.end + 1;
+      } else if (resuming && response.status === 200) {
+        // The host ignored Range; this body starts at zero.
+        restarted = true;
+        await restart();
+      } else if (resuming && response.status === 416) {
+        await discard(response);
+        if (restarted) throw coded('engine.downloadFailed', `Model download failed (${response.status}): ${a.url}`, { status: response.status, url: a.url });
+        restarted = true;
+        await restart();
+        continue;
+      } else if (response.status !== 200) {
+        throw coded('engine.downloadFailed', `Model download failed (${response.status}): ${a.url}`, { status: response.status, url: a.url });
+      }
+      const body = response.body;
+      if (!body) throw coded('engine.downloadFailed', `Model download failed (${response.status}): ${a.url}`, { status: response.status, url: a.url });
+
+      const reader = body.getReader();
+      try {
+        for (;;) {
+          throwIfAborted(signal);
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (offset + value.byteLength > end) throw coded('engine.downloadTooLarge', 'Model download exceeds manifest size.');
+          bytes.set(value, offset);
+          offset += value.byteLength;
+          progress(offset, a.bytes);
+          if (writer) {
+            try {
+              await writer.write(value);
+            } catch {
+              await closeWriter();
+            }
+          }
+          if (offset - checkpointed >= PARTIAL_CHECKPOINT_BYTES) {
+            checkpointed = offset;
+            if (await closeWriter()) await reopenWriter();
+          }
+        }
+      } catch (error) {
+        await closeWriter();
+        if (error instanceof Error && 'code' in error && error.code === 'engine.downloadTooLarge') {
+          await cachePartialDelete(a.sha256);
+          durable = false;
+        }
+        throw error;
+      } finally {
+        try { await reader.cancel(); } catch { /* already closed */ }
+      }
+
+      if (offset < end) {
+        throw coded('engine.downloadIncomplete', `Incomplete download for ${a.url}: got ${offset}, expected ${end}.`, { url: a.url, got: offset, expected: end });
+      }
+      if (offset < a.bytes) {
+        // A host-capped range finished; request the next missing range.
+        await reopenWriter();
+        continue;
+      }
+
+      try {
+        await verify(bytes, a);
+      } catch (error) {
+        await closeWriter();
+        await cachePartialDelete(a.sha256);
+        offset = 0;
+        if (fromPartial && !restarted) {
+          // The durable prefix was stale or corrupt; retry once from zero.
+          restarted = true;
+          checkpointed = 0;
+          await reopenWriter();
+          continue;
+        }
+        throw error;
+      }
+      await closeWriter();
+      // Keep the (verified) partial when OPFS cannot store the cache entry.
+      if (await cachePut(a.sha256, bytes)) await cachePartialDelete(a.sha256);
+      return bytes;
     }
   } finally {
-    try { await reader.cancel(); } catch { /* ignore */ }
+    await closeWriter();
   }
-  if (offset !== a.bytes) throw coded('engine.downloadIncomplete', `Incomplete download for ${a.url}: got ${offset}, expected ${a.bytes}.`, { url: a.url, got: offset, expected: a.bytes });
-  await verify(bytes, a);
-  try { await cachePut(a.sha256, bytes); } catch { /* quota / private mode */ }
-  return bytes;
 }
 
 /** Total bytes a validated session may need to download (fp32 or fp16 + warmup). */
@@ -138,7 +306,7 @@ export async function bundleFromLocalFiles(files: Iterable<File>): Promise<Local
       if (!file) throw coded('engine.localFileMissing', `Missing local file for ${name} (listed in the manifest as ${artifact.url}).`, { name, url: artifact.url });
       const bytes = new Uint8Array(await file.arrayBuffer());
       await verify(bytes, artifact);
-      try { await cachePut(artifact.sha256, bytes); } catch { /* optional */ }
+      await cachePut(artifact.sha256, bytes); // Optional: the object URL is the bundle source.
       const url = URL.createObjectURL(new Blob([bytes as Uint8Array<ArrayBuffer>]));
       objectUrls.push(url);
       return { ...artifact, url };

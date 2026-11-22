@@ -57,8 +57,8 @@ function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) throw new DOMException('Model download was cancelled.', 'AbortError');
 }
 
-/** How many received bytes may be lost if the worker is killed mid-download. */
-const PARTIAL_CHECKPOINT_BYTES = 16 * 1024 * 1024;
+/** Cumulative received bytes between OPFS commits; bounds what a worker kill loses. */
+export const PARTIAL_CHECKPOINT_BYTES = 16 * 1024 * 1024;
 
 type ContentRange = { start: number; end: number; total: number };
 
@@ -117,8 +117,8 @@ export async function loadArtifact(
   if (offset === a.bytes) {
     try {
       await verify(bytes, a);
-      await cachePut(a.sha256, bytes);
-      await cachePartialDelete(a.sha256);
+      // Keep the verified prefix when OPFS cannot store the cache entry.
+      if (await cachePut(a.sha256, bytes)) await cachePartialDelete(a.sha256);
       progress(a.bytes, a.bytes);
       return bytes;
     } catch {
@@ -133,6 +133,8 @@ export async function loadArtifact(
   let writer = await cachePartialWriter(a.sha256, a.bytes, offset);
   if (writer && writer.offset !== offset) writer = undefined;
   let durable = writer !== undefined;
+  // Cumulative, not per-response: hosts may cap each 206 below one interval.
+  let checkpointed = offset;
 
   const closeWriter = async (): Promise<boolean> => {
     const current = writer;
@@ -156,6 +158,7 @@ export async function loadArtifact(
     await closeWriter();
     await cachePartialDelete(a.sha256);
     offset = 0;
+    checkpointed = 0;
     await reopenWriter();
   };
   const discard = async (response: Response): Promise<void> => {
@@ -205,7 +208,6 @@ export async function loadArtifact(
       if (!body) throw coded('engine.downloadFailed', `Model download failed (${response.status}): ${a.url}`, { status: response.status, url: a.url });
 
       const reader = body.getReader();
-      let checkpointed = offset;
       try {
         for (;;) {
           throwIfAborted(signal);
@@ -256,14 +258,15 @@ export async function loadArtifact(
         if (fromPartial && !restarted) {
           // The durable prefix was stale or corrupt; retry once from zero.
           restarted = true;
+          checkpointed = 0;
           await reopenWriter();
           continue;
         }
         throw error;
       }
       await closeWriter();
-      try { await cachePut(a.sha256, bytes); } catch { /* quota / private mode */ }
-      await cachePartialDelete(a.sha256);
+      // Keep the (verified) partial when OPFS cannot store the cache entry.
+      if (await cachePut(a.sha256, bytes)) await cachePartialDelete(a.sha256);
       return bytes;
     }
   } finally {
@@ -303,7 +306,7 @@ export async function bundleFromLocalFiles(files: Iterable<File>): Promise<Local
       if (!file) throw coded('engine.localFileMissing', `Missing local file for ${name} (listed in the manifest as ${artifact.url}).`, { name, url: artifact.url });
       const bytes = new Uint8Array(await file.arrayBuffer());
       await verify(bytes, artifact);
-      try { await cachePut(artifact.sha256, bytes); } catch { /* optional */ }
+      await cachePut(artifact.sha256, bytes); // Optional: the object URL is the bundle source.
       const url = URL.createObjectURL(new Blob([bytes as Uint8Array<ArrayBuffer>]));
       objectUrls.push(url);
       return { ...artifact, url };

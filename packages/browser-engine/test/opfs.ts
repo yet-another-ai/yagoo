@@ -2,13 +2,18 @@
 
 type WriteChunk = Uint8Array | { type: 'write'; position?: number; data?: Uint8Array };
 
-export function mockOpfs(initial: Record<string, Uint8Array> = {}) {
+export type OpfsOptions = {
+  /** Reject writable creation for matching entry names (quota / private mode). */
+  failWrite?: (name: string) => boolean;
+};
+
+export function mockOpfs(initial: Record<string, Uint8Array> = {}, options: OpfsOptions = {}) {
   const files = new Map<string, Uint8Array>(
     Object.entries(initial).map(([name, data]) => [name, data.slice()]),
   );
   const directory = {
-    async getFileHandle(name: string, options?: { create?: boolean }) {
-      if (!files.has(name) && !options?.create) throw new DOMException('missing', 'NotFoundError');
+    async getFileHandle(name: string, createOptions?: { create?: boolean }) {
+      if (!files.has(name) && !createOptions?.create) throw new DOMException('missing', 'NotFoundError');
       if (!files.has(name)) files.set(name, new Uint8Array());
       return {
         kind: 'file' as const,
@@ -29,8 +34,9 @@ export function mockOpfs(initial: Record<string, Uint8Array> = {}) {
             },
           };
         },
-        async createWritable(options?: { keepExistingData?: boolean }) {
-          let pending = options?.keepExistingData ? (files.get(name) ?? new Uint8Array()).slice() : new Uint8Array();
+        async createWritable(writeOptions?: { keepExistingData?: boolean }) {
+          if (options.failWrite?.(name)) throw new DOMException('quota', 'QuotaExceededError');
+          let pending = writeOptions?.keepExistingData ? (files.get(name) ?? new Uint8Array()).slice() : new Uint8Array();
           return {
             async write(chunk: WriteChunk) {
               if (chunk instanceof Uint8Array) {

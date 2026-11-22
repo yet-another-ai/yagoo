@@ -31,17 +31,22 @@ export async function cacheDelete(sha256: string): Promise<void> {
   }
 }
 
-export async function cachePut(sha256: string, bytes: Uint8Array): Promise<void> {
+/** Writes a verified artifact; false when OPFS is unavailable, full, or blocked. */
+export async function cachePut(sha256: string, bytes: Uint8Array): Promise<boolean> {
   const directory = await openModelDirectory();
-  if (!directory) return;
-  const writer = await (await directory.getFileHandle(sha256, { create: true })).createWritable();
+  if (!directory) return false;
+  let writer: FileSystemWritableFileStream | undefined;
   try {
+    writer = await (await directory.getFileHandle(sha256, { create: true })).createWritable();
     await writer.write(bytes as Uint8Array<ArrayBuffer>);
     await writer.close();
-  } catch (error) {
-    try { await writer.abort(); } catch { /* ignore */ }
+    return true;
+  } catch {
+    if (writer) {
+      try { await writer.abort(); } catch { /* ignore */ }
+    }
     try { await directory.removeEntry(sha256); } catch { /* ignore partial */ }
-    throw error;
+    return false;
   }
 }
 

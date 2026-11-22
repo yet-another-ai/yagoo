@@ -1,5 +1,11 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { bundleFromLocalFiles, loadArtifact, validateManifest, type Artifact } from '../src/model';
+import {
+  PARTIAL_CHECKPOINT_BYTES,
+  bundleFromLocalFiles,
+  loadArtifact,
+  validateManifest,
+  type Artifact,
+} from '../src/model';
 import { mockOpfs } from './opfs';
 
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
@@ -245,6 +251,59 @@ it('accepts a full-length partial without a network request', async () => {
   expect(Array.from(bytes)).toEqual([9, 8, 7, 6, 5, 4]);
   expect(Array.from(files.get(meta.sha256)!)).toEqual([9, 8, 7, 6, 5, 4]);
   expect(files.has(partialName(meta.sha256))).toBe(false);
+});
+
+it('keeps a verified partial when the cache entry cannot be written', async () => {
+  const payload = new Uint8Array([9, 8, 7, 6, 5, 4]);
+  const meta = await artifact(payload);
+  let failCache = true;
+  const { files, directory } = mockOpfs(
+    { [partialName(meta.sha256)]: payload },
+    { failWrite: name => failCache && name === meta.sha256 },
+  );
+  useOpfs(directory);
+  const fetchMock = vi.fn();
+  vi.stubGlobal('fetch', fetchMock);
+
+  const first = await loadArtifact('https://example.test/', meta);
+  expect(Array.from(first)).toEqual([9, 8, 7, 6, 5, 4]);
+  expect(files.has(meta.sha256)).toBe(false);
+  expect(Array.from(files.get(partialName(meta.sha256))!)).toEqual([9, 8, 7, 6, 5, 4]);
+
+  failCache = false;
+  const second = await loadArtifact('https://example.test/', meta);
+  expect(Array.from(second)).toEqual([9, 8, 7, 6, 5, 4]);
+  expect(fetchMock).not.toHaveBeenCalled();
+  expect(files.has(meta.sha256)).toBe(true);
+  expect(files.has(partialName(meta.sha256))).toBe(false);
+});
+
+it('checkpoints cumulatively across host-capped ranges', async () => {
+  const cap = Math.floor(PARTIAL_CHECKPOINT_BYTES / 2);
+  const payload = new Uint8Array(2 * cap + 1024);
+  for (let i = 0; i < payload.length; i++) payload[i] = i & 0xff;
+  const meta = await artifact(payload);
+  const { files, directory } = mockOpfs({ [partialName(meta.sha256)]: payload.subarray(0, 1) });
+  useOpfs(directory);
+  let observed = -1;
+  const fetchMock = vi.fn(async (_url: string | URL, init?: RequestInit) => {
+    const start = Number(/^bytes=(\d+)-$/.exec(rangeOf(init) ?? '')?.[1]);
+    if (start > 2 * cap) observed = files.get(partialName(meta.sha256))?.byteLength ?? 0;
+    const end = Math.min(start + cap, payload.length);
+    return response([payload.subarray(start, end)], {
+      status: 206,
+      headers: { 'Content-Range': `bytes ${start}-${end - 1}/${payload.length}` },
+    });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+
+  const bytes = await loadArtifact('https://example.test/', meta);
+
+  expect(fetchMock).toHaveBeenCalledTimes(3);
+  expect(bytes.byteLength).toBe(payload.length);
+  expect(observed).toBe(2 * cap + 1);
+  expect(files.has(partialName(meta.sha256))).toBe(false);
+  expect(files.get(meta.sha256)?.byteLength).toBe(payload.length);
 });
 
 it('drops a corrupt OPFS hit and refetches instead of failing forever', async () => {

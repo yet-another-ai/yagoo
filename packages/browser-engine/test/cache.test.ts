@@ -22,7 +22,7 @@ it('stores, lists, and clears content-addressed OPFS model blobs', async () => {
   useOpfs(directory);
   const sha = 'a'.repeat(64);
   const bytes = new Uint8Array([1, 2, 3, 4]);
-  await cachePut(sha, bytes);
+  expect(await cachePut(sha, bytes)).toBe(true);
   expect(await cacheHas(sha)).toBe(true);
   expect(Array.from(await cacheRead(sha) ?? [])).toEqual([1, 2, 3, 4]);
   expect(await listCachedModels()).toEqual([{ sha256: sha, bytes: 4 }]);
